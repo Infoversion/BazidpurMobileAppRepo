@@ -1,16 +1,16 @@
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, useWindowDimensions, RefreshControl,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { supabase } from '@/lib/supabase'
 import type { Photo, Video } from '@/lib/types'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import VideoPlayer from '@/components/gallery/VideoPlayer'
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 40
 
 // ─── Photo grid ───────────────────────────────────────────────────────────────
 
@@ -23,13 +23,13 @@ function PhotoGrid({
   onRefresh: () => void
 }) {
   const { width } = useWindowDimensions()
-  const tileSize = (width - 48) / 2  // 2 cols, 16px outer padding each side, 16px gap
+  const tileSize = (width - 48) / 2
 
   if (photos.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center py-20">
-        <Text className="text-4xl mb-3">🖼️</Text>
-        <Text className="text-sm text-gray-400">No photos yet</Text>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
+        <Text style={{ fontSize: 40, marginBottom: 12 }}>🖼️</Text>
+        <Text style={{ fontSize: 14, color: '#9ca3af' }}>No photos yet</Text>
       </View>
     )
   }
@@ -81,9 +81,9 @@ function VideoList({
 
   if (videos.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center py-20">
-        <Text className="text-4xl mb-3">🎬</Text>
-        <Text className="text-sm text-gray-400">No videos yet</Text>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
+        <Text style={{ fontSize: 40, marginBottom: 12 }}>🎬</Text>
+        <Text style={{ fontSize: 14, color: '#9ca3af' }}>No videos yet</Text>
       </View>
     )
   }
@@ -103,16 +103,14 @@ function VideoList({
             onPress={() => onPress(item)}
             activeOpacity={0.85}
           >
-            {/* Thumbnail */}
             <View style={{ position: 'relative' }}>
               <Image
                 source={{ uri: thumb }}
                 style={{ width: width - 32, height: thumbHeight }}
                 contentFit="cover"
               />
-              {/* Play button overlay */}
               <View style={{
-                position: 'absolute', inset: 0,
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
                 alignItems: 'center', justifyContent: 'center',
                 backgroundColor: 'rgba(0,0,0,0.25)',
               }}>
@@ -125,7 +123,6 @@ function VideoList({
                 </View>
               </View>
             </View>
-            {/* Info */}
             <View style={{ padding: 12 }}>
               <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 2 }} numberOfLines={2}>
                 {item.title}
@@ -145,13 +142,13 @@ function VideoList({
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function TimelessMomentsScreen() {
+export default function PublicMediaScreen() {
+  const insets = useSafeAreaInsets()
   const [activeTab, setActiveTab] = useState<'photos' | 'videos'>('photos')
   const [photos, setPhotos] = useState<Photo[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [activeVideo, setActiveVideo] = useState<Video | null>(null)
 
@@ -174,27 +171,34 @@ export default function TimelessMomentsScreen() {
     setRefreshing(false)
   }, [])
 
+  const TABS: Array<{ key: 'photos' | 'videos'; label: string; emoji: string }> = [
+    { key: 'photos', label: 'Photos', emoji: '📷' },
+    { key: 'videos', label: 'Videos', emoji: '🎬' },
+  ]
+
   return (
-    <SafeAreaView className="flex-1 bg-[#f5f5f7]">
+    <View style={{ flex: 1, backgroundColor: '#f5f5f7' }}>
 
-      {/* Header */}
-      <View className="bg-white border-b border-gray-100 px-4 pt-4 pb-0">
-        <Text className="text-2xl font-bold text-gray-900 mb-3 tracking-tight">Timeless Moments</Text>
-
-        {/* Tab switcher */}
-        <View className="flex-row">
-          {(['photos', 'videos'] as const).map(tab => (
+      {/* Tab switcher */}
+      <View style={{ backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
+        <View style={{ flexDirection: 'row', paddingHorizontal: 4 }}>
+          {TABS.map(tab => (
             <TouchableOpacity
-              key={tab}
-              className="px-5 py-2.5 mr-1"
-              style={{ borderBottomWidth: 2, borderBottomColor: activeTab === tab ? '#2d1b69' : 'transparent' }}
-              onPress={() => setActiveTab(tab)}
+              key={tab.key}
+              style={{
+                paddingHorizontal: 20, paddingVertical: 12,
+                borderBottomWidth: 2,
+                borderBottomColor: activeTab === tab.key ? '#2d1b69' : 'transparent',
+              }}
+              onPress={() => setActiveTab(tab.key)}
             >
               <Text style={{
                 fontSize: 14, fontWeight: '500',
-                color: activeTab === tab ? '#2d1b69' : '#9ca3af',
+                color: activeTab === tab.key ? '#2d1b69' : '#9ca3af',
               }}>
-                {tab === 'photos' ? `📷  Photos${photos.length ? ` (${photos.length})` : ''}` : `🎬  Videos${videos.length ? ` (${videos.length})` : ''}`}
+                {tab.emoji}{'  '}{tab.label}
+                {tab.key === 'photos' && photos.length > 0 ? ` (${photos.length})` : ''}
+                {tab.key === 'videos' && videos.length > 0 ? ` (${videos.length})` : ''}
               </Text>
             </TouchableOpacity>
           ))}
@@ -202,11 +206,11 @@ export default function TimelessMomentsScreen() {
       </View>
 
       {loading ? (
-        <View className="flex-1 items-center justify-center">
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#2d1b69" />
         </View>
       ) : (
-        <View className="flex-1">
+        <View style={{ flex: 1 }}>
           {activeTab === 'photos' ? (
             <PhotoGrid
               photos={photos}
@@ -225,7 +229,6 @@ export default function TimelessMomentsScreen() {
         </View>
       )}
 
-      {/* Lightbox */}
       {lightboxIndex !== null && (
         <PhotoLightbox
           photos={photos}
@@ -234,7 +237,6 @@ export default function TimelessMomentsScreen() {
         />
       )}
 
-      {/* Video player */}
       {activeVideo && (
         <VideoPlayer
           video={activeVideo}
@@ -242,6 +244,6 @@ export default function TimelessMomentsScreen() {
         />
       )}
 
-    </SafeAreaView>
+    </View>
   )
 }
