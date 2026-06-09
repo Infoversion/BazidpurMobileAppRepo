@@ -5,7 +5,9 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
+import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 import type { Photo, Video } from '@/lib/types'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import VideoPlayer from '@/components/gallery/VideoPlayer'
@@ -190,6 +192,7 @@ function VideoList({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function TimelessMomentsScreen() {
+  const { session } = useAuth()
   const [activeTab, setActiveTab] = useState<'photos' | 'videos'>('photos')
   const [photos, setPhotos] = useState<Photo[]>([])
   const [videos, setVideos] = useState<Video[]>([])
@@ -228,9 +231,19 @@ export default function TimelessMomentsScreen() {
 
       {/* Header */}
       <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 }}>
-        <Text style={{ fontSize: 11, fontWeight: '600', color: '#8e8e93', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>
-          Community · Media
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: '#8e8e93', letterSpacing: 1.2, textTransform: 'uppercase' }}>
+            Bazidpur · Media
+          </Text>
+          {!session ? (
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/login')}
+              style={{ backgroundColor: '#2d1b69', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
+            >
+              <Text style={{ fontSize: 12, color: '#fff', fontWeight: '600' }}>Sign In</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
         <Text style={{ fontSize: 34, fontWeight: '700', color: '#1c1c1e', letterSpacing: -0.5, marginBottom: 12 }}>
           Timeless Moments
         </Text>
