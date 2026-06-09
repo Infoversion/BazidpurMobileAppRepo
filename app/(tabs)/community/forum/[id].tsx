@@ -118,7 +118,7 @@ export default function ThreadScreen() {
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
 
   const threadHeader = thread ? (
-    <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
+    <View style={{ margin: 12, backgroundColor: '#ffffff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
       {thread.is_pinned ? (
         <View style={{ flexDirection: 'row', marginBottom: 8 }}>
           <View style={{ backgroundColor: '#fef3c7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -146,7 +146,7 @@ export default function ThreadScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}>
         <Stack.Screen options={{ headerShown: false }} />
         <ActivityIndicator color="#2d1b69" />
       </View>
@@ -154,15 +154,15 @@ export default function ThreadScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
       <Stack.Screen options={{
         headerShown: true,
         title: 'Thread',
         headerTintColor: '#2d1b69',
         headerBackTitle: '',
         headerShadowVisible: false,
-        headerStyle: { backgroundColor: '#fff' },
-        headerTitleStyle: { fontWeight: '700', color: '#111827' },
+        headerStyle: { backgroundColor: '#f2f2f7' },
+        headerTitleStyle: { fontWeight: '700', color: '#1c1c1e' },
       }} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={88}>
@@ -177,17 +177,24 @@ export default function ThreadScreen() {
           renderItem={({ item }) => {
             const isOwn = item.author_id === session?.user?.id
             return (
-              <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 12 }}>
+              <View style={{
+                flexDirection: 'row', gap: 10,
+                marginHorizontal: 12, marginBottom: 8,
+                backgroundColor: '#ffffff', borderRadius: 14,
+                paddingHorizontal: 14, paddingVertical: 12,
+                shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+              }}>
                 <Avatar author={item.author} />
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#1c1c1e' }}>
                       {item.author ? `${item.author.first_name} ${item.author.last_name}` : 'Member'}
                     </Text>
-                    <Text style={{ fontSize: 11, color: '#9ca3af' }}>{timeAgo(item.created_at)}</Text>
+                    <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{timeAgo(item.created_at)}</Text>
                     {isOwn || isAdmin ? (
                       <Pressable onPress={() => deleteReply(item.id)} style={{ marginLeft: 'auto' }}>
-                        <Text style={{ fontSize: 12, color: '#d1d5db' }}>✕</Text>
+                        <Text style={{ fontSize: 12, color: '#c7c7cc' }}>✕</Text>
                       </Pressable>
                     ) : null}
                   </View>
@@ -196,10 +203,9 @@ export default function ThreadScreen() {
               </View>
             )
           }}
-          ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#f9fafb', marginLeft: 62 }} />}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingTop: 40 }}>
-              <Text style={{ fontSize: 14, color: '#9ca3af' }}>No replies yet. Be the first!</Text>
+              <Text style={{ fontSize: 14, color: '#aeaeb2' }}>No replies yet. Be the first!</Text>
             </View>
           }
         />
@@ -208,7 +214,7 @@ export default function ThreadScreen() {
         <View style={{
           flexDirection: 'row', alignItems: 'flex-end', gap: 10,
           paddingHorizontal: 14, paddingTop: 10, paddingBottom: insets.bottom + 10,
-          borderTopWidth: 1, borderTopColor: '#f3f4f6', backgroundColor: '#fff',
+          borderTopWidth: 1, borderTopColor: '#e5e5ea', backgroundColor: '#ffffff',
         }}>
           <Avatar author={user ? { first_name: user.first_name, last_name: user.last_name, photo_url: user.photo_url } : undefined} />
           <TextInput

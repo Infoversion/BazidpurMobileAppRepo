@@ -2,6 +2,7 @@ import { Tabs, router } from 'expo-router'
 import { useEffect } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { ActivityIndicator, View, Text, Image, TouchableOpacity } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
 
@@ -45,6 +46,7 @@ function AvatarTabIcon() {
 
 export default function TabLayout() {
   const { session, loading, user } = useAuth()
+  const insets = useSafeAreaInsets()
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
 
   useEffect(() => {
@@ -66,10 +68,27 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: '#2d1b69',
         tabBarInactiveTintColor: '#9ca3af',
-        tabBarStyle: { borderTopColor: '#f3f4f6' },
-        headerShown: false,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginBottom: 4 },
+        tabBarStyle: {
+          position: 'absolute',
+          bottom: insets.bottom + 12,
+          left: 16,
+          right: 16,
+          height: 62,
+          borderRadius: 32,
+          backgroundColor: '#ffffff',
+          borderTopWidth: 0,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.12,
+          shadowRadius: 24,
+          elevation: 16,
+          paddingTop: 6,
+          paddingBottom: 8,
+        },
       }}
     >
       {/* Home — custom button navigates to public area, never activates this tab */}

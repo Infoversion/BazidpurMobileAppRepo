@@ -30,18 +30,16 @@ function timeAgo(dateStr: string) {
 function AlbumCover({ coverUrl, thumbUrls, size }: { coverUrl?: string | null; thumbUrls: string[]; size: number }) {
   const cover = imgUri(coverUrl)
 
-  // If cover photo set, show it full
   if (cover) {
     return <Image source={{ uri: cover }} style={{ width: size, height: size }} contentFit="cover" />
   }
 
-  // 4-photo collage
   const half = size / 2
   const slots = [thumbUrls[0], thumbUrls[1], thumbUrls[2], thumbUrls[3]]
 
   if (slots.filter(Boolean).length === 0) {
     return (
-      <View style={{ width: size, height: size, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: size, height: size, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ fontSize: 34 }}>📷</Text>
       </View>
     )
@@ -51,7 +49,7 @@ function AlbumCover({ coverUrl, thumbUrls, size }: { coverUrl?: string | null; t
     const uri = imgUri(slots[0])
     return uri
       ? <Image source={{ uri }} style={{ width: size, height: size }} contentFit="cover" />
-      : <View style={{ width: size, height: size, backgroundColor: '#e5e7eb' }} />
+      : <View style={{ width: size, height: size, backgroundColor: '#e5e5ea' }} />
   }
 
   return (
@@ -62,7 +60,7 @@ function AlbumCover({ coverUrl, thumbUrls, size }: { coverUrl?: string | null; t
           <View key={i} style={{ width: half, height: half, padding: 0.5 }}>
             {uri
               ? <Image source={{ uri }} style={{ flex: 1 }} contentFit="cover" />
-              : <View style={{ flex: 1, backgroundColor: '#d1d5db' }} />
+              : <View style={{ flex: 1, backgroundColor: '#d1d1d6' }} />
             }
           </View>
         )
@@ -77,7 +75,7 @@ interface AlbumWithThumbs extends Album {
 
 export default function GalleryScreen() {
   const { width } = useWindowDimensions()
-  const colW = (width - 48) / 2
+  const colW = (width - 44) / 2
   const [albums, setAlbums] = useState<AlbumWithThumbs[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -93,7 +91,6 @@ export default function GalleryScreen() {
 
     if (raw.length === 0) { setAlbums([]); return }
 
-    // Fetch first 4 photos for each album (for collage thumbnails)
     const albumIds = raw.map(a => a.id)
     const { data: photoData } = await supabase
       .from('album_photos')
@@ -122,15 +119,15 @@ export default function GalleryScreen() {
   }, [])
 
   if (loading) {
-    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#2d1b69" /></View>
+    return <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#2d1b69" /></View>
   }
 
   if (!albums.length) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-        <Text style={{ fontSize: 40, marginBottom: 12 }}>📸</Text>
-        <Text style={{ fontSize: 16, fontWeight: '600', color: '#374151' }}>No albums yet</Text>
-        <Text style={{ fontSize: 13, color: '#9ca3af', marginTop: 4, textAlign: 'center' }}>Community photo albums will appear here.</Text>
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <Text style={{ fontSize: 44, marginBottom: 12 }}>📸</Text>
+        <Text style={{ fontSize: 17, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No albums yet</Text>
+        <Text style={{ fontSize: 13, color: '#8e8e93', textAlign: 'center' }}>Community photo albums will appear here.</Text>
       </View>
     )
   }
@@ -141,29 +138,35 @@ export default function GalleryScreen() {
       keyExtractor={a => a.id}
       numColumns={2}
       columnWrapperStyle={{ gap: 12 }}
-      contentContainerStyle={{ padding: 16, gap: 12 }}
+      contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 90, backgroundColor: '#f2f2f7' }}
+      style={{ backgroundColor: '#f2f2f7' }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
       renderItem={({ item }) => {
         const author = item.user ? `${item.user.first_name} ${item.user.last_name}` : ''
         return (
           <TouchableOpacity
-            style={{ width: colW, borderRadius: 14, overflow: 'hidden', backgroundColor: '#f3f4f6', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }}
+            style={{
+              width: colW, borderRadius: 16, overflow: 'hidden',
+              backgroundColor: '#ffffff',
+              shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
+            }}
             onPress={() => router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: item.id } })}
             activeOpacity={0.85}
           >
             {/* Cover / collage */}
-            <View style={{ width: colW, height: colW, backgroundColor: '#e5e7eb', overflow: 'hidden' }}>
+            <View style={{ width: colW, height: colW, backgroundColor: '#e5e5ea', overflow: 'hidden' }}>
               <AlbumCover coverUrl={item.cover_photo_url} thumbUrls={item._thumbUrls} size={colW} />
             </View>
 
             {/* Info */}
-            <View style={{ padding: 10 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#111827' }} numberOfLines={1}>{item.title}</Text>
-              {author ? <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }} numberOfLines={1}>{author}</Text> : null}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
-                <Text style={{ fontSize: 10, color: '#9ca3af' }}>{timeAgo(item.created_at)}</Text>
+            <View style={{ padding: 12 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1c1c1e' }} numberOfLines={1}>{item.title}</Text>
+              {author ? <Text style={{ fontSize: 12, color: '#8e8e93', marginTop: 2 }} numberOfLines={1}>{author}</Text> : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{timeAgo(item.created_at)}</Text>
                 {item._thumbUrls.length > 0 ? (
-                  <Text style={{ fontSize: 10, color: '#9ca3af' }}>{item._thumbUrls.length >= 4 ? '4+' : item._thumbUrls.length} photos</Text>
+                  <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{item._thumbUrls.length >= 4 ? '4+' : item._thumbUrls.length} photos</Text>
                 ) : null}
               </View>
             </View>

@@ -35,17 +35,17 @@ function ThreadAvatar({ author }: { author?: ForumThread['author'] }) {
   const uri = avatarUri(author?.photo_url)
   const initials = author ? `${author.first_name[0]}${author.last_name[0]}` : '?'
   return (
-    <View style={{ width: 34, height: 34, borderRadius: 17, overflow: 'hidden', backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <View style={{ width: 38, height: 38, borderRadius: 19, overflow: 'hidden', backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       {uri
-        ? <Image source={{ uri }} style={{ width: 34, height: 34 }} contentFit="cover" />
-        : <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>{initials}</Text>
+        ? <Image source={{ uri }} style={{ width: 38, height: 38 }} contentFit="cover" />
+        : <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>{initials}</Text>
       }
     </View>
   )
 }
 
 function NewThreadModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const { user, session } = useAuth()
+  const { session } = useAuth()
   const insets = useSafeAreaInsets()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -75,34 +75,35 @@ function NewThreadModal({ onClose, onCreated }: { onClose: () => void; onCreated
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+        <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
           {/* Header */}
           <View style={{
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingTop: insets.top + 12, paddingBottom: 14, paddingHorizontal: 20,
-            borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+            backgroundColor: '#ffffff',
+            borderBottomWidth: 1, borderBottomColor: '#e5e5ea',
           }}>
             <TouchableOpacity onPress={onClose}>
-              <Text style={{ fontSize: 15, color: '#6b7280' }}>Cancel</Text>
+              <Text style={{ fontSize: 15, color: '#8e8e93' }}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>New Thread</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#1c1c1e' }}>New Thread</Text>
             <TouchableOpacity onPress={submit} disabled={submitting}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: submitting ? '#9ca3af' : '#2d1b69' }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: submitting ? '#aeaeb2' : '#2d1b69' }}>
                 {submitting ? 'Posting…' : 'Post'}
               </Text>
             </TouchableOpacity>
           </View>
 
-          <View style={{ padding: 20, gap: 14 }}>
-            {error ? <Text style={{ fontSize: 13, color: '#ef4444' }}>{error}</Text> : null}
+          <View style={{ margin: 16, backgroundColor: '#ffffff', borderRadius: 14, padding: 16, gap: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 }}>
+            {error ? <Text style={{ fontSize: 13, color: '#ff3b30' }}>{error}</Text> : null}
             <TextInput
               value={title}
               onChangeText={setTitle}
               placeholder="Thread title…"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor="#aeaeb2"
               style={{
-                fontSize: 17, fontWeight: '600', color: '#111827',
-                borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingBottom: 12,
+                fontSize: 17, fontWeight: '600', color: '#1c1c1e',
+                borderBottomWidth: 1, borderBottomColor: '#e5e5ea', paddingBottom: 12,
               }}
               maxLength={200}
               returnKeyType="next"
@@ -111,7 +112,7 @@ function NewThreadModal({ onClose, onCreated }: { onClose: () => void; onCreated
               value={body}
               onChangeText={setBody}
               placeholder="What's on your mind? (optional)"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor="#aeaeb2"
               style={{ fontSize: 15, color: '#374151', lineHeight: 22, minHeight: 120 }}
               multiline
               textAlignVertical="top"
@@ -125,6 +126,7 @@ function NewThreadModal({ onClose, onCreated }: { onClose: () => void; onCreated
 }
 
 export default function ForumScreen() {
+  const insets = useSafeAreaInsets()
   const [threads, setThreads] = useState<ForumThread[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -150,64 +152,69 @@ export default function ForumScreen() {
   }, [])
 
   if (loading) {
-    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#2d1b69" /></View>
+    return <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#2d1b69" /></View>
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
       <FlatList
         data={threads}
         keyExtractor={t => t.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
-        contentContainerStyle={{ paddingVertical: 8 }}
-        ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: '#f3f4f6', marginLeft: 68 }} />}
+        contentContainerStyle={{ padding: 12, gap: 8, paddingBottom: 90 }}
         renderItem={({ item }) => {
           const replyCount = item.replies?.[0]?.count ?? 0
           const authorName = item.author ? `${item.author.first_name} ${item.author.last_name}` : 'Member'
           return (
             <Pressable
               onPress={() => router.push({ pathname: '/(tabs)/community/forum/[id]' as any, params: { id: item.id } })}
-              style={({ pressed }) => ({ backgroundColor: pressed ? '#f9fafb' : '#fff', paddingHorizontal: 16, paddingVertical: 14 })}
+              style={({ pressed }) => ({
+                backgroundColor: pressed ? '#f5f5f5' : '#ffffff',
+                borderRadius: 16, paddingHorizontal: 14, paddingVertical: 14,
+                shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+              })}
             >
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <ThreadAvatar author={item.author} />
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    {item.is_pinned ? (
-                      <View style={{ backgroundColor: '#fef3c7', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  {item.is_pinned ? (
+                    <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+                      <View style={{ backgroundColor: '#fffbeb', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
                         <Text style={{ fontSize: 10, fontWeight: '700', color: '#d97706' }}>📌 Pinned</Text>
                       </View>
-                    ) : null}
-                  </View>
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827', lineHeight: 22, marginBottom: 2 }}>
+                    </View>
+                  ) : null}
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#1c1c1e', lineHeight: 21, marginBottom: 4 }}>
                     {item.title}
                   </Text>
                   {item.body ? (
-                    <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 19, marginBottom: 6 }} numberOfLines={2}>
+                    <Text style={{ fontSize: 13, color: '#8e8e93', lineHeight: 18, marginBottom: 6 }} numberOfLines={2}>
                       {item.body}
                     </Text>
                   ) : null}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Text style={{ fontSize: 11, color: '#9ca3af' }}>{authorName}</Text>
-                    <Text style={{ fontSize: 11, color: '#d1d5db' }}>·</Text>
-                    <Text style={{ fontSize: 11, color: '#9ca3af' }}>{timeAgo(item.created_at)}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{authorName}</Text>
+                    <Text style={{ fontSize: 11, color: '#d1d1d6' }}>·</Text>
+                    <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{timeAgo(item.created_at)}</Text>
                     {replyCount > 0 ? (
                       <>
-                        <Text style={{ fontSize: 11, color: '#d1d5db' }}>·</Text>
-                        <Text style={{ fontSize: 11, color: '#6b7280' }}>💬 {replyCount}</Text>
+                        <Text style={{ fontSize: 11, color: '#d1d1d6' }}>·</Text>
+                        <Text style={{ fontSize: 11, color: '#8e8e93' }}>💬 {replyCount}</Text>
                       </>
                     ) : null}
                   </View>
                 </View>
-                <Text style={{ fontSize: 18, color: '#d1d5db', alignSelf: 'center' }}>›</Text>
+                <Text style={{ fontSize: 18, color: '#c7c7cc', alignSelf: 'center' }}>›</Text>
               </View>
             </Pressable>
           )
         }}
         ListEmptyComponent={
           <View style={{ alignItems: 'center', paddingTop: 80 }}>
-            <Text style={{ fontSize: 40, marginBottom: 12 }}>💬</Text>
-            <Text style={{ fontSize: 14, color: '#9ca3af' }}>No threads yet. Start the conversation!</Text>
+            <Text style={{ fontSize: 44, marginBottom: 12 }}>💬</Text>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No threads yet</Text>
+            <Text style={{ fontSize: 13, color: '#8e8e93' }}>Start the conversation!</Text>
           </View>
         }
       />
@@ -216,11 +223,11 @@ export default function ForumScreen() {
       <TouchableOpacity
         onPress={() => setShowCreate(true)}
         style={{
-          position: 'absolute', bottom: 24, right: 20,
-          width: 52, height: 52, borderRadius: 26,
+          position: 'absolute', bottom: insets.bottom + 90, right: 20,
+          width: 54, height: 54, borderRadius: 27,
           backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center',
-          shadowColor: '#2d1b69', shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
+          shadowColor: '#2d1b69', shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
         }}
       >
         <Text style={{ fontSize: 26, color: '#fff', lineHeight: 30 }}>+</Text>

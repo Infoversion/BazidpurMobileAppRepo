@@ -275,7 +275,7 @@ export default function AlbumScreen() {
   const listData = manageMode ? photos : visiblePhotos
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
       <Stack.Screen options={{
         title: album?.title || 'Album',
         headerRight: canManage ? () => (
@@ -311,7 +311,7 @@ export default function AlbumScreen() {
       }} />
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#2d1b69" />
         </View>
       ) : (

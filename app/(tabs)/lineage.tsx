@@ -226,7 +226,7 @@ export default function AncestralLineageScreen() {
     : 0
 
   return (
-    <SafeAreaView className="flex-1 bg-[#f5f5f7]">
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
 
       {/* Header */}
       <View className="bg-white border-b border-gray-100 px-6 pt-5 pb-4">
@@ -275,7 +275,7 @@ export default function AncestralLineageScreen() {
           <ActivityIndicator color="#2d1b69" />
         </View>
       ) : (
-        <ScrollView className="flex-1" contentContainerClassName="pb-8">
+        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 90 }}>
           {tab === 'cards'
             ? <CardsView nodes={sorted} />
             : <TimelineView nodes={sorted} />

@@ -12,6 +12,39 @@ import VideoPlayer from '@/components/gallery/VideoPlayer'
 
 const PAGE_SIZE = 20
 
+// ─── Segmented control ────────────────────────────────────────────────────────
+
+function SegmentedControl<T extends string>({
+  options, value, onChange, labels,
+}: {
+  options: T[]
+  value: T
+  onChange: (v: T) => void
+  labels: Record<T, string>
+}) {
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: '#e5e5ea', borderRadius: 9, padding: 2 }}>
+      {options.map(opt => (
+        <TouchableOpacity
+          key={opt}
+          style={{
+            flex: 1, paddingVertical: 7, borderRadius: 7, alignItems: 'center',
+            backgroundColor: value === opt ? '#ffffff' : 'transparent',
+            shadowColor: value === opt ? '#000' : 'transparent',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.12, shadowRadius: 2, elevation: value === opt ? 1 : 0,
+          }}
+          onPress={() => onChange(opt)}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600', color: value === opt ? '#1c1c1e' : '#8e8e93' }}>
+            {labels[opt]}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  )
+}
+
 // ─── Photo grid ───────────────────────────────────────────────────────────────
 
 function PhotoGrid({
@@ -23,13 +56,14 @@ function PhotoGrid({
   onRefresh: () => void
 }) {
   const { width } = useWindowDimensions()
-  const tileSize = (width - 48) / 2  // 2 cols, 16px outer padding each side, 16px gap
+  const tileSize = (width - 52) / 2
 
   if (photos.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center py-20">
-        <Text className="text-4xl mb-3">🖼️</Text>
-        <Text className="text-sm text-gray-400">No photos yet</Text>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
+        <Text style={{ fontSize: 44, marginBottom: 12 }}>🖼️</Text>
+        <Text style={{ fontSize: 15, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No photos yet</Text>
+        <Text style={{ fontSize: 13, color: '#8e8e93' }}>Community photos will appear here.</Text>
       </View>
     )
   }
@@ -40,11 +74,16 @@ function PhotoGrid({
       keyExtractor={p => p.id}
       numColumns={2}
       columnWrapperStyle={{ gap: 12 }}
-      contentContainerStyle={{ padding: 16, gap: 12 }}
+      contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 90 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
       renderItem={({ item, index }) => (
         <TouchableOpacity
-          style={{ width: tileSize, borderRadius: 12, overflow: 'hidden', backgroundColor: '#f3f4f6' }}
+          style={{
+            width: tileSize, borderRadius: 14, overflow: 'hidden',
+            backgroundColor: '#ffffff',
+            shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+          }}
           onPress={() => onPress(index)}
           activeOpacity={0.85}
         >
@@ -77,13 +116,15 @@ function VideoList({
   onRefresh: () => void
 }) {
   const { width } = useWindowDimensions()
-  const thumbHeight = ((width - 32) * 9) / 16
+  const cardWidth = width - 32
+  const thumbHeight = (cardWidth * 9) / 16
 
   if (videos.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center py-20">
-        <Text className="text-4xl mb-3">🎬</Text>
-        <Text className="text-sm text-gray-400">No videos yet</Text>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
+        <Text style={{ fontSize: 44, marginBottom: 12 }}>🎬</Text>
+        <Text style={{ fontSize: 15, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No videos yet</Text>
+        <Text style={{ fontSize: 13, color: '#8e8e93' }}>Community videos will appear here.</Text>
       </View>
     )
   }
@@ -92,14 +133,18 @@ function VideoList({
     <FlatList
       data={videos}
       keyExtractor={v => v.id}
-      contentContainerStyle={{ padding: 16, gap: 16 }}
+      contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 90 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
       renderItem={({ item }) => {
         const thumb = item.thumbnail_url
           || `https://img.youtube.com/vi/${item.youtube_id}/hqdefault.jpg`
         return (
           <TouchableOpacity
-            style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: '#f3f4f6' }}
+            style={{
+              borderRadius: 16, overflow: 'hidden', backgroundColor: '#ffffff',
+              shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+            }}
             onPress={() => onPress(item)}
             activeOpacity={0.85}
           >
@@ -107,18 +152,17 @@ function VideoList({
             <View style={{ position: 'relative' }}>
               <Image
                 source={{ uri: thumb }}
-                style={{ width: width - 32, height: thumbHeight }}
+                style={{ width: cardWidth, height: thumbHeight }}
                 contentFit="cover"
               />
-              {/* Play button overlay */}
               <View style={{
                 position: 'absolute', inset: 0,
                 alignItems: 'center', justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.25)',
+                backgroundColor: 'rgba(0,0,0,0.2)',
               }}>
                 <View style={{
-                  width: 52, height: 52, borderRadius: 26,
-                  backgroundColor: 'rgba(0,0,0,0.6)',
+                  width: 54, height: 54, borderRadius: 27,
+                  backgroundColor: 'rgba(0,0,0,0.55)',
                   alignItems: 'center', justifyContent: 'center',
                 }}>
                   <Text style={{ color: '#fff', fontSize: 22, marginLeft: 4 }}>▶</Text>
@@ -126,12 +170,12 @@ function VideoList({
               </View>
             </View>
             {/* Info */}
-            <View style={{ padding: 12 }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 2 }} numberOfLines={2}>
+            <View style={{ padding: 14 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#1c1c1e', marginBottom: 4, lineHeight: 20 }} numberOfLines={2}>
                 {item.title}
               </Text>
               {item.description ? (
-                <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18 }} numberOfLines={2}>
+                <Text style={{ fontSize: 13, color: '#8e8e93', lineHeight: 18 }} numberOfLines={2}>
                   {item.description}
                 </Text>
               ) : null}
@@ -174,39 +218,40 @@ export default function TimelessMomentsScreen() {
     setRefreshing(false)
   }, [])
 
+  const tabLabels: Record<'photos' | 'videos', string> = {
+    photos: `📷  Photos${photos.length ? ` (${photos.length})` : ''}`,
+    videos: `🎬  Videos${videos.length ? ` (${videos.length})` : ''}`,
+  }
+
   return (
-    <SafeAreaView className="flex-1 bg-[#f5f5f7]">
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
 
       {/* Header */}
-      <View className="bg-white border-b border-gray-100 px-4 pt-4 pb-0">
-        <Text className="text-2xl font-bold text-gray-900 mb-3 tracking-tight">Timeless Moments</Text>
+      <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 }}>
+        <Text style={{ fontSize: 11, fontWeight: '600', color: '#8e8e93', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>
+          Community · Media
+        </Text>
+        <Text style={{ fontSize: 34, fontWeight: '700', color: '#1c1c1e', letterSpacing: -0.5, marginBottom: 12 }}>
+          Timeless Moments
+        </Text>
 
-        {/* Tab switcher */}
-        <View className="flex-row">
-          {(['photos', 'videos'] as const).map(tab => (
-            <TouchableOpacity
-              key={tab}
-              className="px-5 py-2.5 mr-1"
-              style={{ borderBottomWidth: 2, borderBottomColor: activeTab === tab ? '#2d1b69' : 'transparent' }}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={{
-                fontSize: 14, fontWeight: '500',
-                color: activeTab === tab ? '#2d1b69' : '#9ca3af',
-              }}>
-                {tab === 'photos' ? `📷  Photos${photos.length ? ` (${photos.length})` : ''}` : `🎬  Videos${videos.length ? ` (${videos.length})` : ''}`}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        {/* Segmented control */}
+        <View style={{ marginBottom: 12 }}>
+          <SegmentedControl
+            options={['photos', 'videos']}
+            value={activeTab}
+            onChange={setActiveTab}
+            labels={tabLabels}
+          />
         </View>
       </View>
 
       {loading ? (
-        <View className="flex-1 items-center justify-center">
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#2d1b69" />
         </View>
       ) : (
-        <View className="flex-1">
+        <View style={{ flex: 1 }}>
           {activeTab === 'photos' ? (
             <PhotoGrid
               photos={photos}
@@ -225,7 +270,6 @@ export default function TimelessMomentsScreen() {
         </View>
       )}
 
-      {/* Lightbox */}
       {lightboxIndex !== null && (
         <PhotoLightbox
           photos={photos}
@@ -234,7 +278,6 @@ export default function TimelessMomentsScreen() {
         />
       )}
 
-      {/* Video player */}
       {activeVideo && (
         <VideoPlayer
           video={activeVideo}

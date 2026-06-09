@@ -401,16 +401,16 @@ export default function FamilyTreeScreen() {
   // ── Loading / empty ─────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color="#2d1b69" size="large" />
-        <Text style={{ fontSize: 14, color: '#9ca3af', marginTop: 12 }}>Loading family tree…</Text>
+        <Text style={{ fontSize: 14, color: '#8e8e93', marginTop: 12 }}>Loading family tree…</Text>
       </SafeAreaView>
     )
   }
 
   if (!nodes.length) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
         <Text style={{ fontSize: 40, marginBottom: 12 }}>🌳</Text>
         <Text style={{ fontSize: 18, fontWeight: '600', color: '#374151', marginBottom: 8 }}>No tree data yet</Text>
         <Text style={{ fontSize: 14, color: '#9ca3af', textAlign: 'center' }}>
@@ -492,6 +492,7 @@ export default function FamilyTreeScreen() {
             onSelect={() => setSelectedNode(item.node)}
           />
         )}
+        contentContainerStyle={{ paddingBottom: 90 }}
         getItemLayout={(_, index) => ({ length: ROW_H, offset: ROW_H * index, index })}
         onScrollToIndexFailed={({ index }) => {
           listRef.current?.scrollToOffset({ offset: index * ROW_H, animated: true })

@@ -220,7 +220,7 @@ export default function AdminScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f7' }}>
         <ActivityIndicator color="#2d1b69" />
       </View>
     )
@@ -229,7 +229,7 @@ export default function AdminScreen() {
   const s = stats!
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
 
       {/* Header */}
       <View style={{
@@ -250,7 +250,7 @@ export default function AdminScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32, gap: 20 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 90, gap: 20 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
         showsVerticalScrollIndicator={false}
       >

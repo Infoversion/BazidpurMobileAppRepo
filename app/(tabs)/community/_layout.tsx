@@ -7,8 +7,8 @@ export default function CommunityLayout() {
         headerTintColor: '#2d1b69',
         headerBackTitle: '',
         headerShadowVisible: false,
-        headerStyle: { backgroundColor: '#fff' },
-        headerTitleStyle: { fontWeight: '700', color: '#111827' },
+        headerStyle: { backgroundColor: '#f2f2f7' },
+        headerTitleStyle: { fontWeight: '700', color: '#1c1c1e' },
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
