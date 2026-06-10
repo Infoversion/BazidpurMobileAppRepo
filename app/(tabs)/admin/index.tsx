@@ -320,7 +320,7 @@ export default function AdminScreen() {
               emoji="🌳"
               title="Family Tree"
               sub={`${s.familyTreeNodes} nodes`}
-              onPress={() => router.push('/(tabs)/tree')}
+              onPress={() => router.push('/(tabs)/admin/family-tree' as any)}
             />
 
             <ActionCard
