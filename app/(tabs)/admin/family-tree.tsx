@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, Modal, TextInput,
   ActivityIndicator, Alert, ScrollView, Switch, Image,
@@ -14,7 +14,6 @@ import { webUpload } from '@/lib/webApi'
 import type { FamilyNode } from '@/lib/family-tree-layout'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
-const CONNECTOR_W = 18
 
 function resolvePhoto(url?: string | null) {
   if (!url) return null
@@ -34,74 +33,7 @@ function countDescendants(id: string, all: FamilyNode[]): number {
     .reduce((s, c) => s + 1 + countDescendants(c.id, all), 0)
 }
 
-// ─── DFS tree builder ─────────────────────────────────────────────────────────
-interface TreeItem {
-  node: FamilyNode
-  depth: number
-  isLast: boolean
-  /** For each ancestor level i, whether to draw a continuing vertical line */
-  lineage: boolean[]
-  hasChildren: boolean
-}
-
-function buildTreeItems(nodes: FamilyNode[], collapsed: Set<string>): TreeItem[] {
-  const childrenOf = new Map<string | null, FamilyNode[]>()
-  for (const n of nodes) {
-    const pid = n.parent_id ?? null
-    if (!childrenOf.has(pid)) childrenOf.set(pid, [])
-    childrenOf.get(pid)!.push(n)
-  }
-  for (const arr of childrenOf.values()) arr.sort((a, b) => a.display_order - b.display_order)
-
-  const result: TreeItem[] = []
-  function visit(node: FamilyNode, depth: number, lineage: boolean[], isLast: boolean) {
-    const children = childrenOf.get(node.id) ?? []
-    const hasChildren = children.length > 0
-    result.push({ node, depth, isLast, lineage: [...lineage], hasChildren })
-    if (hasChildren && !collapsed.has(node.id)) {
-      children.forEach((child, i) =>
-        visit(child, depth + 1, [...lineage, !isLast], i === children.length - 1)
-      )
-    }
-  }
-  const roots = childrenOf.get(null) ?? []
-  roots.forEach((root, i) => visit(root, 0, [], i === roots.length - 1))
-  return result
-}
-
-// ─── Tree connector lines ─────────────────────────────────────────────────────
-function TreeConnectors({ depth, isLast, lineage }: { depth: number; isLast: boolean; lineage: boolean[] }) {
-  if (depth === 0) return null
-  return (
-    <View style={{ flexDirection: 'row', alignSelf: 'stretch' }}>
-      {Array.from({ length: depth }, (_, i) => {
-        const isConnectorLevel = i === depth - 1
-        if (isConnectorLevel) {
-          return (
-            <View key={i} style={{ width: CONNECTOR_W, alignSelf: 'stretch' }}>
-              {/* Top half of vertical line — always */}
-              <View style={{ position: 'absolute', top: 0, bottom: '50%', left: CONNECTOR_W / 2 - 0.5, width: 1, backgroundColor: '#d1d5db' }} />
-              {/* Bottom half — only if not last child */}
-              {!isLast && (
-                <View style={{ position: 'absolute', top: '50%', bottom: 0, left: CONNECTOR_W / 2 - 0.5, width: 1, backgroundColor: '#d1d5db' }} />
-              )}
-              {/* Horizontal connector */}
-              <View style={{ position: 'absolute', top: '50%', left: CONNECTOR_W / 2, right: 0, height: 1, backgroundColor: '#d1d5db' }} />
-            </View>
-          )
-        }
-        // Ancestor slot — vertical line if that level continues past here
-        return (
-          <View key={i} style={{ width: CONNECTOR_W, alignSelf: 'stretch' }}>
-            {lineage[i] && (
-              <View style={{ position: 'absolute', top: 0, bottom: 0, left: CONNECTOR_W / 2 - 0.5, width: 1, backgroundColor: '#d1d5db' }} />
-            )}
-          </View>
-        )
-      })}
-    </View>
-  )
-}
+interface FlatItem { node: FamilyNode; depth: number }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 function NodeAvatar({ node, size = 36 }: { node: FamilyNode; size?: number }) {
@@ -362,7 +294,7 @@ export default function FamilyTreeAdminScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const [modalVisible, setModalVisible] = useState(false)
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add')
@@ -376,7 +308,15 @@ export default function FamilyTreeAdminScreen() {
       .select('*')
       .order('tree_level')
       .order('display_order')
-    setNodes((data as FamilyNode[]) ?? [])
+    const rows = (data as FamilyNode[]) ?? []
+    setNodes(rows)
+    // Auto-expand root + first generation on first load
+    setExpanded(prev => {
+      if (prev.size > 0) return prev
+      const init = new Set<string>()
+      rows.forEach(n => { if (n.tree_level <= 1) init.add(n.id) })
+      return init
+    })
   }
 
   useEffect(() => { load().finally(() => setLoading(false)) }, [])
@@ -387,8 +327,8 @@ export default function FamilyTreeAdminScreen() {
     setRefreshing(false)
   }, [])
 
-  function toggleCollapse(id: string) {
-    setCollapsed(prev => {
+  function toggleExpand(id: string) {
+    setExpanded(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -396,21 +336,46 @@ export default function FamilyTreeAdminScreen() {
     })
   }
 
-  // ── Build hierarchical list or search results ────────────────────────────────
-  const treeItems = useMemo(() => buildTreeItems(nodes, collapsed), [nodes, collapsed])
+  // ── Build DFS flat list (same pattern as tree.tsx) ───────────────────────────
+  const childrenOf = useMemo(() => {
+    const map = new Map<string | null, FamilyNode[]>()
+    nodes.forEach(n => {
+      const pid = n.parent_id ?? null
+      const arr = map.get(pid) ?? []
+      arr.push(n)
+      map.set(pid, arr)
+    })
+    for (const arr of map.values()) arr.sort((a, b) => a.display_order - b.display_order)
+    return map
+  }, [nodes])
 
-  const displayed: TreeItem[] = useMemo(() => {
-    if (!search.trim()) return treeItems
-    // In search mode: flat filtered list, highlight matches
-    const q = search.toLowerCase()
-    return nodes
-      .filter(n =>
-        n.name.toLowerCase().includes(q) ||
-        n.married_to?.toLowerCase().includes(q) ||
-        n.description?.toLowerCase().includes(q)
-      )
-      .map(n => ({ node: n, depth: 0, isLast: true, lineage: [], hasChildren: false }))
-  }, [treeItems, nodes, search])
+  const matchIds = search.trim().length > 1
+    ? new Set(nodes.filter(n =>
+        n.name.toLowerCase().includes(search.toLowerCase()) ||
+        n.married_to?.toLowerCase().includes(search.toLowerCase())
+      ).map(n => n.id))
+    : null
+
+  const effectiveExpanded = useMemo(() => {
+    if (!matchIds) return expanded
+    return new Set(nodes.map(n => n.id)) // expand all when searching
+  }, [matchIds, expanded, nodes])
+
+  const flatItems = useMemo<FlatItem[]>(() => {
+    const result: FlatItem[] = []
+    function walk(parentId: string | null, depth: number) {
+      for (const node of (childrenOf.get(parentId) ?? [])) {
+        result.push({ node, depth })
+        if (effectiveExpanded.has(node.id)) walk(node.id, depth + 1)
+      }
+    }
+    walk(null, 0)
+    return result
+  }, [childrenOf, effectiveExpanded])
+
+  const displayed = matchIds
+    ? flatItems.filter(item => matchIds.has(item.node.id))
+    : flatItems
 
   // ── CRUD ───────────────────────────────────────────────────────────────────
   async function handleSave(data: Partial<FamilyNode>) {
@@ -437,8 +402,8 @@ export default function FamilyTreeAdminScreen() {
 
       if (error) { Alert.alert('Error', error.message); return }
       setNodes(prev => [...prev, created as FamilyNode])
-      // Auto-expand the parent so the new child is visible
-      if (data.parent_id) setCollapsed(prev => { const n = new Set(prev); n.delete(data.parent_id!); return n })
+      // Auto-expand parent so new child is immediately visible
+      if (data.parent_id) setExpanded(prev => { const n = new Set(prev); n.add(data.parent_id!); return n })
     } else {
       const id = modalInitial.id
       const { data: updated, error } = await supabase
@@ -503,13 +468,14 @@ export default function FamilyTreeAdminScreen() {
     setModalVisible(true)
   }
 
-  function showActions(item: TreeItem) {
+  function showActions(item: FlatItem) {
     const { node } = item
     const childCount = countDescendants(node.id, nodes)
+    const hasKids = (childrenOf.get(node.id) ?? []).length > 0
+    const isExpanded = expanded.has(node.id)
     const canDelete = isSuperadmin || node.tree_level > 2
-    const isCollapsed = collapsed.has(node.id)
     const opts: string[] = ['Edit', 'Add Child']
-    if (item.hasChildren) opts.push(isCollapsed ? 'Expand' : 'Collapse')
+    if (hasKids) opts.push(isExpanded ? 'Collapse' : 'Expand')
     if (canDelete) opts.push('Delete')
     opts.push('Cancel')
 
@@ -526,7 +492,7 @@ export default function FamilyTreeAdminScreen() {
           const chosen = opts[idx]
           if (chosen === 'Edit') openEdit(node)
           else if (chosen === 'Add Child') openAdd(node)
-          else if (chosen === 'Expand' || chosen === 'Collapse') toggleCollapse(node.id)
+          else if (chosen === 'Collapse' || chosen === 'Expand') toggleExpand(node.id)
           else if (chosen === 'Delete') handleDelete(node)
         },
       )
@@ -534,7 +500,7 @@ export default function FamilyTreeAdminScreen() {
       Alert.alert(node.name, `Level ${node.tree_level}`, [
         { text: 'Edit', onPress: () => openEdit(node) },
         { text: 'Add Child', onPress: () => openAdd(node) },
-        ...(item.hasChildren ? [{ text: isCollapsed ? 'Expand' : 'Collapse', onPress: () => toggleCollapse(node.id) }] : []),
+        ...(hasKids ? [{ text: isExpanded ? 'Collapse' : 'Expand', onPress: () => toggleExpand(node.id) }] : []),
         ...(canDelete ? [{ text: 'Delete', style: 'destructive' as const, onPress: () => handleDelete(node) }] : []),
         { text: 'Cancel', style: 'cancel' },
       ])
@@ -542,13 +508,17 @@ export default function FamilyTreeAdminScreen() {
   }
 
   // ── Row ─────────────────────────────────────────────────────────────────────
-  function renderItem({ item }: { item: TreeItem }) {
-    const { node, depth, isLast, lineage, hasChildren } = item
+  function renderItem({ item }: { item: FlatItem }) {
+    const { node, depth } = item
+    const hasKids = (childrenOf.get(node.id) ?? []).length > 0
     const childCount = nodes.filter(n => n.parent_id === node.id).length
-    const isCollapsed = collapsed.has(node.id)
+    const isExpanded = expanded.has(node.id)
     const canDelete = isSuperadmin || node.tree_level > 2
     const dobY = yearStr(node.dob)
     const dodY = yearStr(node.dod)
+    const nameColor = node.is_alive
+      ? (node.sex === 'female' ? '#be185d' : '#1e40af')
+      : '#64748b'
 
     function closeAllExcept(id: string) {
       swipeRefs.current.forEach((ref, key) => { if (key !== id) ref.close() })
@@ -591,55 +561,51 @@ export default function FamilyTreeAdminScreen() {
           style={({ pressed }) => ({
             flexDirection: 'row', alignItems: 'center',
             backgroundColor: pressed ? '#f5f3ff' : '#fff',
+            paddingLeft: 12 + depth * 18,
             paddingRight: 16, paddingVertical: 10,
             borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
-            minHeight: 58,
           })}
         >
-          {/* Tree connector lines */}
-          <TreeConnectors depth={depth} isLast={isLast} lineage={lineage} />
-
-          {/* Expand/collapse toggle */}
-          {hasChildren ? (
-            <TouchableOpacity
-              onPress={() => toggleCollapse(node.id)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={{ marginRight: 6 }}
-            >
-              <Text style={{ fontSize: 10, color: '#9ca3af', fontWeight: '700' }}>
-                {isCollapsed ? '▶' : '▼'}
+          {/* Expand / collapse toggle — same as tree.tsx */}
+          <TouchableOpacity
+            onPress={hasKids ? () => toggleExpand(node.id) : undefined}
+            style={{ width: 22, alignItems: 'center', marginRight: 4 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            {hasKids ? (
+              <Text style={{ fontSize: 10, fontWeight: '700', color: '#a78bfa' }}>
+                {isExpanded ? '▼' : '▶'}
               </Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 16, marginRight: 6 }} />
-          )}
+            ) : (
+              <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: '#e5e7eb' }} />
+            )}
+          </TouchableOpacity>
 
           <NodeAvatar node={node} />
 
           <View style={{ flex: 1, marginLeft: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Text style={{ fontSize: 14, fontWeight: depth === 0 ? '800' : '600', color: '#111827' }} numberOfLines={1}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: nameColor }} numberOfLines={1}>
                 {node.name}
               </Text>
-              {!node.is_alive && <Text style={{ fontSize: 11, color: '#9ca3af' }}>†</Text>}
+              {!node.is_alive && <Text style={{ fontSize: 11, color: '#94a3b8' }}>†</Text>}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sexColor(node.sex) }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: sexColor(node.sex) }}>
+                {node.sex === 'male' ? '♂' : node.sex === 'female' ? '♀' : '⚬'}
+              </Text>
               {(dobY || dodY) && (
-                <Text style={{ fontSize: 11, color: '#9ca3af' }}>{dobY}{dodY ? ` – ${dodY}` : ''}</Text>
+                <Text style={{ fontSize: 11, color: '#94a3b8' }}>
+                  {dobY}{!node.is_alive && dodY ? `  †${dodY}` : ''}
+                </Text>
               )}
-              {node.married_to ? (
-                <Text style={{ fontSize: 11, color: '#ec4899' }} numberOfLines={1}>♥ {node.married_to}</Text>
-              ) : null}
             </View>
           </View>
 
-          {/* Children count */}
-          {childCount > 0 && (
-            <View style={{ backgroundColor: isCollapsed ? '#e0e7ff' : '#f3f4f6', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, marginRight: 6 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: isCollapsed ? '#4338ca' : '#6b7280' }}>
-                {isCollapsed ? `+${childCount}` : childCount}
-              </Text>
+          {/* Collapsed child count badge */}
+          {hasKids && !isExpanded && (
+            <View style={{ backgroundColor: '#e0e7ff', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, marginRight: 6 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#4338ca' }}>{childCount}</Text>
             </View>
           )}
 
@@ -697,8 +663,8 @@ export default function FamilyTreeAdminScreen() {
         ))}
       </View>
 
-      {/* Gesture hint — tree mode only */}
-      {!search && nodes.length > 0 && (
+      {/* Gesture hint */}
+      {nodes.length > 0 && (
         <View style={{ backgroundColor: '#f5f3ff', paddingHorizontal: 16, paddingVertical: 5 }}>
           <Text style={{ fontSize: 11, color: '#7c3aed', textAlign: 'center' }}>
             ▶/▼ expand · swipe → add child · swipe ← delete · long press for more
@@ -709,7 +675,7 @@ export default function FamilyTreeAdminScreen() {
       {/* Tree list */}
       <FlatList
         data={displayed}
-        keyExtractor={item => item.node.id}
+        keyExtractor={(item: FlatItem) => item.node.id}
         renderItem={renderItem}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
