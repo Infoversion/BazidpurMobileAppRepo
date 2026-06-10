@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, ActivityIndicator,
   useWindowDimensions, RefreshControl, TouchableOpacity,
@@ -7,6 +7,8 @@ import {
 import { Stack, useLocalSearchParams, router } from 'expo-router'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import * as ImagePicker from 'expo-image-picker'
+import * as FileSystem from 'expo-file-system/legacy'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
@@ -168,6 +170,10 @@ export default function AlbumScreen() {
   const [captionPhoto,  setCaptionPhoto]   = useState<AlbumPhoto | null>(null)
   const [saving,        setSaving]         = useState<string | null>(null)
 
+  // Upload
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; pct: number } | null>(null)
+  const uploadCancelRef = useRef<(() => void) | null>(null)
+
   async function load() {
     const [{ data: a }, { data: p }] = await Promise.all([
       supabase.from('photo_albums').select('id, title, description, user_id, is_hidden, cover_photo_url, display_order, created_at, user:user_id(first_name, last_name)').eq('id', id).single(),
@@ -229,6 +235,81 @@ export default function AlbumScreen() {
     await Promise.all(
       updated.map(p => supabase.from('album_photos').update({ display_order: p.display_order }).eq('id', p.id))
     )
+  }
+
+  // ── Add photos ──────────────────────────────────────────────────────────────
+
+  async function addPhotos() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library.')
+      return
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.9,
+      selectionLimit: 10,
+    })
+    if (result.canceled || !result.assets.length) return
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { Alert.alert('Error', 'Not signed in.'); return }
+
+    const assets = result.assets
+    setUploadProgress({ current: 0, total: assets.length, pct: 0 })
+
+    const uploaded: AlbumPhoto[] = []
+    let cancelled = false
+    uploadCancelRef.current = () => { cancelled = true }
+
+    for (let i = 0; i < assets.length; i++) {
+      if (cancelled) break
+      const asset = assets[i]
+      const ext = (asset.uri.split('.').pop()?.split('?')[0] || 'jpg').toLowerCase()
+      const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg'
+      const url = `https://bazidpur.com/api/albums/${id}/photos?_t=${encodeURIComponent(session.access_token)}`
+
+      const task = FileSystem.createUploadTask(
+        url, asset.uri,
+        {
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          fieldName: 'file',
+          mimeType,
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        },
+        ({ totalBytesSent, totalBytesExpectedToSend }) => {
+          const filePct = totalBytesExpectedToSend > 0
+            ? Math.round((totalBytesSent / totalBytesExpectedToSend) * 100)
+            : 0
+          const overall = Math.round(((i + filePct / 100) / assets.length) * 100)
+          setUploadProgress({ current: i + 1, total: assets.length, pct: Math.min(overall, 99) })
+        }
+      )
+
+      try {
+        const res = await task.uploadAsync()
+        if (!res || res.status < 200 || res.status >= 300) {
+          let msg = `Upload failed (${res?.status ?? 'no response'})`
+          try { const j = JSON.parse(res?.body ?? '{}'); msg = j.error ?? msg } catch {}
+          Alert.alert('Upload error', `Photo ${i + 1}: ${msg}`)
+          break
+        }
+        const parsed = JSON.parse(res.body)
+        if (parsed.photo) uploaded.push(parsed.photo as AlbumPhoto)
+      } catch (e) {
+        Alert.alert('Upload error', `Photo ${i + 1} failed.`)
+        break
+      }
+    }
+
+    uploadCancelRef.current = null
+    setUploadProgress(null)
+    if (uploaded.length > 0) {
+      setPhotos(prev => [...prev, ...uploaded])
+    }
   }
 
   // ── Album actions ────────────────────────────────────────────────────────────
@@ -377,6 +458,14 @@ export default function AlbumScreen() {
                     </TouchableOpacity>
                   </View>
 
+                  <TouchableOpacity
+                    onPress={addPhotos}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f0fdf4', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 }}
+                  >
+                    <Text style={{ fontSize: 15 }}>➕</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#16a34a' }}>Add Photos</Text>
+                  </TouchableOpacity>
+
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 6 }}>
                     Photos ({photos.length}) · tap to manage
                   </Text>
@@ -518,6 +607,30 @@ export default function AlbumScreen() {
           }}
         />
       ) : null}
+
+      {uploadProgress !== null && (
+        <View style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.75)', padding: 20,
+          flexDirection: 'row', alignItems: 'center', gap: 14,
+        }}>
+          <ActivityIndicator color="#fff" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
+              Uploading {uploadProgress.current} of {uploadProgress.total}…
+            </Text>
+            <View style={{ marginTop: 6, height: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 2 }}>
+              <View style={{ width: `${uploadProgress.pct}%`, height: 4, backgroundColor: '#4ade80', borderRadius: 2 }} />
+            </View>
+          </View>
+          <TouchableOpacity
+            onPress={() => { uploadCancelRef.current?.(); setUploadProgress(null) }}
+            style={{ paddingHorizontal: 10, paddingVertical: 6 }}
+          >
+            <Text style={{ color: '#f87171', fontWeight: '600', fontSize: 13 }}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   )
 }

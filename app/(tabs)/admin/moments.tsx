@@ -1,0 +1,684 @@
+import { useEffect, useState, useCallback, useRef } from 'react'
+import {
+  View, Text, FlatList, TouchableOpacity, Modal,
+  ActivityIndicator, RefreshControl, TextInput,
+  Alert, ActionSheetIOS, Platform, ScrollView,
+  KeyboardAvoidingView,
+} from 'react-native'
+import { Image } from 'expo-image'
+import * as ImagePicker from 'expo-image-picker'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { supabase } from '@/lib/supabase'
+import * as FileSystem from 'expo-file-system/legacy'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type MediaTab = 'photos' | 'videos'
+type StatusFilter = 'all' | 'active' | 'hidden'
+
+const MAX_FILE_BYTES = 10 * 1024 * 1024
+
+interface PickedImage { uri: string; fileSize?: number }
+interface UploadState { current: number; total: number; pct: number; label: string }
+
+interface MomentPhoto {
+  id: string
+  title?: string
+  description?: string
+  r2_url: string
+  thumbnail_url?: string
+  display_order: number
+  is_active?: boolean
+  created_at: string
+}
+
+interface MomentVideo {
+  id: string
+  title?: string
+  description?: string
+  youtube_id: string
+  youtube_url?: string
+  thumbnail_url?: string
+  display_order: number
+  is_active: boolean
+  created_at: string
+}
+
+interface FormState {
+  title: string
+  description: string
+  displayOrder: string
+  youtubeUrl: string
+  images: PickedImage[]
+}
+
+const PAGE_SIZE = 25
+const EMPTY_FORM: FormState = { title: '', description: '', displayOrder: '', youtubeUrl: '', images: [] }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function extractYouTubeId(url: string): string | null {
+  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/)
+  return m ? m[1] : (url.length === 11 ? url : null)
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// Upload a photo to the web API (R2 storage) using expo-file-system.
+// createUploadTask streams the file natively — no JS blob/XHR issues.
+async function webApiUpload(
+  apiUrl: string,
+  uri: string,
+  fields: { title: string; description: string; display_order: number },
+  onProgress: (pct: number, label: string) => void
+): Promise<Record<string, unknown>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Not signed in.')
+
+  const ext = uri.split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg'
+  const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg'
+
+  onProgress(0, 'Uploading…')
+
+  const url = `${apiUrl}?_t=${encodeURIComponent(session.access_token)}`
+
+  const task = FileSystem.createUploadTask(
+    url,
+    uri,
+    {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType,
+      parameters: {
+        title: fields.title || '',
+        description: fields.description || '',
+        display_order: String(fields.display_order),
+      },
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    },
+    ({ totalBytesSent, totalBytesExpectedToSend }) => {
+      if (totalBytesExpectedToSend > 0) {
+        onProgress(Math.round((totalBytesSent / totalBytesExpectedToSend) * 95), 'Uploading…')
+      }
+    }
+  )
+
+  const result = await task.uploadAsync()
+  if (!result) throw new Error('Upload failed — no response from server.')
+
+  onProgress(98, 'Saving…')
+
+  if (result.status < 200 || result.status >= 300) {
+    let errMsg = `Server returned ${result.status}`
+    try { const j = JSON.parse(result.body); errMsg = (j.error ?? j.message ?? errMsg) as string } catch {}
+    throw new Error(errMsg)
+  }
+
+  const parsed = JSON.parse(result.body)
+  return (parsed.photo as Record<string, unknown>) ?? parsed
+}
+
+// ─── Segmented control ────────────────────────────────────────────────────────
+
+function Seg<T extends string>({ tabs, selected, onSelect }: {
+  tabs: { key: T; label: string }[]
+  selected: T
+  onSelect: (k: T) => void
+}) {
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: 'rgba(118,118,128,0.12)', borderRadius: 9, padding: 2, marginHorizontal: 16, marginTop: 10, marginBottom: 8 }}>
+      {tabs.map(tab => {
+        const active = tab.key === selected
+        return (
+          <TouchableOpacity key={tab.key} onPress={() => onSelect(tab.key)} activeOpacity={0.8}
+            style={[{ flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 7 }, active && { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }]}
+          >
+            <Text style={{ fontSize: 12, fontWeight: active ? '600' : '400', color: active ? '#000' : 'rgba(60,60,67,0.6)' }}>{tab.label}</Text>
+          </TouchableOpacity>
+        )
+      })}
+    </View>
+  )
+}
+
+function ActiveBadge({ active }: { active: boolean | undefined }) {
+  if (active === undefined) return null
+  return (
+    <View style={{ borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: active ? '#d1fae5' : '#fee2e2' }}>
+      <Text style={{ fontSize: 10, fontWeight: '600', color: active ? '#065f46' : '#991b1b' }}>{active ? 'ACTIVE' : 'HIDDEN'}</Text>
+    </View>
+  )
+}
+
+// ─── Form modal ───────────────────────────────────────────────────────────────
+
+function FormModal({ visible, title: modalTitle, mediaType, initial, saving, uploadState, onSave, onClose }: {
+  visible: boolean
+  title: string
+  mediaType: MediaTab
+  initial: FormState
+  saving: boolean
+  uploadState: UploadState | null
+  onSave: (f: FormState) => void
+  onClose: () => void
+}) {
+  const [form, setForm] = useState<FormState>(initial)
+  const isNew = !initial.title && !initial.youtubeUrl
+
+  useEffect(() => { if (visible) setForm(initial) }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function pickImages() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) { Alert.alert('Permission needed', 'Please allow photo library access in Settings.'); return }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsMultipleSelection: true,
+      allowsEditing: false,
+      exif: false,
+    })
+    if (result.canceled) return
+
+    const oversized = result.assets.filter(a => a.fileSize != null && a.fileSize > MAX_FILE_BYTES)
+    const valid = result.assets.filter(a => a.fileSize == null || a.fileSize <= MAX_FILE_BYTES)
+
+    if (oversized.length > 0) {
+      Alert.alert(
+        `${oversized.length} photo${oversized.length > 1 ? 's' : ''} skipped`,
+        `${oversized.length > 1 ? 'They were' : 'It was'} over the ${formatBytes(MAX_FILE_BYTES)} limit.`
+      )
+    }
+    if (valid.length > 0) {
+      setForm(f => ({ ...f, images: [...f.images, ...valid.map(a => ({ uri: a.uri, fileSize: a.fileSize ?? undefined }))] }))
+    }
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#f2f2f7' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={{ backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.18)' }}>
+          <TouchableOpacity onPress={onClose} disabled={saving}><Text style={{ fontSize: 16, color: saving ? 'rgba(60,60,67,0.3)' : '#2d1b69' }}>Cancel</Text></TouchableOpacity>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: '#000' }}>{modalTitle}</Text>
+          <TouchableOpacity onPress={() => onSave(form)} disabled={saving}>
+            {saving ? <ActivityIndicator color="#2d1b69" /> : <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Save</Text>}
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
+
+          {/* Upload progress */}
+          {uploadState && (
+            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#2d1b69' }}>
+                  Photo {uploadState.current} of {uploadState.total}
+                </Text>
+                <Text style={{ fontSize: 13, color: 'rgba(60,60,67,0.5)' }}>{uploadState.label}</Text>
+              </View>
+              <View style={{ height: 8, backgroundColor: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+                <View style={{ height: 8, width: `${uploadState.pct}%` as any, backgroundColor: '#2d1b69', borderRadius: 4 }} />
+              </View>
+              <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)', textAlign: 'right' }}>{uploadState.pct}%</Text>
+            </View>
+          )}
+
+          {/* Photo picker */}
+          {mediaType === 'photos' && isNew && !uploadState && (
+            <View style={{ gap: 8 }}>
+              <TouchableOpacity
+                onPress={pickImages}
+                style={{ backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#2d1b69', borderStyle: 'dashed', paddingVertical: 28 }}
+              >
+                <Text style={{ fontSize: 36 }}>📷</Text>
+                <Text style={{ fontSize: 15, fontWeight: '500', color: '#2d1b69', marginTop: 6 }}>
+                  {form.images.length > 0 ? '+ Add More Photos' : 'Tap to choose photo(s)'}
+                </Text>
+                <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.4)', marginTop: 4 }}>
+                  Max {formatBytes(MAX_FILE_BYTES)} per photo
+                </Text>
+              </TouchableOpacity>
+
+              {form.images.length > 0 && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {form.images.map((img, i) => (
+                    <View key={i} style={{ alignItems: 'center', gap: 2 }}>
+                      <View style={{ position: 'relative' }}>
+                        <Image source={{ uri: img.uri }} style={{ width: 80, height: 80, borderRadius: 8 }} contentFit="cover" />
+                        <TouchableOpacity
+                          onPress={() => setForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
+                          style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                      {img.fileSize != null && (
+                        <Text style={{ fontSize: 9, color: 'rgba(60,60,67,0.45)' }}>{formatBytes(img.fileSize)}</Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
+          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 14 }}>
+            {mediaType === 'videos' && (
+              <>
+                <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)', marginBottom: 4 }}>YouTube URL or Video ID</Text>
+                <TextInput style={{ fontSize: 16, color: '#000', paddingVertical: 4 }} value={form.youtubeUrl}
+                  onChangeText={v => setForm(f => ({ ...f, youtubeUrl: v }))}
+                  placeholder="https://youtube.com/watch?v=... or video ID"
+                  autoCapitalize="none" />
+                <View style={{ height: 0.5, backgroundColor: 'rgba(60,60,67,0.1)' }} />
+              </>
+            )}
+            {(['title', 'description', 'displayOrder'] as const).map((key, idx) => (
+              <View key={key}>
+                {idx > 0 && <View style={{ height: 0.5, backgroundColor: 'rgba(60,60,67,0.1)', marginBottom: 14 }} />}
+                <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)', marginBottom: 4 }}>
+                  {key === 'title' ? 'Title' : key === 'description' ? 'Description' : 'Display Order'}
+                </Text>
+                <TextInput
+                  style={{ fontSize: 16, color: '#000', paddingVertical: 4 }}
+                  value={String(form[key] ?? '')}
+                  onChangeText={v => setForm(f => ({ ...f, [key]: v }))}
+                  placeholder={key === 'displayOrder' ? '0' : `Optional ${key}`}
+                  keyboardType={key === 'displayOrder' ? 'numeric' : 'default'}
+                  autoCapitalize={key === 'displayOrder' ? 'none' : 'sentences'}
+                  multiline={key === 'description'}
+                />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
+  )
+}
+
+// ─── Rows ─────────────────────────────────────────────────────────────────────
+
+function PhotoRow({ item, onAction }: { item: MomentPhoto; onAction: () => void }) {
+  return (
+    <TouchableOpacity onPress={onAction} activeOpacity={0.6}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10 }}
+    >
+      <View style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', backgroundColor: '#f2f2f7', flexShrink: 0 }}>
+        <Image source={{ uri: item.thumbnail_url || item.r2_url }} style={{ width: 52, height: 52 }} contentFit="cover" />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 15, fontWeight: '500', color: '#000', marginBottom: 2 }} numberOfLines={1}>{item.title || '(Untitled)'}</Text>
+        {item.description ? <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)' }} numberOfLines={1}>{item.description}</Text> : null}
+        <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.35)', marginTop: 1 }}>Order: {item.display_order}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+        <ActiveBadge active={item.is_active} />
+        <Text style={{ fontSize: 20, color: '#c7c7cc' }}>›</Text>
+      </View>
+    </TouchableOpacity>
+  )
+}
+
+function VideoRow({ item, onAction }: { item: MomentVideo; onAction: () => void }) {
+  const thumb = item.thumbnail_url || `https://img.youtube.com/vi/${item.youtube_id}/mqdefault.jpg`
+  return (
+    <TouchableOpacity onPress={onAction} activeOpacity={0.6}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10 }}
+    >
+      <View style={{ width: 72, height: 52, borderRadius: 8, overflow: 'hidden', backgroundColor: '#000', flexShrink: 0, alignItems: 'center', justifyContent: 'center' }}>
+        <Image source={{ uri: thumb }} style={{ width: 72, height: 52 }} contentFit="cover" />
+        <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 9, marginLeft: 2 }}>▶</Text>
+        </View>
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 15, fontWeight: '500', color: '#000', marginBottom: 2 }} numberOfLines={1}>{item.title || '(Untitled)'}</Text>
+        {item.description ? <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)' }} numberOfLines={1}>{item.description}</Text> : null}
+        <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.35)', marginTop: 1 }}>Order: {item.display_order}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+        <ActiveBadge active={item.is_active} />
+        <Text style={{ fontSize: 20, color: '#c7c7cc' }}>›</Text>
+      </View>
+    </TouchableOpacity>
+  )
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
+export default function MomentsAdminScreen() {
+  const insets = useSafeAreaInsets()
+  const [mediaTab, setMediaTab] = useState<MediaTab>('photos')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [photos, setPhotos] = useState<MomentPhoto[]>([])
+  const [videos, setVideos] = useState<MomentVideo[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [counts, setCounts] = useState({ photos: 0, videos: 0 })
+  const [modalVisible, setModalVisible] = useState(false)
+  const [modalForm, setModalForm] = useState<FormState>(EMPTY_FORM)
+  const [modalTitle, setModalTitle] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [uploadState, setUploadState] = useState<UploadState | null>(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 400)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const currentData: (MomentPhoto | MomentVideo)[] = mediaTab === 'photos' ? photos : videos
+
+  async function fetchPage(tab: MediaTab, sf: StatusFilter, s: string, offset: number) {
+    const table = tab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let q: any = supabase.from(table).select('*').order('display_order')
+    if (sf === 'active') q = q.eq('is_active', true)
+    else if (sf === 'hidden') q = q.eq('is_active', false)
+    if (s) q = q.or(`title.ilike.%${s}%,description.ilike.%${s}%`)
+    const { data } = await q.range(offset, offset + PAGE_SIZE - 1)
+    return (data ?? []) as any[] // eslint-disable-line @typescript-eslint/no-explicit-any
+  }
+
+  async function fetchCounts() {
+    const [{ count: p }, { count: v }] = await Promise.all([
+      supabase.from('timeless_moments').select('*', { count: 'exact', head: true }),
+      supabase.from('timeless_moment_videos').select('*', { count: 'exact', head: true }),
+    ])
+    setCounts({ photos: p ?? 0, videos: v ?? 0 })
+  }
+
+  useEffect(() => {
+    Promise.all([
+      fetchPage('photos', 'all', '', 0).then(rows => { setPhotos(rows); if (mediaTab === 'photos') setHasMore(rows.length === PAGE_SIZE) }),
+      fetchPage('videos', 'all', '', 0).then(rows => { setVideos(rows); if (mediaTab === 'videos') setHasMore(rows.length === PAGE_SIZE) }),
+      fetchCounts(),
+    ]).finally(() => setLoading(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadingMoreRef = useRef(false)
+  const skipFirst = useRef(true)
+  useEffect(() => {
+    if (skipFirst.current) { skipFirst.current = false; return }
+    loadingMoreRef.current = true
+    if (mediaTab === 'photos') setPhotos([])
+    else setVideos([])
+    setHasMore(true)
+    fetchPage(mediaTab, statusFilter, debouncedSearch, 0).then(rows => {
+      if (mediaTab === 'photos') setPhotos(rows)
+      else setVideos(rows)
+      setHasMore(rows.length === PAGE_SIZE)
+    }).finally(() => { loadingMoreRef.current = false })
+  }, [mediaTab, statusFilter, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    const [rows] = await Promise.all([fetchPage(mediaTab, statusFilter, debouncedSearch, 0), fetchCounts()])
+    if (mediaTab === 'photos') setPhotos(rows)
+    else setVideos(rows)
+    setHasMore(rows.length === PAGE_SIZE)
+    setRefreshing(false)
+  }, [mediaTab, statusFilter, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function onLoadMore() {
+    if (loadingMoreRef.current || !hasMore) return
+    loadingMoreRef.current = true
+    setLoadingMore(true)
+    try {
+      const rows = await fetchPage(mediaTab, statusFilter, debouncedSearch, currentData.length)
+      if (mediaTab === 'photos') {
+        setPhotos(prev => { const ids = new Set(prev.map(x => x.id)); return [...prev, ...(rows as MomentPhoto[]).filter(r => !ids.has(r.id))] })
+      } else {
+        setVideos(prev => { const ids = new Set(prev.map(x => x.id)); return [...prev, ...(rows as MomentVideo[]).filter(r => !ids.has(r.id))] })
+      }
+      setHasMore(rows.length === PAGE_SIZE)
+    } finally {
+      loadingMoreRef.current = false
+      setLoadingMore(false)
+    }
+  }
+
+  async function handleSave(form: FormState) {
+    const order = parseInt(form.displayOrder) || 0
+    setSaving(true)
+    setUploadState(null)
+
+    try {
+      if (editingId) {
+        const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
+        const update: Record<string, unknown> = {
+          title: form.title.trim() || null,
+          description: form.description.trim() || null,
+          display_order: order,
+        }
+        if (mediaTab === 'videos' && form.youtubeUrl.trim()) {
+          const yid = extractYouTubeId(form.youtubeUrl.trim())
+          if (yid) { update.youtube_id = yid; update.youtube_url = `https://www.youtube.com/watch?v=${yid}` }
+        }
+        const { error } = await supabase.from(mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos').update(update).eq('id', editingId)
+        if (error) throw new Error(error.message)
+        if (mediaTab === 'photos') setPhotos(prev => prev.map(x => x.id === editingId ? { ...x, ...update } as MomentPhoto : x))
+        else setVideos(prev => prev.map(x => x.id === editingId ? { ...x, ...update } as MomentVideo : x))
+
+      } else if (mediaTab === 'videos') {
+        const yid = extractYouTubeId(form.youtubeUrl.trim())
+        if (!yid) throw new Error('Could not extract a YouTube video ID from that URL.')
+        const { data, error } = await supabase.from('timeless_moment_videos').insert({
+          youtube_id: yid,
+          youtube_url: `https://www.youtube.com/watch?v=${yid}`,
+          title: form.title.trim() || null,
+          description: form.description.trim() || null,
+          display_order: order,
+          is_active: true,
+        }).select().single()
+        if (error) throw new Error(error.message)
+        setVideos(prev => [data as MomentVideo, ...prev])
+        setCounts(c => ({ ...c, videos: c.videos + 1 }))
+
+      } else {
+        if (form.images.length === 0) throw new Error('Please choose at least one photo.')
+
+        const inserted: MomentPhoto[] = []
+        for (let i = 0; i < form.images.length; i++) {
+          const { uri, fileSize } = form.images[i]
+
+          if (fileSize != null && fileSize > MAX_FILE_BYTES) {
+            throw new Error(`Photo ${i + 1} is ${formatBytes(fileSize)}, which exceeds the ${formatBytes(MAX_FILE_BYTES)} limit.`)
+          }
+
+          const newPhoto = await webApiUpload(
+            'https://bazidpur.com/api/timeless-moments',
+            uri,
+            { title: form.title.trim(), description: form.description.trim(), display_order: order + i },
+            (pct, label) => setUploadState({ current: i + 1, total: form.images.length, pct, label })
+          )
+          inserted.push(newPhoto as unknown as MomentPhoto)
+        }
+
+        setPhotos(prev => [...inserted, ...prev])
+        setCounts(c => ({ ...c, photos: c.photos + inserted.length }))
+      }
+
+      setModalVisible(false)
+
+    } catch (e) {
+      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSaving(false)
+      setUploadState(null)
+    }
+  }
+
+  async function deleteItem(id: string) {
+    const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
+    Alert.alert('Delete?', 'This will remove the item permanently.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          const { error } = await supabase.from(table).delete().eq('id', id)
+          if (error) { Alert.alert('Error', error.message); return }
+          if (mediaTab === 'photos') { setPhotos(prev => prev.filter(x => x.id !== id)); setCounts(c => ({ ...c, photos: c.photos - 1 })) }
+          else { setVideos(prev => prev.filter(x => x.id !== id)); setCounts(c => ({ ...c, videos: c.videos - 1 })) }
+        },
+      },
+    ])
+  }
+
+  async function toggleActive(id: string, current: boolean) {
+    const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
+    const { error } = await supabase.from(table).update({ is_active: !current }).eq('id', id)
+    if (error) { Alert.alert('Error', error.message); return }
+    if (mediaTab === 'videos') setVideos(prev => prev.map(x => x.id === id ? { ...x, is_active: !current } : x))
+  }
+
+  async function moveItem(id: string, direction: 'up' | 'down') {
+    const list = currentData
+    const idx = list.findIndex(x => x.id === id)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= list.length) return
+    const a = list[idx], b = list[swapIdx]
+    const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
+    const [ra, rb] = await Promise.all([
+      supabase.from(table).update({ display_order: b.display_order }).eq('id', a.id),
+      supabase.from(table).update({ display_order: a.display_order }).eq('id', b.id),
+    ])
+    if (ra.error || rb.error) { Alert.alert('Error', 'Could not reorder.'); return }
+    const newList = [...list]
+    newList[idx] = { ...a, display_order: b.display_order }
+    newList[swapIdx] = { ...b, display_order: a.display_order }
+    newList.sort((x, y) => x.display_order - y.display_order)
+    if (mediaTab === 'photos') setPhotos(newList as MomentPhoto[])
+    else setVideos(newList as MomentVideo[])
+  }
+
+  function showActions(item: MomentPhoto | MomentVideo) {
+    const isFirst = currentData[0]?.id === item.id
+    const isLast = currentData[currentData.length - 1]?.id === item.id
+    const active = (item as MomentVideo).is_active
+
+    const options: string[] = ['✏️  Edit']
+    if (mediaTab === 'videos') options.push(active ? '🚫  Hide' : '✅  Make Active')
+    if (!isFirst) options.push('⬆️  Move Up')
+    if (!isLast) options.push('⬇️  Move Down')
+    options.push('🗑️  Delete', 'Cancel')
+
+    const handle = (i: number) => {
+      const label = options[i]
+      if (label.includes('Edit')) {
+        const v = item as any // eslint-disable-line @typescript-eslint/no-explicit-any
+        setEditingId(item.id)
+        setModalForm({ title: v.title ?? '', description: v.description ?? '', displayOrder: String(item.display_order), youtubeUrl: v.youtube_url ?? '', images: [] })
+        setModalTitle('Edit')
+        setModalVisible(true)
+      } else if (label.includes('Hide') || label.includes('Active')) {
+        toggleActive(item.id, active)
+      } else if (label.includes('Move Up')) {
+        moveItem(item.id, 'up')
+      } else if (label.includes('Move Down')) {
+        moveItem(item.id, 'down')
+      } else if (label.includes('Delete')) {
+        deleteItem(item.id)
+      }
+    }
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: (item as any).title || (mediaTab === 'photos' ? 'Photo' : 'Video'), options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: options.findIndex(o => o.includes('Delete')) }, // eslint-disable-line @typescript-eslint/no-explicit-any
+        handle
+      )
+    } else {
+      Alert.alert('', '', options.slice(0, -1).map((label, i) => ({
+        text: label.replace(/^[^\s]+\s+/, ''),
+        style: label.includes('Delete') ? 'destructive' : 'default',
+        onPress: () => handle(i),
+      })).concat([{ text: 'Cancel', style: 'cancel', onPress: () => {} }]))
+    }
+  }
+
+  const MEDIA_TABS = [
+    { key: 'photos' as MediaTab, label: `Photos (${counts.photos})` },
+    { key: 'videos' as MediaTab, label: `Videos (${counts.videos})` },
+  ]
+  const STATUS_TABS = [
+    { key: 'all' as StatusFilter, label: 'All' },
+    { key: 'active' as StatusFilter, label: 'Active' },
+    { key: 'hidden' as StatusFilter, label: 'Hidden' },
+  ]
+
+  if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f7' }}><ActivityIndicator color="#2d1b69" /></View>
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+      <View style={{ backgroundColor: '#f2f2f7', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(118,118,128,0.12)', borderRadius: 10, paddingHorizontal: 10, gap: 6 }}>
+          <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)' }}>🔍</Text>
+          <TextInput
+            style={{ flex: 1, fontSize: 15, color: '#000', paddingVertical: 9 }}
+            placeholder="Search title…" placeholderTextColor="rgba(60,60,67,0.4)"
+            value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing"
+          />
+        </View>
+      </View>
+
+      <Seg tabs={MEDIA_TABS} selected={mediaTab} onSelect={t => { setMediaTab(t); setStatusFilter('all') }} />
+      <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+        <Seg tabs={STATUS_TABS} selected={statusFilter} onSelect={setStatusFilter} />
+      </View>
+
+      <FlatList
+        data={currentData}
+        keyExtractor={item => `${mediaTab}-${item.id}`}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 160 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
+        onEndReached={onLoadMore}
+        onEndReachedThreshold={0.3}
+        ItemSeparatorComponent={() => <View style={{ height: 0.5, backgroundColor: 'rgba(60,60,67,0.18)', marginLeft: 80 }} />}
+        ListHeaderComponent={<View style={{ height: 8 }} />}
+        renderItem={({ item }) =>
+          mediaTab === 'photos'
+            ? <PhotoRow item={item as MomentPhoto} onAction={() => showActions(item)} />
+            : <VideoRow item={item as MomentVideo} onAction={() => showActions(item)} />
+        }
+        ListFooterComponent={
+          loadingMore ? <ActivityIndicator color="#2d1b69" style={{ paddingVertical: 20 }} />
+            : !hasMore && currentData.length > 0
+              ? <Text style={{ textAlign: 'center', color: 'rgba(60,60,67,0.4)', fontSize: 12, paddingVertical: 24 }}>{currentData.length} items total</Text>
+              : null
+        }
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', paddingTop: 80, paddingHorizontal: 32 }}>
+            <Text style={{ fontSize: 40, marginBottom: 14 }}>{mediaTab === 'photos' ? '✨' : '🎬'}</Text>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#000', marginBottom: 6 }}>Nothing here</Text>
+            <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)', textAlign: 'center' }}>No {mediaTab} match the current filter.</Text>
+          </View>
+        }
+      />
+
+      <TouchableOpacity
+        onPress={() => { setEditingId(null); setModalForm(EMPTY_FORM); setModalTitle(`Add ${mediaTab === 'photos' ? 'Photo' : 'Video'}`); setModalVisible(true) }}
+        style={{ position: 'absolute', bottom: insets.bottom + 86, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 }}
+      >
+        <Text style={{ color: '#fff', fontSize: 28, lineHeight: 32 }}>+</Text>
+      </TouchableOpacity>
+
+      <FormModal
+        visible={modalVisible}
+        title={modalTitle}
+        mediaType={mediaTab}
+        initial={modalForm}
+        saving={saving}
+        uploadState={uploadState}
+        onSave={handleSave}
+        onClose={() => { if (!saving) setModalVisible(false) }}
+      />
+    </View>
+  )
+}

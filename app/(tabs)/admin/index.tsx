@@ -18,9 +18,6 @@ interface Stats {
   familyTreeNodes: number
   totalPhotos: number
   totalVideos: number
-  totalPoetry: number
-  totalExperiences: number
-  draftExperiences: number
   totalPhotoAlbums: number
   totalAlbumPhotos: number
   totalVideoAlbums: number
@@ -30,66 +27,10 @@ interface Stats {
   totalChats: number
   totalMoments: number
   totalMomentVideos: number
+  totalBooks: number
 }
 
-function StatCard({
-  value, label, sub, accent, alert,
-}: {
-  value: number
-  label: string
-  sub?: string
-  accent: string
-  alert?: boolean
-}) {
-  return (
-    <View style={{
-      flex: 1,
-      backgroundColor: '#fff',
-      borderRadius: 16,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: alert ? '#fde68a' : '#f3f4f6',
-      shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
-      overflow: 'hidden',
-    }}>
-      {/* Top accent line */}
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: accent, borderTopLeftRadius: 16, borderTopRightRadius: 16 }} />
-      <Text style={{ fontSize: 34, fontWeight: '800', color: alert ? '#d97706' : '#111827', marginTop: 4 }}>
-        {value.toLocaleString()}
-      </Text>
-      <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', marginTop: 2 }}>{label}</Text>
-      {sub ? <Text style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{sub}</Text> : null}
-      {alert && value > 0 ? (
-        <View style={{ marginTop: 6, backgroundColor: '#fef3c7', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' }}>
-          <Text style={{ fontSize: 9, fontWeight: '700', color: '#92400e', textTransform: 'uppercase', letterSpacing: 0.5 }}>Action needed</Text>
-        </View>
-      ) : null}
-    </View>
-  )
-}
 
-function CompactStat({ value, label, sub, color }: { value: number; label: string; sub?: string; color: string }) {
-  return (
-    <View style={{
-      backgroundColor: '#fff',
-      borderRadius: 12,
-      paddingVertical: 12, paddingHorizontal: 16,
-      borderWidth: 1, borderColor: '#f3f4f6',
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.04, shadowRadius: 3, elevation: 1,
-      overflow: 'hidden',
-    }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, backgroundColor: color, borderTopLeftRadius: 12, borderBottomLeftRadius: 12 }} />
-      <View style={{ marginLeft: 8, flex: 1 }}>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>{label}</Text>
-        {sub ? <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 1 }}>{sub}</Text> : null}
-      </View>
-      <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827', marginLeft: 8 }}>{value.toLocaleString()}</Text>
-    </View>
-  )
-}
 
 function ActionCard({
   emoji, title, sub, badge, badgeColor, onPress,
@@ -149,9 +90,6 @@ export default function AdminScreen() {
       { count: familyTreeNodes },
       { count: totalPhotos },
       { count: totalVideos },
-      { count: totalPoetry },
-      { count: totalExperiences },
-      { count: draftExperiences },
       { count: totalPhotoAlbums },
       { count: totalAlbumPhotos },
       { count: unreadContacts },
@@ -161,6 +99,7 @@ export default function AdminScreen() {
       { count: totalMomentVideos },
       { count: totalVideoAlbums },
       { count: totalAlbumVideos },
+      { count: totalBooks },
     ] = await Promise.all([
       supabase.from('users').select('*', { count: 'exact', head: true }),
       supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'member'),
@@ -169,9 +108,6 @@ export default function AdminScreen() {
       supabase.from('family_tree_nodes').select('*', { count: 'exact', head: true }),
       supabase.from('photos').select('*', { count: 'exact', head: true }),
       supabase.from('videos').select('*', { count: 'exact', head: true }),
-      supabase.from('poetry').select('*', { count: 'exact', head: true }),
-      supabase.from('experiences').select('*', { count: 'exact', head: true }),
-      supabase.from('experiences').select('*', { count: 'exact', head: true }).eq('is_published', false),
       supabase.from('photo_albums').select('*', { count: 'exact', head: true }),
       supabase.from('album_photos').select('*', { count: 'exact', head: true }),
       supabase.from('contact_submissions').select('*', { count: 'exact', head: true }).eq('is_read', false),
@@ -181,6 +117,7 @@ export default function AdminScreen() {
       supabase.from('timeless_moment_videos').select('*', { count: 'exact', head: true }).eq('is_active', true),
       supabase.from('video_albums').select('*', { count: 'exact', head: true }),
       supabase.from('video_album_items').select('*', { count: 'exact', head: true }),
+      supabase.from('library_books').select('*', { count: 'exact', head: true }).eq('is_active', true),
     ])
 
     setStats({
@@ -191,9 +128,6 @@ export default function AdminScreen() {
       familyTreeNodes: familyTreeNodes ?? 0,
       totalPhotos: totalPhotos ?? 0,
       totalVideos: totalVideos ?? 0,
-      totalPoetry: totalPoetry ?? 0,
-      totalExperiences: totalExperiences ?? 0,
-      draftExperiences: draftExperiences ?? 0,
       totalPhotoAlbums: totalPhotoAlbums ?? 0,
       totalAlbumPhotos: totalAlbumPhotos ?? 0,
       totalVideoAlbums: totalVideoAlbums ?? 0,
@@ -203,6 +137,7 @@ export default function AdminScreen() {
       totalChats: totalChats ?? 0,
       totalMoments: totalMoments ?? 0,
       totalMomentVideos: totalMomentVideos ?? 0,
+      totalBooks: totalBooks ?? 0,
     })
   }
 
@@ -255,78 +190,74 @@ export default function AdminScreen() {
         showsVerticalScrollIndicator={false}
       >
 
-        {/* ── Hero stats — 2×2 grid ───────────────────────────────────── */}
-        <View style={{ gap: 10 }}>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <StatCard value={s.totalUsers} label="Total Registered" sub="all accounts" accent="#64748b" />
-            <StatCard value={s.totalMembers} label="Active Members" sub="approved" accent="#22c55e" />
-          </View>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <StatCard
-              value={s.pendingCount}
-              label="Pending Review"
-              sub="awaiting approval"
-              accent={s.pendingCount > 0 ? '#f59e0b' : '#e5e7eb'}
-              alert={s.pendingCount > 0}
-            />
-            <StatCard value={s.adminCount} label="Admins & Staff" sub="admins + superadmins" accent="#3b82f6" />
-          </View>
-        </View>
-
-        {/* ── Content stats — single scrollable row ───────────────────── */}
+        {/* ── Overview card ────────────────────────────────────────────── */}
         <View>
           <Text style={{ fontSize: 11, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
-            Content
+            Overview
           </Text>
-          <View style={{ gap: 8 }}>
-            <CompactStat
-              value={s.familyTreeNodes}
-              label="Family Tree"
-              sub="documented family members"
-              color="#10b981"
-            />
-            <CompactStat
-              value={s.totalPhotos + s.totalVideos}
-              label="Media"
-              sub={`${s.totalPhotos} photos · ${s.totalVideos} videos`}
-              color="#06b6d4"
-            />
-            <CompactStat
-              value={s.totalMoments + s.totalMomentVideos}
-              label="Timeless Moments"
-              sub={`${s.totalMoments} photos · ${s.totalMomentVideos} videos`}
-              color="#8b5cf6"
-            />
-            <CompactStat
-              value={s.totalPhotoAlbums + s.totalVideoAlbums}
-              label="Gallery Albums"
-              sub={`${s.totalPhotoAlbums} photo (${s.totalAlbumPhotos}) · ${s.totalVideoAlbums} video (${s.totalAlbumVideos})`}
-              color="#14b8a6"
-            />
-            <CompactStat
-              value={s.totalPoetry}
-              label="Rhymes & Roots"
-              sub="poems & ghazals"
-              color="#ec4899"
-            />
-            <CompactStat
-              value={s.totalExperiences}
-              label="Memoirs"
-              sub={s.draftExperiences > 0 ? `${s.draftExperiences} unpublished draft${s.draftExperiences > 1 ? 's' : ''}` : 'all published'}
-              color="#7c3aed"
-            />
-            <CompactStat
-              value={s.totalContacts}
-              label="Contact Messages"
-              sub={s.unreadContacts > 0 ? `${s.unreadContacts} unread` : 'all read'}
-              color="#f43f5e"
-            />
-            <CompactStat
-              value={s.totalChats}
-              label="WhatsApp Archive"
-              sub="imported chat files"
-              color="#0ea5e9"
-            />
+          <View style={{
+            backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
+            shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+          }}>
+          <View style={{ height: 3, backgroundColor: '#2d1b69' }} />
+          {[
+            { label: 'Total Registered', value: s.totalUsers,                              sub: 'all accounts',                                                                highlight: false,              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'all' } }) },
+            { label: 'Pending Review',   value: s.pendingCount,                            sub: 'awaiting approval',                                                           highlight: s.pendingCount > 0, onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'pending' } }) },
+            { label: 'Admins & Staff',   value: s.adminCount,                              sub: 'admins + superadmins',                                                        highlight: false,              onPress: null },
+            { label: 'Family Tree',      value: s.familyTreeNodes,                         sub: 'documented members',                                                          highlight: false,              onPress: null },
+            { label: 'Media',            value: s.totalPhotos + s.totalVideos,             sub: `${s.totalPhotos} photos · ${s.totalVideos} videos`,                          highlight: false,              onPress: null },
+            { label: 'Timeless Moments', value: s.totalMoments + s.totalMomentVideos,      sub: `${s.totalMoments} photos · ${s.totalMomentVideos} videos`,                   highlight: false,              onPress: null },
+            { label: 'Gallery Albums',   value: s.totalPhotoAlbums + s.totalVideoAlbums,   sub: `${s.totalPhotoAlbums} photo · ${s.totalVideoAlbums} video`,                  highlight: false,              onPress: null },
+            { label: 'Reading Room',     value: s.totalBooks,                              sub: 'active books',                                                                highlight: false,              onPress: null },
+            { label: 'Contact Messages', value: s.totalContacts,                           sub: s.unreadContacts > 0 ? `${s.unreadContacts} unread` : 'all read',             highlight: s.unreadContacts > 0, onPress: null },
+          ].map((row, i, arr) => {
+            const isPending = row.label === 'Pending Review'
+            const bgColor = row.highlight ? (isPending ? '#fffbeb' : '#fff1f2') : 'transparent'
+            const textColor = row.highlight ? (isPending ? '#92400e' : '#9f1239') : '#374151'
+            const numColor = row.highlight ? (isPending ? '#d97706' : '#e11d48') : '#111827'
+            const inner = (
+              <>
+                <Text style={{ flex: 1, fontSize: 13, color: textColor }}>
+                  {row.label}{' '}
+                  <Text style={{ color: '#9ca3af' }}>({row.sub})</Text>
+                </Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: numColor }}>
+                  {row.value.toLocaleString()}
+                </Text>
+                {row.onPress ? <Text style={{ fontSize: 14, color: '#d1d5db', marginLeft: 6 }}>›</Text> : null}
+              </>
+            )
+            return row.onPress ? (
+              <TouchableOpacity
+                key={row.label}
+                onPress={row.onPress}
+                activeOpacity={0.6}
+                style={{
+                  flexDirection: 'row', alignItems: 'center',
+                  paddingVertical: 9, paddingHorizontal: 16,
+                  borderBottomWidth: i < arr.length - 1 ? 1 : 0,
+                  borderBottomColor: '#f3f4f6',
+                  backgroundColor: bgColor,
+                }}
+              >
+                {inner}
+              </TouchableOpacity>
+            ) : (
+              <View
+                key={row.label}
+                style={{
+                  flexDirection: 'row', alignItems: 'center',
+                  paddingVertical: 9, paddingHorizontal: 16,
+                  borderBottomWidth: i < arr.length - 1 ? 1 : 0,
+                  borderBottomColor: '#f3f4f6',
+                  backgroundColor: bgColor,
+                }}
+              >
+                {inner}
+              </View>
+            )
+          })}
           </View>
         </View>
 
@@ -343,7 +274,7 @@ export default function AdminScreen() {
               sub={`${s.totalMembers} members · ${s.pendingCount} pending`}
               badge={s.pendingCount > 0 ? `${s.pendingCount} awaiting` : null}
               badgeColor="#fef3c7"
-              onPress={() => openWeb('/admin/members')}
+              onPress={() => router.push('/(tabs)/admin/members')}
             />
 
             <ActionCard
@@ -352,7 +283,7 @@ export default function AdminScreen() {
               sub={`${s.totalContacts} total · ${s.unreadContacts} unread`}
               badge={s.unreadContacts > 0 ? `${s.unreadContacts} unread` : null}
               badgeColor="#fee2e2"
-              onPress={() => openWeb('/admin/contacts')}
+              onPress={() => router.push('/(tabs)/admin/contacts')}
             />
 
             <ActionCard
@@ -363,71 +294,40 @@ export default function AdminScreen() {
             />
 
             <ActionCard
-              emoji="📖"
-              title="Memoirs"
-              sub={`${s.totalExperiences} total${s.draftExperiences > 0 ? ` · ${s.draftExperiences} draft` : ''}`}
-              badge={s.draftExperiences > 0 ? `${s.draftExperiences} drafts` : null}
-              badgeColor="#fef3c7"
-              onPress={() => openWeb('/admin/experiences')}
-            />
-
-            <ActionCard
-              emoji="✍️"
-              title="Rhymes & Roots"
-              sub={`${s.totalPoetry} poems & ghazals`}
-              onPress={() => openWeb('/admin/poetry')}
-            />
-
-            <ActionCard
               emoji="📸"
               title="Media"
               sub={`${s.totalPhotos} photos · ${s.totalVideos} videos`}
-              onPress={() => openWeb('/admin/media')}
+              onPress={() => router.push('/(tabs)/admin/media')}
             />
 
             <ActionCard
               emoji="✨"
               title="Timeless Moments"
               sub={`${s.totalMoments} moments`}
-              onPress={() => openWeb('/admin/timeless-moments')}
+              onPress={() => router.push('/(tabs)/admin/moments')}
+            />
+
+            <ActionCard
+              emoji="📚"
+              title="The Reading Room"
+              sub={`${s.totalBooks} books`}
+              onPress={() => router.push('/(tabs)/admin/library' as any)}
             />
 
             <ActionCard
               emoji="💬"
               title="WhatsApp Archive"
               sub={`${s.totalChats} chats imported`}
-              onPress={() => openWeb('/admin/whatsapp')}
+              onPress={() => router.push('/(tabs)/admin/whatsapp')}
             />
 
             <ActionCard
               emoji="📨"
               title="Send Invitations"
               sub="Invite family to join"
-              onPress={() => openWeb('/admin/invitations')}
+              onPress={() => router.push('/(tabs)/admin/invite')}
             />
 
-            {isSuperadmin ? (
-              <>
-                <ActionCard
-                  emoji="📊"
-                  title="Site Statistics"
-                  sub="Sessions & page views"
-                  onPress={() => openWeb('/admin/site-statistics')}
-                />
-                <ActionCard
-                  emoji="📋"
-                  title="Event Logs"
-                  sub="System event log files"
-                  onPress={() => openWeb('/admin/logs')}
-                />
-                <ActionCard
-                  emoji="🔧"
-                  title="Configuration"
-                  sub="Notifications & site settings"
-                  onPress={() => openWeb('/admin/configuration')}
-                />
-              </>
-            ) : null}
 
           </View>
         </View>

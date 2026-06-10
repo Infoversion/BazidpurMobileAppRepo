@@ -2,10 +2,14 @@ import React, { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, useWindowDimensions, RefreshControl,
+  Modal, TextInput, Alert,
 } from 'react-native'
+import { Stack } from 'expo-router'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 import type { Album } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -73,12 +77,92 @@ interface AlbumWithThumbs extends Album {
   _thumbUrls: string[]
 }
 
+function CreateAlbumModal({ onClose, onCreated }: { onClose: () => void; onCreated: (album: Album) => void }) {
+  const insets = useSafeAreaInsets()
+  const [title, setTitle] = useState('')
+  const [desc, setDesc] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    if (!title.trim()) return
+    setSaving(true)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { Alert.alert('Error', 'Not signed in.'); setSaving(false); return }
+
+    const res = await fetch(
+      `https://bazidpur.com/api/albums?_t=${encodeURIComponent(session.access_token)}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ title: title.trim(), description: desc.trim() || undefined }),
+      }
+    )
+    const json = await res.json()
+    setSaving(false)
+    if (!res.ok) { Alert.alert('Error', json.error ?? 'Failed to create album.'); return }
+    onCreated(json.album as Album)
+  }
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: '#fff' }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          paddingTop: insets.top + 12, paddingBottom: 14, paddingHorizontal: 20,
+          borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+        }}>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={{ fontSize: 15, color: '#6b7280' }}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>New Album</Text>
+          <TouchableOpacity onPress={save} disabled={saving || !title.trim()}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: saving || !title.trim() ? '#9ca3af' : '#2d1b69' }}>
+              {saving ? 'Creating…' : 'Create'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ padding: 20, gap: 16 }}>
+          <View>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Title *</Text>
+            <TextInput
+              autoFocus
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Album title…"
+              placeholderTextColor="#9ca3af"
+              style={{ fontSize: 16, color: '#111827', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 12 }}
+              maxLength={200}
+            />
+          </View>
+          <View>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Description</Text>
+            <TextInput
+              value={desc}
+              onChangeText={setDesc}
+              placeholder="Optional…"
+              placeholderTextColor="#9ca3af"
+              style={{ fontSize: 15, color: '#374151', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, padding: 12, minHeight: 80, textAlignVertical: 'top' }}
+              multiline
+              maxLength={1000}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
 export default function GalleryScreen() {
   const { width } = useWindowDimensions()
   const colW = (width - 44) / 2
+  const { user } = useAuth()
   const [albums, setAlbums] = useState<AlbumWithThumbs[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
 
   async function load() {
     const { data: albumData } = await supabase
@@ -125,14 +209,47 @@ export default function GalleryScreen() {
   if (!albums.length) {
     return (
       <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <Stack.Screen options={user ? {
+          headerRight: () => (
+            <TouchableOpacity onPress={() => setCreateOpen(true)} style={{ paddingHorizontal: 4 }}>
+              <Text style={{ fontSize: 26, color: '#2d1b69', lineHeight: 30 }}>+</Text>
+            </TouchableOpacity>
+          ),
+        } : {}} />
         <Text style={{ fontSize: 44, marginBottom: 12 }}>📸</Text>
         <Text style={{ fontSize: 17, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No albums yet</Text>
         <Text style={{ fontSize: 13, color: '#8e8e93', textAlign: 'center' }}>Community photo albums will appear here.</Text>
+        {user ? (
+          <TouchableOpacity
+            onPress={() => setCreateOpen(true)}
+            style={{ marginTop: 24, backgroundColor: '#2d1b69', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Create First Album</Text>
+          </TouchableOpacity>
+        ) : null}
+        {createOpen && (
+          <CreateAlbumModal
+            onClose={() => setCreateOpen(false)}
+            onCreated={album => {
+              setAlbums([{ ...album, _thumbUrls: [] }])
+              setCreateOpen(false)
+              router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: album.id } })
+            }}
+          />
+        )}
       </View>
     )
   }
 
   return (
+    <>
+    <Stack.Screen options={user ? {
+      headerRight: () => (
+        <TouchableOpacity onPress={() => setCreateOpen(true)} style={{ paddingHorizontal: 4 }}>
+          <Text style={{ fontSize: 26, color: '#2d1b69', lineHeight: 30 }}>+</Text>
+        </TouchableOpacity>
+      ),
+    } : {}} />
     <FlatList
       data={albums}
       keyExtractor={a => a.id}
@@ -174,5 +291,16 @@ export default function GalleryScreen() {
         )
       }}
     />
+    {createOpen && (
+      <CreateAlbumModal
+        onClose={() => setCreateOpen(false)}
+        onCreated={album => {
+          setAlbums(prev => [{ ...album, _thumbUrls: [] }, ...prev])
+          setCreateOpen(false)
+          router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: album.id } })
+        }}
+      />
+    )}
+    </>
   )
 }
