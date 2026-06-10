@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Linking, Alert,
+  ActivityIndicator, RefreshControl, Linking, Alert, Image,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -74,8 +74,13 @@ function ActionCard({
 
 export default function AdminScreen() {
   const insets = useSafeAreaInsets()
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const isSuperadmin = user?.role === 'superadmin'
+
+  async function handleSignOut() {
+    await signOut()
+    router.replace('/(public)')
+  }
 
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -172,16 +177,41 @@ export default function AdminScreen() {
         paddingTop: insets.top + 10,
         paddingBottom: 20,
         paddingHorizontal: 20,
+        flexDirection: 'row',
+        alignItems: 'flex-end',
       }}>
-        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>
-          Admin Panel
-        </Text>
-        <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>Dashboard</Text>
-        {isSuperadmin ? (
-          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>Superadmin</Text>
-        ) : (
-          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>Admin</Text>
-        )}
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>
+            Admin Panel
+          </Text>
+          <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>Admin</Text>
+          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>
+            {isSuperadmin ? 'Superadmin' : 'Admin'}
+          </Text>
+        </View>
+        {/* Avatar + Sign Out */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{
+            width: 34, height: 34, borderRadius: 17,
+            backgroundColor: 'rgba(255,255,255,0.22)',
+            alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
+          }}>
+            {user?.photo_url ? (
+              <Image source={{ uri: user.photo_url }} style={{ width: 34, height: 34, borderRadius: 17 }} />
+            ) : (
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
+                {user ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase() : '?'}
+              </Text>
+            )}
+          </View>
+          <TouchableOpacity
+            onPress={handleSignOut}
+            style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 8, paddingHorizontal: 11, paddingVertical: 6 }}
+          >
+            <Text style={{ fontSize: 12, color: '#fff', fontWeight: '600' }}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
