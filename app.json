@@ -9,7 +9,12 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bazidpur.app"
+      "bundleIdentifier": "com.bazidpur.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Used to update your profile photo.",
+        "NSPhotoLibraryAddUsageDescription": "Used to save photos from the app."
+      }
     },
     "android": {
       "package": "com.bazidpur.app",
@@ -44,6 +49,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "214b0ec8-49ed-4d9e-8245-662a0860599c"
+      }
     }
   }
 }
