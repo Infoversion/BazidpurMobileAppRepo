@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { PurpleHeader } from '@/components/PurpleHeader'
 import { DEFAULT_NODES } from '@/lib/ancestral-lineage-defaults'
 import type { AncestorNode } from '@/lib/types'
 
@@ -226,28 +226,22 @@ export default function AncestralLineageScreen() {
     : 0
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
 
-      {/* Header */}
-      <View className="bg-white border-b border-gray-100 px-6 pt-5 pb-4">
-        <Text className="text-xs text-gray-400 uppercase tracking-widest mb-1 text-center font-medium">
-          Community · Ancestry
-        </Text>
-        <Text className="text-2xl font-bold text-gray-900 text-center tracking-tight mb-1">
-          Ancestral Lineage
-        </Text>
-        <Text className="text-xs text-gray-500 text-center leading-relaxed" numberOfLines={2}>
+      <PurpleHeader title="Lineage" showBack />
+
+      {/* Description strip */}
+      <View style={{ backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' }}>
+        <Text style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', lineHeight: 17 }}>
           Tracing the direct ancestral line of the Bazidpur family across ten generations.
         </Text>
         {!loading && sorted.length > 0 && (
-          <View className="flex-row justify-center gap-4 mt-2">
-            <Text className="text-xs text-gray-400">
-              c. {sorted[0]?.bornApprox} – {sorted[sorted.length - 1]?.bornApprox}
-            </Text>
-            <Text className="text-xs text-gray-300">|</Text>
-            <Text className="text-xs text-gray-400">10 generations</Text>
-            <Text className="text-xs text-gray-300">|</Text>
-            <Text className="text-xs text-gray-400">~{spanYears} years</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, alignItems: 'center' }}>
+            <Text style={{ fontSize: 11, color: '#9ca3af' }}>c. {sorted[0]?.bornApprox} – {sorted[sorted.length - 1]?.bornApprox}</Text>
+            <Text style={{ fontSize: 11, color: '#d1d5db' }}>|</Text>
+            <Text style={{ fontSize: 11, color: '#9ca3af' }}>10 generations</Text>
+            <Text style={{ fontSize: 11, color: '#d1d5db' }}>|</Text>
+            <Text style={{ fontSize: 11, color: '#9ca3af' }}>~{spanYears} years</Text>
           </View>
         )}
       </View>
@@ -283,6 +277,6 @@ export default function AncestralLineageScreen() {
         </ScrollView>
       )}
 
-    </SafeAreaView>
+    </View>
   )
 }

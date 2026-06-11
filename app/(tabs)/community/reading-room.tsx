@@ -7,6 +7,7 @@ import {
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { PurpleHeader } from '@/components/PurpleHeader'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
 
@@ -187,26 +188,33 @@ export default function ReadingRoomScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color="#2d1b69" />
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <PurpleHeader title="Reading Room" showBack />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#2d1b69" />
+        </View>
       </View>
     )
   }
 
   if (!books.length) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-        <Text style={{ fontSize: 48, marginBottom: 12 }}>📚</Text>
-        <Text style={{ fontSize: 17, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No books yet</Text>
-        <Text style={{ fontSize: 13, color: '#8e8e93', textAlign: 'center' }}>
-          Books and writings from the Bazidpur family heritage will appear here.
-        </Text>
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <PurpleHeader title="Reading Room" showBack />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Text style={{ fontSize: 48, marginBottom: 12 }}>📚</Text>
+          <Text style={{ fontSize: 17, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No books yet</Text>
+          <Text style={{ fontSize: 13, color: '#8e8e93', textAlign: 'center' }}>
+            Books and writings from the Bazidpur family heritage will appear here.
+          </Text>
+        </View>
       </View>
     )
   }
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+      <PurpleHeader title="Reading Room" showBack />
       <FlatList
         data={books}
         keyExtractor={b => b.id}
@@ -257,6 +265,6 @@ export default function ReadingRoomScreen() {
       {selectedBook && (
         <BookModal book={selectedBook} onClose={() => setSelectedBook(null)} />
       )}
-    </>
+    </View>
   )
 }

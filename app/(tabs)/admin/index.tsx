@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Linking, Alert, Image,
+  ActivityIndicator, RefreshControl, Linking, Alert,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -74,13 +74,8 @@ function ActionCard({
 
 export default function AdminScreen() {
   const insets = useSafeAreaInsets()
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const isSuperadmin = user?.role === 'superadmin'
-
-  async function handleSignOut() {
-    await signOut()
-    router.replace('/(public)')
-  }
 
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -189,29 +184,6 @@ export default function AdminScreen() {
             {isSuperadmin ? 'Superadmin' : 'Admin'}
           </Text>
         </View>
-        {/* Avatar + Sign Out */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{
-            width: 34, height: 34, borderRadius: 17,
-            backgroundColor: 'rgba(255,255,255,0.22)',
-            alignItems: 'center', justifyContent: 'center',
-            overflow: 'hidden',
-          }}>
-            {user?.photo_url ? (
-              <Image source={{ uri: user.photo_url }} style={{ width: 34, height: 34, borderRadius: 17 }} />
-            ) : (
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
-                {user ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase() : '?'}
-              </Text>
-            )}
-          </View>
-          <TouchableOpacity
-            onPress={handleSignOut}
-            style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 8, paddingHorizontal: 11, paddingVertical: 6 }}
-          >
-            <Text style={{ fontSize: 12, color: '#fff', fontWeight: '600' }}>Sign out</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       <ScrollView
@@ -232,15 +204,17 @@ export default function AdminScreen() {
           }}>
           <View style={{ height: 3, backgroundColor: '#2d1b69' }} />
           {[
-            { label: 'Total Registered', value: s.totalUsers,                              sub: 'all accounts',                                                                highlight: false,              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'all' } }) },
-            { label: 'Pending Review',   value: s.pendingCount,                            sub: 'awaiting approval',                                                           highlight: s.pendingCount > 0, onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'pending' } }) },
-            { label: 'Admins & Staff',   value: s.adminCount,                              sub: 'admins + superadmins',                                                        highlight: false,              onPress: null },
-            { label: 'Family Tree',      value: s.familyTreeNodes,                         sub: 'documented members',                                                          highlight: false,              onPress: null },
-            { label: 'Media',            value: s.totalPhotos + s.totalVideos,             sub: `${s.totalPhotos} photos · ${s.totalVideos} videos`,                          highlight: false,              onPress: null },
-            { label: 'Timeless Moments', value: s.totalMoments + s.totalMomentVideos,      sub: `${s.totalMoments} photos · ${s.totalMomentVideos} videos`,                   highlight: false,              onPress: null },
-            { label: 'Gallery Albums',   value: s.totalPhotoAlbums + s.totalVideoAlbums,   sub: `${s.totalPhotoAlbums} photo · ${s.totalVideoAlbums} video`,                  highlight: false,              onPress: null },
-            { label: 'Reading Room',     value: s.totalBooks,                              sub: 'active books',                                                                highlight: false,              onPress: null },
-            { label: 'Contact Messages', value: s.totalContacts,                           sub: s.unreadContacts > 0 ? `${s.unreadContacts} unread` : 'all read',             highlight: s.unreadContacts > 0, onPress: null },
+            { icon: '👥', label: 'Total Registered', value: s.totalUsers,                              sub: 'all accounts',                                                                highlight: false,              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'all' } }) },
+            { icon: '⏳', label: 'Pending Review',   value: s.pendingCount,                            sub: 'awaiting approval',                                                           highlight: s.pendingCount > 0, onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'pending' } }) },
+            { icon: '🛡️', label: 'Admins & Staff',   value: s.adminCount,                              sub: 'admins + superadmins',                                                        highlight: false,              onPress: null },
+            { icon: '🌳', label: 'Family Tree',      value: s.familyTreeNodes,                         sub: 'documented members',                                                          highlight: false,              onPress: () => router.push('/(tabs)/admin/family-tree' as any) },
+            { icon: '📸', label: 'Media',            value: s.totalPhotos + s.totalVideos,             sub: `${s.totalPhotos} photos · ${s.totalVideos} videos`,                          highlight: false,              onPress: () => router.push('/(tabs)/admin/media') },
+            { icon: '✨', label: 'Timeless Moments', value: s.totalMoments + s.totalMomentVideos,      sub: `${s.totalMoments} photos · ${s.totalMomentVideos} videos`,                   highlight: false,              onPress: () => router.push('/(tabs)/admin/moments') },
+            { icon: '🗂️', label: 'Gallery Albums',   value: s.totalPhotoAlbums + s.totalVideoAlbums,   sub: `${s.totalPhotoAlbums} photo · ${s.totalVideoAlbums} video`,                  highlight: false,              onPress: null },
+            { icon: '📚', label: 'Reading Room',     value: s.totalBooks,                              sub: 'active books',                                                                highlight: false,              onPress: () => router.push('/(tabs)/admin/library' as any) },
+            { icon: '✉️', label: 'Contact Submissions', value: s.totalContacts,                        sub: s.unreadContacts > 0 ? `${s.unreadContacts} unread` : 'all read',             highlight: s.unreadContacts > 0, onPress: () => router.push('/(tabs)/admin/contacts') },
+            { icon: '💬', label: 'WhatsApp Archive',    value: s.totalChats,                           sub: 'chats imported',                                                              highlight: false,              onPress: () => router.push('/(tabs)/admin/whatsapp') },
+            { icon: '📨', label: 'Send Invitations',    value: null,                                   sub: 'invite family to join',                                                       highlight: false,              onPress: () => router.push('/(tabs)/admin/invite') },
           ].map((row, i, arr) => {
             const isPending = row.label === 'Pending Review'
             const bgColor = row.highlight ? (isPending ? '#fffbeb' : '#fff1f2') : 'transparent'
@@ -248,14 +222,17 @@ export default function AdminScreen() {
             const numColor = row.highlight ? (isPending ? '#d97706' : '#e11d48') : '#111827'
             const inner = (
               <>
+                <Text style={{ fontSize: 15, marginRight: 8 }}>{row.icon}</Text>
                 <Text style={{ flex: 1, fontSize: 13, color: textColor }}>
                   {row.label}{' '}
                   <Text style={{ color: '#9ca3af' }}>({row.sub})</Text>
                 </Text>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: numColor }}>
-                  {row.value.toLocaleString()}
-                </Text>
-                {row.onPress ? <Text style={{ fontSize: 14, color: '#d1d5db', marginLeft: 6 }}>›</Text> : null}
+                {row.value !== null && (
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: numColor }}>
+                    {row.value.toLocaleString()}
+                  </Text>
+                )}
+                {row.onPress ? <Text style={{ fontSize: 18, fontWeight: '700', color: '#9ca3af', marginLeft: 6 }}>›</Text> : null}
               </>
             )
             return row.onPress ? (
@@ -288,77 +265,6 @@ export default function AdminScreen() {
               </View>
             )
           })}
-          </View>
-        </View>
-
-        {/* ── Management actions ───────────────────────────────────────── */}
-        <View>
-          <Text style={{ fontSize: 11, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
-            Management
-          </Text>
-          <View style={{ gap: 8 }}>
-
-            <ActionCard
-              emoji="👥"
-              title="Member Management"
-              sub={`${s.totalMembers} members · ${s.pendingCount} pending`}
-              badge={s.pendingCount > 0 ? `${s.pendingCount} awaiting` : null}
-              badgeColor="#fef3c7"
-              onPress={() => router.push('/(tabs)/admin/members')}
-            />
-
-            <ActionCard
-              emoji="✉️"
-              title="Contact Submissions"
-              sub={`${s.totalContacts} total · ${s.unreadContacts} unread`}
-              badge={s.unreadContacts > 0 ? `${s.unreadContacts} unread` : null}
-              badgeColor="#fee2e2"
-              onPress={() => router.push('/(tabs)/admin/contacts')}
-            />
-
-            <ActionCard
-              emoji="🌳"
-              title="Family Tree"
-              sub={`${s.familyTreeNodes} nodes`}
-              onPress={() => router.push('/(tabs)/admin/family-tree' as any)}
-            />
-
-            <ActionCard
-              emoji="📸"
-              title="Media"
-              sub={`${s.totalPhotos} photos · ${s.totalVideos} videos`}
-              onPress={() => router.push('/(tabs)/admin/media')}
-            />
-
-            <ActionCard
-              emoji="✨"
-              title="Timeless Moments"
-              sub={`${s.totalMoments} moments`}
-              onPress={() => router.push('/(tabs)/admin/moments')}
-            />
-
-            <ActionCard
-              emoji="📚"
-              title="The Reading Room"
-              sub={`${s.totalBooks} books`}
-              onPress={() => router.push('/(tabs)/admin/library' as any)}
-            />
-
-            <ActionCard
-              emoji="💬"
-              title="WhatsApp Archive"
-              sub={`${s.totalChats} chats imported`}
-              onPress={() => router.push('/(tabs)/admin/whatsapp')}
-            />
-
-            <ActionCard
-              emoji="📨"
-              title="Send Invitations"
-              sub="Invite family to join"
-              onPress={() => router.push('/(tabs)/admin/invite')}
-            />
-
-
           </View>
         </View>
 

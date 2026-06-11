@@ -1,6 +1,6 @@
 import { View, Text, ScrollView } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
+import { PurpleHeader } from '@/components/PurpleHeader'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
 const PORTRAIT       = `${R2}/about/fazihat-shah-warsi.jpg`
@@ -25,15 +25,13 @@ const SONS = ['Abul Hasan', 'Ali Kareem', 'Mehdi Hasan']
 
 export default function ZahoorAliScreen() {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }} edges={['top', 'bottom']}>
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+      <PurpleHeader title="Zahoor Ali" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 110 }}>
 
         {/* Hero */}
-        <View style={{ backgroundColor: '#fff', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e5e5ea' }}>
-          <Text style={{ fontSize: 11, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8, fontWeight: '600' }}>The Saint of Bazidpur</Text>
-          <Text style={{ fontSize: 28, fontWeight: '700', color: '#1c1c1e', marginBottom: 8, letterSpacing: -0.5, textAlign: 'center', lineHeight: 34 }}>
-            Fazihat Shah Warsi
-          </Text>
+        <View style={{ backgroundColor: '#fff', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e5e5ea' }}>
+          <Text style={{ fontSize: 11, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 6, fontWeight: '600' }}>The Saint of Bazidpur</Text>
           <Text style={{ fontSize: 14, color: '#8e8e93', textAlign: 'center', lineHeight: 21, maxWidth: 300 }}>
             Scholar, saint, and servant of humanity — his legacy of love, unity, and brotherhood continues to shape the Bazidpur family across generations.
           </Text>
@@ -189,6 +187,6 @@ export default function ZahoorAliScreen() {
 
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   )
 }

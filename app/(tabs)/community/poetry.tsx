@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { PurpleHeader } from '@/components/PurpleHeader'
 import type { Poetry, PoetryVerse } from '@/lib/types'
 
 type Tab = 'poetry' | 'ghazal'
@@ -167,11 +168,20 @@ export default function PoetryScreen() {
   const filtered = poems.filter(p => p.type === tab)
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#2d1b69" /></View>
+    return (
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <PurpleHeader title="Rhymes & Roots" showBack />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#2d1b69" />
+        </View>
+      </View>
+    )
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+
+      <PurpleHeader title="Rhymes & Roots" showBack />
 
       {/* iOS Segmented Control */}
       <View style={{ backgroundColor: '#f2f2f7', paddingHorizontal: 16, paddingVertical: 10 }}>
@@ -201,16 +211,17 @@ export default function PoetryScreen() {
         keyExtractor={p => p.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 90, gap: 10 }}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const isUrduItem = !!(item.title_urdu || item.content_urdu)
           const langLabel = isUrduItem ? 'Urdu' : 'Persian'
           const verseCount = item.verses?.length ?? 0
+          const isEven = index % 2 === 0
 
           return (
             <Pressable
               onPress={() => setSelected(item)}
               style={({ pressed }) => ({
-                backgroundColor: pressed ? '#f5f5f5' : '#ffffff',
+                backgroundColor: pressed ? '#ddd6fe' : isEven ? '#ffffff' : '#ede9fe',
                 borderRadius: 14, padding: 16,
                 shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
@@ -232,7 +243,7 @@ export default function PoetryScreen() {
                     </Text>
                   ) : null}
                   {item.author ? (
-                    <Text style={{ fontSize: 12, color: '#aeaeb2', marginTop: 4 }}>by {item.author}</Text>
+                    <Text style={{ fontSize: 12, color: '#aeaeb2', marginTop: 2 }}>by {item.author}</Text>
                   ) : null}
                 </View>
                 <View style={{ backgroundColor: '#f0effe', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
@@ -241,7 +252,7 @@ export default function PoetryScreen() {
               </View>
 
               {/* Footer */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
                 <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                   <View style={{ backgroundColor: '#f2f2f7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
                     <Text style={{ fontSize: 11, color: '#8e8e93', fontWeight: '600' }}>{langLabel}</Text>

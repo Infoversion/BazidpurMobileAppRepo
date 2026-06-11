@@ -151,10 +151,14 @@ function LightboxImage({
       }
     })
 
+  // Swallow long-press so the native "Save Image" menu never appears
+  const longPress = Gesture.LongPress().minDuration(300).onStart(() => {})
+
   // Race: double-tap wins over everything; otherwise pinch + zoomPan + dismissPan
   // all run simultaneously (each has its own activation condition).
   const gesture = Gesture.Race(
     doubleTap,
+    longPress,
     Gesture.Simultaneous(pinch, zoomPan, dismissPan),
   )
 

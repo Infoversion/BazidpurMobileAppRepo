@@ -16,14 +16,13 @@ type Tile = {
 const TILES: Tile[] = [
   { emoji: '✨', label: 'Timeless Moments', sub: 'Curated moments',    route: '/(tabs)/community/moments', bg: '#fde68a', depth: '#b45309' },
   { emoji: '🖼️', label: 'The Gallery',     sub: 'Photos & albums',    route: '/(tabs)/community/gallery', bg: '#fed7aa', depth: '#92400e' },
-  { emoji: '✍️', label: 'Rhyme & Roots',   sub: 'Urdu & Persian',     route: '/(tabs)/community/poetry',  bg: '#ddd6fe', depth: '#5b21b6' },
+  { emoji: '✍️', label: 'Rhymes & Roots',  sub: 'Urdu & Persian',     route: '/(tabs)/community/poetry',  bg: '#ddd6fe', depth: '#5b21b6' },
   { emoji: '📖', label: 'Memoirs',         sub: 'Personal stories',   route: '/(tabs)/community/memoirs', bg: '#bbf7d0', depth: '#065f46' },
   { emoji: '📚', label: 'Reading Room',     sub: 'Books & journals',   route: '/(tabs)/community/reading-room', bg: '#e0e7ff', depth: '#3730a3' },
   { emoji: '💬', label: 'The Forum',       sub: 'Community threads',  route: '/(tabs)/community/forum',   bg: '#bae6fd', depth: '#0369a1' },
   { emoji: '🌳', label: 'Family Tree',     sub: 'Trace lineage',      route: '/(tabs)/tree',              bg: '#99f6e4', depth: '#0f766e' },
   { emoji: '📜', label: 'Lineage',         sub: 'Ten generations',    route: '/(tabs)/lineage',           bg: '#fef08a', depth: '#854d0e' },
-  { emoji: '👤', label: 'My Profile',      sub: 'Settings & sign out',route: '/(tabs)/more',              bg: '#c7d2fe', depth: '#3730a3' },
-  { emoji: '⚙️', label: 'Admin',           sub: 'Manage content',     route: '/(tabs)/admin', adminOnly: true, bg: '#fca5a5', depth: '#991b1b' },
+{ emoji: '⚙️', label: 'Admin',           sub: 'Manage content',     route: '/(tabs)/admin', adminOnly: true, bg: '#fca5a5', depth: '#991b1b' },
 ]
 
 const DEPTH = 5

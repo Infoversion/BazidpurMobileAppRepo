@@ -5,12 +5,13 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
+import type { Photo, Video } from '@/lib/types'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import VideoPlayer from '@/components/gallery/VideoPlayer'
 import { PurpleHeader } from '@/components/PurpleHeader'
-import type { Photo, Video } from '@/lib/types'
 
-const PAGE_SIZE = 40
+const PAGE_SIZE = 20
 
 // ─── Segmented control ────────────────────────────────────────────────────────
 
@@ -61,9 +62,9 @@ function PhotoGrid({
   if (photos.length === 0) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
-        <Text style={{ fontSize: 44, marginBottom: 12 }}>✨</Text>
+        <Text style={{ fontSize: 44, marginBottom: 12 }}>🖼️</Text>
         <Text style={{ fontSize: 15, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No photos yet</Text>
-        <Text style={{ fontSize: 13, color: '#8e8e93' }}>Check back soon.</Text>
+        <Text style={{ fontSize: 13, color: '#8e8e93' }}>Community photos will appear here.</Text>
       </View>
     )
   }
@@ -124,7 +125,7 @@ function VideoList({
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
         <Text style={{ fontSize: 44, marginBottom: 12 }}>🎬</Text>
         <Text style={{ fontSize: 15, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No videos yet</Text>
-        <Text style={{ fontSize: 13, color: '#8e8e93' }}>Check back soon.</Text>
+        <Text style={{ fontSize: 13, color: '#8e8e93' }}>Community videos will appear here.</Text>
       </View>
     )
   }
@@ -148,6 +149,7 @@ function VideoList({
             onPress={() => onPress(item)}
             activeOpacity={0.85}
           >
+            {/* Thumbnail */}
             <View style={{ position: 'relative' }}>
               <Image
                 source={{ uri: thumb }}
@@ -168,6 +170,7 @@ function VideoList({
                 </View>
               </View>
             </View>
+            {/* Info */}
             <View style={{ padding: 14 }}>
               <Text style={{ fontSize: 15, fontWeight: '700', color: '#1c1c1e', marginBottom: 4, lineHeight: 20 }} numberOfLines={2}>
                 {item.title}
@@ -188,33 +191,28 @@ function VideoList({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function TimelessMomentsScreen() {
+  const { session } = useAuth()
   const [activeTab, setActiveTab] = useState<'photos' | 'videos'>('photos')
   const [photos, setPhotos] = useState<Photo[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [activeVideo, setActiveVideo] = useState<Video | null>(null)
 
   async function fetchData() {
     const [{ data: p }, { data: v }] = await Promise.all([
-      supabase
-        .from('timeless_moments')
-        .select('id, title, description, r2_url, thumbnail_url')
-        .order('display_order')
-        .limit(PAGE_SIZE),
-      supabase
-        .from('timeless_moment_videos')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { nullsFirst: false })
-        .limit(PAGE_SIZE),
+      supabase.from('photos').select('*').eq('is_active', true).order('display_order').limit(PAGE_SIZE),
+      supabase.from('videos').select('*').eq('is_active', true).order('display_order').limit(PAGE_SIZE),
     ])
-    setPhotos((p ?? []) as Photo[])
-    setVideos((v ?? []) as Video[])
+    setPhotos(p ?? [])
+    setVideos(v ?? [])
   }
 
-  useEffect(() => { fetchData().finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+    fetchData().finally(() => setLoading(false))
+  }, [])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -223,17 +221,16 @@ export default function TimelessMomentsScreen() {
   }, [])
 
   const tabLabels: Record<'photos' | 'videos', string> = {
-    photos: `✨  Photos${photos.length ? ` (${photos.length})` : ''}`,
+    photos: `📷  Photos${photos.length ? ` (${photos.length})` : ''}`,
     videos: `🎬  Videos${videos.length ? ` (${videos.length})` : ''}`,
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
-
-      <PurpleHeader title="Timeless Moments" showBack />
+      <PurpleHeader title="Media" />
 
       {/* Segmented control sub-bar */}
-      <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e5e5ea' }}>
+      <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 10 }}>
         <SegmentedControl
           options={['photos', 'videos']}
           value={activeTab}
@@ -280,6 +277,7 @@ export default function TimelessMomentsScreen() {
           onClose={() => setActiveVideo(null)}
         />
       )}
+
     </View>
   )
 }

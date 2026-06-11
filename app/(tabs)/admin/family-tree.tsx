@@ -1,19 +1,21 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
-  View, Text, FlatList, TouchableOpacity, Modal, TextInput,
-  ActivityIndicator, Alert, ScrollView, Switch, Image,
-  RefreshControl, Pressable, Platform, ActionSheetIOS,
-  KeyboardAvoidingView,
+  View, Text, TextInput, TouchableOpacity, FlatList,
+  ActivityIndicator, Modal, ScrollView, Switch, Image,
+  Alert, Platform, ActionSheetIOS, KeyboardAvoidingView,
+  RefreshControl, Pressable, StyleSheet,
 } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Swipeable } from 'react-native-gesture-handler'
 import * as ImagePicker from 'expo-image-picker'
+import { DateOfBirthPicker } from '@/components/DateOfBirthPicker'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { webUpload } from '@/lib/webApi'
-import type { FamilyNode } from '@/lib/family-tree-layout'
+import { levelColor, type FamilyNode } from '@/lib/family-tree-layout'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+const ROW_H = 64
 
 function resolvePhoto(url?: string | null) {
   if (!url) return null
@@ -23,10 +25,6 @@ function sexColor(sex: string) {
   if (sex === 'male') return '#3b82f6'
   if (sex === 'female') return '#ec4899'
   return '#9ca3af'
-}
-function yearStr(iso?: string | null) {
-  if (!iso) return ''
-  return new Date(iso).getFullYear().toString()
 }
 function countDescendants(id: string, all: FamilyNode[]): number {
   return all.filter(n => n.parent_id === id)
@@ -68,15 +66,16 @@ const EMPTY: Omit<FamilyNode, 'id' | 'tree_level' | 'display_order'> = {
   dob: '', dod: '', married_to: '', description: '', photo_url: '', parent_id: null,
 }
 
+
+
 function NodeModal({
-  visible, mode, initial, parentOptions, isSuperadmin,
+  visible, mode, initial, parentOptions,
   onClose, onSave, onDelete,
 }: {
   visible: boolean
   mode: 'add' | 'edit'
-  initial: Partial<FamilyNode> & { parent_id?: string | null }
+  initial: Partial<FamilyNode>
   parentOptions: FamilyNode[]
-  isSuperadmin: boolean
   onClose: () => void
   onSave: (data: Partial<FamilyNode>) => Promise<void>
   onDelete?: () => void
@@ -91,7 +90,6 @@ function NodeModal({
   useEffect(() => { setForm({ ...EMPTY, ...initial }) }, [visible])
 
   const set = (k: keyof typeof form, v: any) => setForm(p => ({ ...p, [k]: v }))
-
   const selectedParent = parentOptions.find(n => n.id === form.parent_id)
   const filteredParents = parentSearch.trim()
     ? parentOptions.filter(n => n.name.toLowerCase().includes(parentSearch.toLowerCase()))
@@ -126,6 +124,7 @@ function NodeModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+          {/* Header */}
           <View style={{
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: 20, paddingTop: insets.top + 14, paddingBottom: 14,
@@ -162,21 +161,21 @@ function NodeModal({
                 )}
                 {uploading
                   ? <ActivityIndicator size="small" color="#2d1b69" style={{ marginTop: 6 }} />
-                  : <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
-                      {form.photo_url ? 'Change photo' : 'Add photo'}
-                    </Text>
+                  : <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>{form.photo_url ? 'Change photo' : 'Add photo'}</Text>
                 }
               </Pressable>
             </View>
 
             <Field label="Full Name *">
-              <TextInput value={form.name} onChangeText={v => set('name', v)} placeholder="Enter full name" style={inputStyle} autoCapitalize="words" returnKeyType="next" />
+              <TextInput value={form.name} onChangeText={v => set('name', v)} placeholder="Enter full name"
+                style={inp} autoCapitalize="words" returnKeyType="next" />
             </Field>
 
             <Field label="Sex">
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {(['male', 'female', 'other'] as const).map(s => (
-                  <TouchableOpacity key={s} onPress={() => set('sex', s)} style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: form.sex === s ? sexColor(s) : '#f3f4f6' }}>
+                  <TouchableOpacity key={s} onPress={() => set('sex', s)}
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: form.sex === s ? sexColor(s) : '#f3f4f6' }}>
                     <Text style={{ fontSize: 13, fontWeight: '600', color: form.sex === s ? '#fff' : '#6b7280', textTransform: 'capitalize' }}>
                       {s === 'male' ? '♂ Male' : s === 'female' ? '♀ Female' : '⚬ Other'}
                     </Text>
@@ -186,31 +185,34 @@ function NodeModal({
             </Field>
 
             <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 14, color: '#374151' }}>Still alive</Text>
+              <Text style={{ fontSize: 14, color: '#374151' }}>Alive?</Text>
               <Switch value={form.is_alive} onValueChange={v => { set('is_alive', v); if (v) set('dod', '') }} trackColor={{ true: '#2d1b69' }} />
             </View>
 
             <Field label="Date of Birth">
-              <TextInput value={form.dob ?? ''} onChangeText={v => set('dob', v)} placeholder="YYYY-MM-DD" style={inputStyle} keyboardType="numbers-and-punctuation" />
+              <DateOfBirthPicker value={form.dob ?? ''} onChange={v => set('dob', v)} defaultDate={new Date(1950, 0, 1)} />
             </Field>
 
             {!form.is_alive && (
               <Field label="Date of Death">
-                <TextInput value={form.dod ?? ''} onChangeText={v => set('dod', v)} placeholder="YYYY-MM-DD" style={inputStyle} keyboardType="numbers-and-punctuation" />
+                <DateOfBirthPicker value={form.dod ?? ''} onChange={v => set('dod', v)} defaultDate={new Date(1950, 0, 1)} />
               </Field>
             )}
 
             <Field label="Married To">
-              <TextInput value={form.married_to ?? ''} onChangeText={v => set('married_to', v)} placeholder="Spouse name" style={inputStyle} />
+              <TextInput value={form.married_to ?? ''} onChangeText={v => set('married_to', v)}
+                placeholder="Spouse name" style={inp} />
             </Field>
 
             <Field label="Description / Note">
-              <TextInput value={form.description ?? ''} onChangeText={v => set('description', v)} placeholder="Brief biography or notes…" style={[inputStyle, { height: 80, textAlignVertical: 'top' }]} multiline />
+              <TextInput value={form.description ?? ''} onChangeText={v => set('description', v)}
+                placeholder="Brief biography or notes…" style={[inp, { height: 80, textAlignVertical: 'top' }]} multiline />
             </Field>
 
             {mode === 'add' && (
               <Field label="Parent Node">
-                <TouchableOpacity onPress={() => setShowParentPicker(true)} style={[inputStyle, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                <TouchableOpacity onPress={() => setShowParentPicker(true)}
+                  style={[inp, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
                   <Text style={{ fontSize: 14, color: selectedParent ? '#111827' : '#9ca3af' }}>
                     {selectedParent ? `${selectedParent.name} (L${selectedParent.tree_level})` : 'Select parent…'}
                   </Text>
@@ -220,7 +222,8 @@ function NodeModal({
             )}
 
             {mode === 'edit' && onDelete && (
-              <TouchableOpacity onPress={onDelete} style={{ backgroundColor: '#fff1f2', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 8 }}>
+              <TouchableOpacity onPress={onDelete}
+                style={{ backgroundColor: '#fff1f2', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 8 }}>
                 <Text style={{ fontSize: 14, fontWeight: '600', color: '#dc2626' }}>Delete Member & Descendants</Text>
               </TouchableOpacity>
             )}
@@ -243,7 +246,8 @@ function NodeModal({
             <View style={{ width: 50 }} />
           </View>
           <View style={{ padding: 12 }}>
-            <TextInput value={parentSearch} onChangeText={setParentSearch} placeholder="Search…" style={inputStyle} autoFocus clearButtonMode="while-editing" />
+            <TextInput value={parentSearch} onChangeText={setParentSearch} placeholder="Search…"
+              style={inp} autoFocus clearButtonMode="while-editing" />
           </View>
           <FlatList
             data={filteredParents}
@@ -269,7 +273,6 @@ function NodeModal({
   )
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View style={{ gap: 6 }}>
@@ -279,10 +282,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-const inputStyle = {
+const inp = {
   backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
   fontSize: 14, color: '#111827', borderWidth: 1, borderColor: '#f3f4f6',
-}
+} as const
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function FamilyTreeAdminScreen() {
@@ -290,53 +293,49 @@ export default function FamilyTreeAdminScreen() {
   const { user } = useAuth()
   const isSuperadmin = user?.role === 'superadmin'
 
-  const [nodes, setNodes] = useState<FamilyNode[]>([])
-  const [loading, setLoading] = useState(true)
+  const [nodes,    setNodes]    = useState<FamilyNode[]>([])
+  const [loading,  setLoading]  = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [search,   setSearch]   = useState('')
 
   const [modalVisible, setModalVisible] = useState(false)
-  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add')
+  const [modalMode,    setModalMode]    = useState<'add' | 'edit'>('add')
   const [modalInitial, setModalInitial] = useState<Partial<FamilyNode>>({})
 
   const swipeRefs = useRef<Map<string, Swipeable>>(new Map())
 
-  async function load() {
+  // ── Exact same load pattern as tree.tsx ─────────────────────────────────────
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase
+        .from('family_tree_nodes')
+        .select('*')
+        .order('tree_level')
+        .order('display_order')
+      const rows = (data ?? []) as FamilyNode[]
+      setNodes(rows)
+      const init = new Set<string>()
+      rows.forEach(n => { if (n.tree_level <= 1) init.add(n.id) })
+      setExpanded(init)
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
     const { data } = await supabase
       .from('family_tree_nodes')
       .select('*')
       .order('tree_level')
       .order('display_order')
-    const rows = (data as FamilyNode[]) ?? []
+    const rows = (data ?? []) as FamilyNode[]
     setNodes(rows)
-    // Auto-expand root + first generation on first load
-    setExpanded(prev => {
-      if (prev.size > 0) return prev
-      const init = new Set<string>()
-      rows.forEach(n => { if (n.tree_level <= 1) init.add(n.id) })
-      return init
-    })
-  }
-
-  useEffect(() => { load().finally(() => setLoading(false)) }, [])
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await load()
     setRefreshing(false)
   }, [])
 
-  function toggleExpand(id: string) {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  // ── Build DFS flat list (same pattern as tree.tsx) ───────────────────────────
+  // ── Exact same useMemo chain as tree.tsx ────────────────────────────────────
   const childrenOf = useMemo(() => {
     const map = new Map<string | null, FamilyNode[]>()
     nodes.forEach(n => {
@@ -350,15 +349,12 @@ export default function FamilyTreeAdminScreen() {
   }, [nodes])
 
   const matchIds = search.trim().length > 1
-    ? new Set(nodes.filter(n =>
-        n.name.toLowerCase().includes(search.toLowerCase()) ||
-        n.married_to?.toLowerCase().includes(search.toLowerCase())
-      ).map(n => n.id))
+    ? new Set(nodes.filter(n => n.name.toLowerCase().includes(search.toLowerCase())).map(n => n.id))
     : null
 
   const effectiveExpanded = useMemo(() => {
     if (!matchIds) return expanded
-    return new Set(nodes.map(n => n.id)) // expand all when searching
+    return new Set(nodes.map(n => n.id))
   }, [matchIds, expanded, nodes])
 
   const flatItems = useMemo<FlatItem[]>(() => {
@@ -373,11 +369,32 @@ export default function FamilyTreeAdminScreen() {
     return result
   }, [childrenOf, effectiveExpanded])
 
-  const displayed = matchIds
+  const displayItems = matchIds
     ? flatItems.filter(item => matchIds.has(item.node.id))
     : flatItems
 
+  function toggleExpand(id: string) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   // ── CRUD ───────────────────────────────────────────────────────────────────
+  function openAdd(parentNode?: FamilyNode) {
+    setModalMode('add')
+    setModalInitial({ parent_id: parentNode?.id ?? null, sex: 'male', is_alive: true })
+    setModalVisible(true)
+  }
+
+  function openEdit(node: FamilyNode) {
+    setModalMode('edit')
+    setModalInitial(node)
+    setModalVisible(true)
+  }
+
   async function handleSave(data: Partial<FamilyNode>) {
     if (modalMode === 'add') {
       const parent = nodes.find(n => n.id === data.parent_id)
@@ -402,7 +419,6 @@ export default function FamilyTreeAdminScreen() {
 
       if (error) { Alert.alert('Error', error.message); return }
       setNodes(prev => [...prev, created as FamilyNode])
-      // Auto-expand parent so new child is immediately visible
       if (data.parent_id) setExpanded(prev => { const n = new Set(prev); n.add(data.parent_id!); return n })
     } else {
       const id = modalInitial.id
@@ -415,7 +431,6 @@ export default function FamilyTreeAdminScreen() {
           married_to: data.married_to || null,
           photo_url: data.photo_url || null,
           is_alive: data.is_alive ?? true,
-          display_order: (data as any).display_order ?? modalInitial.display_order ?? 0,
           updated_by: user?.id,
           updated_at: new Date().toISOString(),
         })
@@ -454,18 +469,6 @@ export default function FamilyTreeAdminScreen() {
         },
       ]
     )
-  }
-
-  function openAdd(parentNode?: FamilyNode) {
-    setModalMode('add')
-    setModalInitial({ parent_id: parentNode?.id ?? null, sex: 'male', is_alive: true })
-    setModalVisible(true)
-  }
-
-  function openEdit(node: FamilyNode) {
-    setModalMode('edit')
-    setModalInitial(node)
-    setModalVisible(true)
   }
 
   function showActions(item: FlatItem) {
@@ -507,154 +510,147 @@ export default function FamilyTreeAdminScreen() {
     }
   }
 
-  // ── Row ─────────────────────────────────────────────────────────────────────
+  // ── Row — identical layout to tree.tsx TreeRow + Swipeable wrapper ──────────
   function renderItem({ item }: { item: FlatItem }) {
     const { node, depth } = item
     const hasKids = (childrenOf.get(node.id) ?? []).length > 0
-    const childCount = nodes.filter(n => n.parent_id === node.id).length
+    const childCount = (childrenOf.get(node.id) ?? []).length
     const isExpanded = expanded.has(node.id)
     const canDelete = isSuperadmin || node.tree_level > 2
-    const dobY = yearStr(node.dob)
-    const dodY = yearStr(node.dod)
-    const nameColor = node.is_alive
-      ? (node.sex === 'female' ? '#be185d' : '#1e40af')
-      : '#64748b'
+    const nameClr = node.is_alive ? (node.sex === 'female' ? '#be185d' : '#1e40af') : '#64748b'
+    const yearPart = node.dob ? node.dob.slice(0, 4) : ''
+    const dodPart  = !node.is_alive && node.dod ? `†${node.dod.slice(0, 4)}` : ''
+    const datePart = [yearPart, dodPart].filter(Boolean).join('  ')
+    const sexClr   = node.sex === 'male' ? '#3b82f6' : '#ec4899'
 
-    function closeAllExcept(id: string) {
-      swipeRefs.current.forEach((ref, key) => { if (key !== id) ref.close() })
+    function closeOthers() {
+      swipeRefs.current.forEach((ref, key) => { if (key !== node.id) ref.close() })
     }
-
-    const leftActions = () => (
-      <TouchableOpacity
-        onPress={() => { swipeRefs.current.get(node.id)?.close(); openAdd(node) }}
-        style={{ backgroundColor: '#10b981', justifyContent: 'center', alignItems: 'center', width: 80 }}
-      >
-        <Text style={{ fontSize: 20 }}>👶</Text>
-        <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff', marginTop: 2 }}>Add Child</Text>
-      </TouchableOpacity>
-    )
-
-    const rightActions = canDelete ? () => (
-      <TouchableOpacity
-        onPress={() => { swipeRefs.current.get(node.id)?.close(); handleDelete(node) }}
-        style={{ backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center', width: 80 }}
-      >
-        <Text style={{ fontSize: 20 }}>🗑</Text>
-        <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff', marginTop: 2 }}>Delete</Text>
-      </TouchableOpacity>
-    ) : undefined
 
     return (
       <Swipeable
         ref={ref => { if (ref) swipeRefs.current.set(node.id, ref); else swipeRefs.current.delete(node.id) }}
-        renderLeftActions={leftActions}
-        renderRightActions={rightActions}
-        onSwipeableOpen={() => closeAllExcept(node.id)}
+        onSwipeableOpen={closeOthers}
         friction={2}
         leftThreshold={60}
         rightThreshold={60}
+        renderLeftActions={() => (
+          <TouchableOpacity
+            onPress={() => { swipeRefs.current.get(node.id)?.close(); openAdd(node) }}
+            style={{ backgroundColor: '#10b981', justifyContent: 'center', alignItems: 'center', width: 80 }}
+          >
+            <Text style={{ fontSize: 20 }}>👶</Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff', marginTop: 2 }}>Add Child</Text>
+          </TouchableOpacity>
+        )}
+        renderRightActions={canDelete ? () => (
+          <TouchableOpacity
+            onPress={() => { swipeRefs.current.get(node.id)?.close(); handleDelete(node) }}
+            style={{ backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center', width: 80 }}
+          >
+            <Text style={{ fontSize: 20 }}>🗑</Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff', marginTop: 2 }}>Delete</Text>
+          </TouchableOpacity>
+        ) : undefined}
       >
-        <Pressable
+        <TouchableOpacity
+          activeOpacity={0.65}
           onPress={() => openEdit(node)}
           onLongPress={() => showActions(item)}
           delayLongPress={400}
-          style={({ pressed }) => ({
-            flexDirection: 'row', alignItems: 'center',
-            backgroundColor: pressed ? '#f5f3ff' : '#fff',
-            paddingLeft: 12 + depth * 18,
-            paddingRight: 16, paddingVertical: 10,
-            borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
-          })}
+          style={[s.row, { paddingLeft: 12 + depth * 18 }]}
         >
-          {/* Expand / collapse toggle — same as tree.tsx */}
+          {/* Expand / collapse toggle — identical to tree.tsx */}
           <TouchableOpacity
             onPress={hasKids ? () => toggleExpand(node.id) : undefined}
-            style={{ width: 22, alignItems: 'center', marginRight: 4 }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={s.toggle}
+            hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
           >
             {hasKids ? (
-              <Text style={{ fontSize: 10, fontWeight: '700', color: '#a78bfa' }}>
+              <Text style={[s.chevron, { color: levelColor(node.tree_level) }]}>
                 {isExpanded ? '▼' : '▶'}
               </Text>
             ) : (
-              <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: '#e5e7eb' }} />
+              <View style={s.leaf} />
             )}
           </TouchableOpacity>
 
+          {/* Avatar */}
           <NodeAvatar node={node} />
 
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: nameColor }} numberOfLines={1}>
-                {node.name}
-              </Text>
-              {!node.is_alive && <Text style={{ fontSize: 11, color: '#94a3b8' }}>†</Text>}
-            </View>
+          {/* Name + sub-info */}
+          <View style={{ flex: 1, marginLeft: 11 }}>
+            <Text style={[s.rowName, { color: nameClr }]} numberOfLines={1}>{node.name}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: sexColor(node.sex) }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: sexClr }}>
                 {node.sex === 'male' ? '♂' : node.sex === 'female' ? '♀' : '⚬'}
               </Text>
-              {(dobY || dodY) && (
-                <Text style={{ fontSize: 11, color: '#94a3b8' }}>
-                  {dobY}{!node.is_alive && dodY ? `  †${dodY}` : ''}
-                </Text>
-              )}
+              {datePart ? <Text style={s.rowSub}>{datePart}</Text> : null}
             </View>
           </View>
 
-          {/* Collapsed child count badge */}
-          {hasKids && !isExpanded && (
-            <View style={{ backgroundColor: '#e0e7ff', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, marginRight: 6 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#4338ca' }}>{childCount}</Text>
-            </View>
-          )}
+          {!node.is_alive ? <View style={s.deceasedDot} /> : null}
 
-          <Text style={{ fontSize: 16, color: '#d1d5db' }}>›</Text>
-        </Pressable>
+          {hasKids && !isExpanded ? (
+            <View style={s.countBadge}>
+              <Text style={s.countText}>{childCount}</Text>
+            </View>
+          ) : null}
+
+          <Text style={s.rowChevron}>›</Text>
+        </TouchableOpacity>
       </Swipeable>
     )
   }
 
   // ── Stats ───────────────────────────────────────────────────────────────────
-  const males = nodes.filter(n => n.sex === 'male').length
-  const females = nodes.filter(n => n.sex === 'female').length
-  const alive = nodes.filter(n => n.is_alive).length
-  const maxLevel = nodes.length ? Math.max(...nodes.map(n => n.tree_level)) : 0
+  const alive    = nodes.filter(n => n.is_alive).length
+  const males    = nodes.filter(n => n.sex === 'male').length
+  const females  = nodes.filter(n => n.sex === 'female').length
+  const maxLevel = nodes.reduce((m, n) => Math.max(m, n.tree_level), 0)
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f7' }}>
-        <ActivityIndicator color="#2d1b69" />
-      </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color="#2d1b69" size="large" />
+      </SafeAreaView>
     )
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
-
-      {/* Search */}
-      <View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f4f6', borderRadius: 12, paddingHorizontal: 12, gap: 8 }}>
-          <Text style={{ fontSize: 15, color: '#9ca3af' }}>🔍</Text>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      {/* Search + Add button */}
+      <View style={{ backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f4f6', borderRadius: 12, paddingHorizontal: 12 }}>
+          <Text style={{ fontSize: 15, color: '#9ca3af', marginRight: 7 }}>🔍</Text>
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search members, spouses…"
-            style={{ flex: 1, fontSize: 14, color: '#111827', paddingVertical: 10 }}
-            clearButtonMode="while-editing"
+            placeholder="Search members…"
+            style={{ flex: 1, fontSize: 16, color: '#111827', paddingVertical: 10 }}
             returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
           />
         </View>
+        <TouchableOpacity
+          onPress={() => openAdd(nodes.find(n => !n.parent_id))}
+          activeOpacity={0.8}
+          style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ fontSize: 24, color: '#fff', lineHeight: 28, marginTop: -1 }}>+</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Stats strip */}
       <View style={{ flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
         {[
-          { label: 'Total', value: nodes.length, color: '#2d1b69' },
-          { label: 'Alive', value: alive, color: '#10b981' },
-          { label: '♂', value: males, color: '#3b82f6' },
-          { label: '♀', value: females, color: '#ec4899' },
-          { label: 'Levels', value: maxLevel + 1, color: '#6b7280' },
+          { label: 'Total',  value: nodes.length, color: '#2d1b69' },
+          { label: 'Alive',  value: alive,         color: '#10b981' },
+          { label: '♂',      value: males,         color: '#3b82f6' },
+          { label: '♀',      value: females,       color: '#ec4899' },
+          { label: 'Levels', value: maxLevel + 1,  color: '#6b7280' },
         ].map(s => (
           <View key={s.label} style={{ alignItems: 'center', flex: 1 }}>
             <Text style={{ fontSize: 16, fontWeight: '800', color: s.color }}>{s.value}</Text>
@@ -667,51 +663,38 @@ export default function FamilyTreeAdminScreen() {
       {nodes.length > 0 && (
         <View style={{ backgroundColor: '#f5f3ff', paddingHorizontal: 16, paddingVertical: 5 }}>
           <Text style={{ fontSize: 11, color: '#7c3aed', textAlign: 'center' }}>
-            ▶/▼ expand · swipe → add child · swipe ← delete · long press for more
+            tap edit · swipe → add child · swipe ← delete · long press for more
           </Text>
         </View>
       )}
 
-      {/* Tree list */}
-      <FlatList
-        data={displayed}
-        keyExtractor={(item: FlatItem) => item.node.id}
+      {/* Tree list — identical FlatList config to tree.tsx */}
+      <FlatList<FlatItem>
+        data={displayItems}
+        keyExtractor={item => item.node.id}
         renderItem={renderItem}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        getItemLayout={(_, index) => ({ length: ROW_H, offset: ROW_H * index, index })}
+        onScrollToIndexFailed={() => {}}
         removeClippedSubviews={false}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={{ padding: 40, alignItems: 'center' }}>
             <Text style={{ fontSize: 32, marginBottom: 8 }}>🌳</Text>
             <Text style={{ fontSize: 15, color: '#6b7280', textAlign: 'center' }}>
-              {search ? `No members matching "${search}"` : 'No family members yet'}
+              {search ? `No results for "${search}"` : 'No family members yet'}
             </Text>
           </View>
         }
       />
-
-      {/* FAB */}
-      <TouchableOpacity
-        onPress={() => openAdd(nodes.find(n => !n.parent_id))}
-        style={{
-          position: 'absolute', bottom: insets.bottom + 74, right: 20,
-          width: 54, height: 54, borderRadius: 27, backgroundColor: '#2d1b69',
-          alignItems: 'center', justifyContent: 'center',
-          shadowColor: '#2d1b69', shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
-        }}
-      >
-        <Text style={{ fontSize: 28, color: '#fff', lineHeight: 32, marginTop: -2 }}>+</Text>
-      </TouchableOpacity>
 
       <NodeModal
         visible={modalVisible}
         mode={modalMode}
         initial={modalInitial}
         parentOptions={nodes}
-        isSuperadmin={isSuperadmin}
         onClose={() => setModalVisible(false)}
         onSave={handleSave}
         onDelete={modalMode === 'edit' ? () => handleDelete(modalInitial as FamilyNode) : undefined}
@@ -719,3 +702,25 @@ export default function FamilyTreeAdminScreen() {
     </View>
   )
 }
+
+// ─── Styles (same names/values as tree.tsx) ───────────────────────────────────
+const s = StyleSheet.create({
+  row: {
+    height: ROW_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
+  },
+  toggle:      { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', marginRight: 4 },
+  chevron:     { fontSize: 14 },
+  leaf:        { width: 5, height: 5, borderRadius: 3, backgroundColor: '#e5e7eb' },
+  rowName:     { fontSize: 15, fontWeight: '600' },
+  rowSub:      { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  deceasedDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#ef4444', marginLeft: 8 },
+  countBadge:  { backgroundColor: '#f3f4f6', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, marginHorizontal: 6 },
+  countText:   { fontSize: 10, color: '#6b7280', fontWeight: '600' },
+  rowChevron:  { fontSize: 22, color: '#2d1b69', marginLeft: 2 },
+})

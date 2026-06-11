@@ -10,6 +10,7 @@ import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { PurpleHeader } from '@/components/PurpleHeader'
 import type { ForumThread } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -152,11 +153,19 @@ export default function ForumScreen() {
   }, [])
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#2d1b69" /></View>
+    return (
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <PurpleHeader title="The Forum" showBack />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#2d1b69" />
+        </View>
+      </View>
+    )
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+      <PurpleHeader title="The Forum" showBack />
       <FlatList
         data={threads}
         keyExtractor={t => t.id}

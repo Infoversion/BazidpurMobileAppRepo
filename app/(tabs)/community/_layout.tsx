@@ -13,14 +13,14 @@ export default function CommunityLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="gallery" options={{ title: 'The Gallery' }} />
-      <Stack.Screen name="reading-room" options={{ title: 'The Reading Room' }} />
+      <Stack.Screen name="gallery" options={{ headerShown: false }} />
+      <Stack.Screen name="reading-room" options={{ headerShown: false }} />
       <Stack.Screen name="album/[id]" options={{ title: '' }} />
-      <Stack.Screen name="poetry" options={{ title: 'Rhyme & Roots' }} />
-      <Stack.Screen name="moments" options={{ title: 'Timeless Moments' }} />
-      <Stack.Screen name="memoirs" options={{ title: 'Memoirs' }} />
+      <Stack.Screen name="poetry" options={{ headerShown: false }} />
+      <Stack.Screen name="moments" options={{ headerShown: false }} />
+      <Stack.Screen name="memoirs" options={{ headerShown: false }} />
       <Stack.Screen name="memoir/[id]" options={{ title: '' }} />
-      <Stack.Screen name="forum/index" options={{ title: 'The Forum' }} />
+      <Stack.Screen name="forum/index" options={{ headerShown: false }} />
       <Stack.Screen name="forum/[id]" options={{ headerShown: false }} />
     </Stack>
   )

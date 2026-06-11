@@ -262,7 +262,7 @@ export default function AppStatsScreen() {
         <SectionHeader title="Content Library" />
         <View style={{ gap: 8 }}>
           <ContentRow emoji="📖" label="Memoirs"        value={s.totalExperiences} sub="published" />
-          <ContentRow emoji="✍️" label="Rhyme & Roots"  value={s.totalPoetry}      sub="poems & ghazals" />
+          <ContentRow emoji="✍️" label="Rhymes & Roots" value={s.totalPoetry}      sub="poems & ghazals" />
           <ContentRow emoji="📚" label="Reading Room"   value={s.totalBooks}       sub="active books" />
           <ContentRow emoji="🌳" label="Family Tree"    value={s.totalFamilyNodes} sub="documented members" />
         </View>

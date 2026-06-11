@@ -6,6 +6,7 @@ import {
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { PurpleHeader } from '@/components/PurpleHeader'
 import type { Experience } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -65,10 +66,19 @@ export default function MemoirsScreen() {
   }, [])
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#2d1b69" /></View>
+    return (
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <PurpleHeader title="Memoirs" showBack />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#2d1b69" />
+        </View>
+      </View>
+    )
   }
 
   return (
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+      <PurpleHeader title="Memoirs" showBack />
     <FlatList
       data={experiences}
       keyExtractor={e => e.id}
@@ -153,5 +163,6 @@ export default function MemoirsScreen() {
         </View>
       }
     />
+    </View>
   )
 }

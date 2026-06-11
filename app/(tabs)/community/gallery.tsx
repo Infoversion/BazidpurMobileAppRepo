@@ -4,12 +4,12 @@ import {
   ActivityIndicator, useWindowDimensions, RefreshControl,
   Modal, TextInput, Alert,
 } from 'react-native'
-import { Stack } from 'expo-router'
 import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { PurpleHeader } from '@/components/PurpleHeader'
 import type { Album } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -203,104 +203,102 @@ export default function GalleryScreen() {
   }, [])
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#2d1b69" /></View>
-  }
-
-  if (!albums.length) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-        <Stack.Screen options={user ? {
-          headerRight: () => (
-            <TouchableOpacity onPress={() => setCreateOpen(true)} style={{ paddingHorizontal: 4 }}>
-              <Text style={{ fontSize: 26, color: '#2d1b69', lineHeight: 30 }}>+</Text>
-            </TouchableOpacity>
-          ),
-        } : {}} />
-        <Text style={{ fontSize: 44, marginBottom: 12 }}>📸</Text>
-        <Text style={{ fontSize: 17, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No albums yet</Text>
-        <Text style={{ fontSize: 13, color: '#8e8e93', textAlign: 'center' }}>Community photo albums will appear here.</Text>
-        {user ? (
-          <TouchableOpacity
-            onPress={() => setCreateOpen(true)}
-            style={{ marginTop: 24, backgroundColor: '#2d1b69', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Create First Album</Text>
-          </TouchableOpacity>
-        ) : null}
-        {createOpen && (
-          <CreateAlbumModal
-            onClose={() => setCreateOpen(false)}
-            onCreated={album => {
-              setAlbums([{ ...album, _thumbUrls: [] }])
-              setCreateOpen(false)
-              router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: album.id } })
-            }}
-          />
-        )}
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <PurpleHeader title="The Gallery" showBack />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#2d1b69" />
+        </View>
       </View>
     )
   }
 
   return (
-    <>
-    <Stack.Screen options={user ? {
-      headerRight: () => (
-        <TouchableOpacity onPress={() => setCreateOpen(true)} style={{ paddingHorizontal: 4 }}>
-          <Text style={{ fontSize: 26, color: '#2d1b69', lineHeight: 30 }}>+</Text>
-        </TouchableOpacity>
-      ),
-    } : {}} />
-    <FlatList
-      data={albums}
-      keyExtractor={a => a.id}
-      numColumns={2}
-      columnWrapperStyle={{ gap: 12 }}
-      contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 90, backgroundColor: '#f2f2f7' }}
-      style={{ backgroundColor: '#f2f2f7' }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
-      renderItem={({ item }) => {
-        const author = item.user ? `${item.user.first_name} ${item.user.last_name}` : ''
-        return (
-          <TouchableOpacity
-            style={{
-              width: colW, borderRadius: 16, overflow: 'hidden',
-              backgroundColor: '#ffffff',
-              shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
-            }}
-            onPress={() => router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: item.id } })}
-            activeOpacity={0.85}
-          >
-            {/* Cover / collage */}
-            <View style={{ width: colW, height: colW, backgroundColor: '#e5e5ea', overflow: 'hidden' }}>
-              <AlbumCover coverUrl={item.cover_photo_url} thumbUrls={item._thumbUrls} size={colW} />
-            </View>
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+      <PurpleHeader title="The Gallery" showBack />
 
-            {/* Info */}
-            <View style={{ padding: 12 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#1c1c1e' }} numberOfLines={1}>{item.title}</Text>
-              {author ? <Text style={{ fontSize: 12, color: '#8e8e93', marginTop: 2 }} numberOfLines={1}>{author}</Text> : null}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{timeAgo(item.created_at)}</Text>
-                {item._thumbUrls.length > 0 ? (
-                  <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{item._thumbUrls.length >= 4 ? '4+' : item._thumbUrls.length} photos</Text>
-                ) : null}
-              </View>
-            </View>
-          </TouchableOpacity>
-        )
-      }}
-    />
-    {createOpen && (
-      <CreateAlbumModal
-        onClose={() => setCreateOpen(false)}
-        onCreated={album => {
-          setAlbums(prev => [{ ...album, _thumbUrls: [] }, ...prev])
-          setCreateOpen(false)
-          router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: album.id } })
-        }}
-      />
-    )}
-    </>
+      {!albums.length ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Text style={{ fontSize: 44, marginBottom: 12 }}>📸</Text>
+          <Text style={{ fontSize: 17, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No albums yet</Text>
+          <Text style={{ fontSize: 13, color: '#8e8e93', textAlign: 'center' }}>Community photo albums will appear here.</Text>
+          {user ? (
+            <TouchableOpacity
+              onPress={() => setCreateOpen(true)}
+              style={{ marginTop: 24, backgroundColor: '#2d1b69', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Create First Album</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : (
+        <FlatList
+          data={albums}
+          keyExtractor={a => a.id}
+          numColumns={2}
+          columnWrapperStyle={{ gap: 12 }}
+          contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 100, backgroundColor: '#f2f2f7' }}
+          style={{ backgroundColor: '#f2f2f7' }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
+          renderItem={({ item }) => {
+            const author = item.user ? `${item.user.first_name} ${item.user.last_name}` : ''
+            return (
+              <TouchableOpacity
+                style={{
+                  width: colW, borderRadius: 16, overflow: 'hidden',
+                  backgroundColor: '#ffffff',
+                  shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
+                }}
+                onPress={() => router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: item.id } })}
+                activeOpacity={0.85}
+              >
+                <View style={{ width: colW, height: colW, backgroundColor: '#e5e5ea', overflow: 'hidden' }}>
+                  <AlbumCover coverUrl={item.cover_photo_url} thumbUrls={item._thumbUrls} size={colW} />
+                </View>
+                <View style={{ padding: 12 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#1c1c1e' }} numberOfLines={1}>{item.title}</Text>
+                  {author ? <Text style={{ fontSize: 12, color: '#8e8e93', marginTop: 2 }} numberOfLines={1}>{author}</Text> : null}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                    <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{timeAgo(item.created_at)}</Text>
+                    {item._thumbUrls.length > 0 ? (
+                      <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{item._thumbUrls.length >= 4 ? '4+' : item._thumbUrls.length} photos</Text>
+                    ) : null}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )
+          }}
+        />
+      )}
+
+      {/* Create album FAB — logged-in users only */}
+      {user ? (
+        <TouchableOpacity
+          onPress={() => setCreateOpen(true)}
+          style={{
+            position: 'absolute', bottom: 120, right: 20,
+            width: 50, height: 50, borderRadius: 25,
+            backgroundColor: '#2d1b69',
+            alignItems: 'center', justifyContent: 'center',
+            shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.25, shadowRadius: 6, elevation: 6,
+          }}
+        >
+          <Text style={{ fontSize: 26, color: '#fff', lineHeight: 30 }}>+</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      {createOpen && (
+        <CreateAlbumModal
+          onClose={() => setCreateOpen(false)}
+          onCreated={album => {
+            setAlbums(prev => prev.length ? [{ ...album, _thumbUrls: [] }, ...prev] : [{ ...album, _thumbUrls: [] }])
+            setCreateOpen(false)
+            router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: album.id } })
+          }}
+        />
+      )}
+    </View>
   )
 }

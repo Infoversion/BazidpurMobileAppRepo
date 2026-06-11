@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { PurpleHeader } from '@/components/PurpleHeader'
 
 type FormState = { name: string; email: string; subject: string; message: string }
 
@@ -45,7 +45,8 @@ export default function ContactScreen() {
 
   if (success) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }} edges={['top', 'bottom']}>
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <PurpleHeader title="Contact Us" hideContact />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
           <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
             <Text style={{ fontSize: 38 }}>✓</Text>
@@ -65,12 +66,13 @@ export default function ContactScreen() {
             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Send another message</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     )
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }} edges={['top', 'bottom']}>
+    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+      <PurpleHeader title="Contact Us" hideContact />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           style={{ flex: 1 }}
@@ -78,14 +80,8 @@ export default function ContactScreen() {
           keyboardShouldPersistTaps="handled"
         >
 
-          {/* Header */}
+          {/* Subheading */}
           <View style={{ paddingHorizontal: 4, marginBottom: 20 }}>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: '#8e8e93', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>
-              Get in Touch
-            </Text>
-            <Text style={{ fontSize: 34, fontWeight: '700', color: '#1c1c1e', letterSpacing: -0.5, marginBottom: 6 }}>
-              Contact Us
-            </Text>
             <Text style={{ fontSize: 14, color: '#8e8e93', lineHeight: 20 }}>
               A question, a thought, or just want to say salaam — we'd love to hear from you.
             </Text>
@@ -174,6 +170,6 @@ export default function ContactScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   )
 }
