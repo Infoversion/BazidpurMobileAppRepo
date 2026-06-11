@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView } from 'react-native'
 import { router } from 'expo-router'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { PurpleHeader } from '@/components/PurpleHeader'
+import { DateOfBirthPicker } from '@/components/DateOfBirthPicker'
 
 export default function SignupScreen() {
-  const insets = useSafeAreaInsets()
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
     country: '', state: '', city: '', linkToBazidpur: '',
   })
+  const [dob, setDob] = useState('')
+  const [sex, setSex] = useState<'male' | 'female' | 'other'>('male')
+  const [agreedToPolicy, setAgreedToPolicy] = useState(false)
   const [loading, setLoading] = useState(false)
 
   function set(key: keyof typeof form) {
@@ -19,6 +22,10 @@ export default function SignupScreen() {
   async function handleSignup() {
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
       Alert.alert('Missing fields', 'Please fill in all required fields.')
+      return
+    }
+    if (!agreedToPolicy) {
+      Alert.alert('Privacy Policy', 'Please read and accept the Privacy Policy to continue.')
       return
     }
     if (form.password !== form.confirmPassword) {
@@ -38,10 +45,13 @@ export default function SignupScreen() {
         data: {
           first_name: form.firstName.trim(),
           last_name: form.lastName.trim(),
+          sex,
+          dob: dob || null,
           location_country: form.country.trim(),
           location_state: form.state.trim(),
           location_city: form.city.trim(),
           link_to_bazidpur: form.linkToBazidpur.trim(),
+          privacy_policy_accepted_at: new Date().toISOString(),
         },
       },
     })
@@ -60,30 +70,20 @@ export default function SignupScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-white"
+      style={{ flex: 1, backgroundColor: '#f2f2f7' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Back button */}
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={{
-          position: 'absolute', top: insets.top + 8, left: 16, zIndex: 10,
-          flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4,
-        }}
-      >
-        <Text style={{ fontSize: 20, color: '#2d1b69' }}>‹</Text>
-        <Text style={{ fontSize: 14, color: '#2d1b69', fontWeight: '500' }}>Home</Text>
-      </TouchableOpacity>
+      <PurpleHeader title="Sign Up" showBack hideVisitorActions />
 
-      <ScrollView className="flex-1" contentContainerClassName="px-6 py-10">
-        <Text className="text-xs text-gray-400 uppercase tracking-widest mb-2 text-center font-medium">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 }}>
+        <Text style={{ fontSize: 11, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 2, textAlign: 'center', fontWeight: '500', marginBottom: 6 }}>
           Join the community
         </Text>
-        <Text className="text-4xl font-bold text-gray-900 mb-1 text-center tracking-tight">
-          Sign Up
+        <Text style={{ fontSize: 32, fontWeight: '800', color: '#111827', textAlign: 'center', letterSpacing: -0.5, marginBottom: 4 }}>
+          Create Account
         </Text>
-        <Text className="text-sm text-gray-500 text-center mb-8">
-          Create your Bazidpur account
+        <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 28 }}>
+          Join the Bazidpur family
         </Text>
 
         <View className="flex-row gap-3 mb-4">
@@ -107,6 +107,36 @@ export default function SignupScreen() {
               onChangeText={set('lastName')}
             />
           </View>
+        </View>
+
+        {/* Gender */}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 }}>Gender</Text>
+          <View style={{ flexDirection: 'row', backgroundColor: '#f3f4f6', borderRadius: 12, padding: 3 }}>
+            {(['male', 'female', 'other'] as const).map(opt => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => setSex(opt)}
+                style={{
+                  flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center',
+                  backgroundColor: sex === opt ? '#fff' : 'transparent',
+                  shadowColor: sex === opt ? '#000' : 'transparent',
+                  shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2,
+                  elevation: sex === opt ? 1 : 0,
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '600', color: sex === opt ? '#1c1c1e' : '#9ca3af', textTransform: 'capitalize' }}>
+                  {opt === 'male' ? '♂ Male' : opt === 'female' ? '♀ Female' : '⚬ Other'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Date of Birth */}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 }}>Date of Birth</Text>
+          <DateOfBirthPicker value={dob} onChange={setDob} />
         </View>
 
         <View className="mb-4">
@@ -194,6 +224,31 @@ export default function SignupScreen() {
           />
         </View>
 
+        {/* Privacy Policy acceptance */}
+        <TouchableOpacity
+          onPress={() => setAgreedToPolicy(v => !v)}
+          style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 20 }}
+          activeOpacity={0.7}
+        >
+          <View style={{
+            width: 22, height: 22, borderRadius: 6, marginTop: 1,
+            borderWidth: 2, borderColor: agreedToPolicy ? '#2d1b69' : '#d1d5db',
+            backgroundColor: agreedToPolicy ? '#2d1b69' : '#fff',
+            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            {agreedToPolicy && <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 16 }}>✓</Text>}
+          </View>
+          <Text style={{ flex: 1, fontSize: 13, color: '#6b7280', lineHeight: 20 }}>
+            I have read and agree to the{' '}
+            <Text
+              style={{ color: '#2d1b69', fontWeight: '600' }}
+              onPress={() => router.push('/(public)/privacy-policy')}
+            >
+              Privacy Policy
+            </Text>
+          </Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           className="w-full py-3.5 bg-primary rounded-xl items-center mb-4"
           onPress={handleSignup}
@@ -211,6 +266,7 @@ export default function SignupScreen() {
             <Text className="text-sm text-accent font-medium">Sign In</Text>
           </TouchableOpacity>
         </View>
+
       </ScrollView>
     </KeyboardAvoidingView>
   )

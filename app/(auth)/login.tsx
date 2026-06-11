@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native'
 import { router } from 'expo-router'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { PurpleHeader } from '@/components/PurpleHeader'
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const insets = useSafeAreaInsets()
 
   async function handleLogin() {
     if (!email || !password) {
@@ -21,35 +20,25 @@ export default function LoginScreen() {
     if (error) {
       Alert.alert('Login failed', error.message)
     } else {
-      router.replace('/(tabs)')
+      router.replace('/(tabs)/home')
     }
   }
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-white"
+      style={{ flex: 1, backgroundColor: '#f2f2f7' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Back button */}
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={{
-          position: 'absolute', top: insets.top + 8, left: 16, zIndex: 10,
-          flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4,
-        }}
-      >
-        <Text style={{ fontSize: 20, color: '#2d1b69' }}>‹</Text>
-        <Text style={{ fontSize: 14, color: '#2d1b69', fontWeight: '500' }}>Home</Text>
-      </TouchableOpacity>
+      <PurpleHeader title="Sign In" showBack hideVisitorActions />
 
-      <View className="flex-1 justify-center px-6">
-        <Text className="text-xs text-gray-400 uppercase tracking-widest mb-2 text-center font-medium">
+      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
+        <Text style={{ fontSize: 11, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 2, textAlign: 'center', fontWeight: '500', marginBottom: 6 }}>
           Welcome back
         </Text>
-        <Text className="text-4xl font-bold text-gray-900 mb-1 text-center tracking-tight">
+        <Text style={{ fontSize: 32, fontWeight: '800', color: '#111827', textAlign: 'center', letterSpacing: -0.5, marginBottom: 4 }}>
           Sign In
         </Text>
-        <Text className="text-sm text-gray-500 text-center mb-10">
+        <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 32 }}>
           Use your Bazidpur account
         </Text>
 
@@ -106,6 +95,13 @@ export default function LoginScreen() {
 
         <TouchableOpacity className="mt-8 self-center" onPress={() => router.push('/(public)')}>
           <Text className="text-sm text-gray-400">Browse as guest</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push('/(public)/privacy-policy')}
+          style={{ alignSelf: 'center', marginTop: 16 }}
+        >
+          <Text style={{ fontSize: 13, color: '#9ca3af' }}>Privacy Policy</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

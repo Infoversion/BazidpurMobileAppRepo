@@ -16,6 +16,7 @@ export default function PublicLayout() {
       <Stack.Screen name="fazihat-shah-warsi" options={{ headerShown: true, title: 'Fazihat Shah Warsi' }} />
       <Stack.Screen name="contact" options={{ headerShown: true, title: 'Contact Us' }} />
       <Stack.Screen name="media" options={{ headerShown: true, title: 'Media' }} />
+      <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
     </Stack>
   )
 }

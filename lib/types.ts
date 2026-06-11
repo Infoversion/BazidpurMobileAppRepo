@@ -20,6 +20,7 @@ export interface User {
   location_city?: string
   location_lat?: number
   location_lng?: number
+  privacy_policy_accepted_at?: string
   created_at: string
   updated_at: string
 }
@@ -197,7 +198,7 @@ export interface ForumThread {
   is_deleted: boolean
   created_at: string
   author_id: string
-  author?: { first_name: string; last_name: string; photo_url?: string }
+  author?: { first_name: string; last_name: string; photo_url?: string; role?: string }
   replies?: [{ count: number }]
 }
 
@@ -208,5 +209,5 @@ export interface ForumReply {
   is_deleted: boolean
   created_at: string
   author_id: string
-  author?: { first_name: string; last_name: string; photo_url?: string }
+  author?: { first_name: string; last_name: string; photo_url?: string; role?: string }
 }
