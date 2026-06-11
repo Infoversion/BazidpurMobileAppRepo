@@ -7,6 +7,7 @@ import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
+import { ReportButton } from '@/components/ReportButton'
 import type { Experience } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -141,7 +142,7 @@ export default function MemoirsScreen() {
               ) : null}
             </View>
 
-            {/* Right: chapter count + chevron */}
+            {/* Right: chapter count + report + chevron */}
             <View style={{ alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
               {chapterCount > 0 ? (
                 <View style={{ backgroundColor: '#ecfdf5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -150,6 +151,7 @@ export default function MemoirsScreen() {
                   </Text>
                 </View>
               ) : null}
+              <ReportButton contentType="memoir" contentId={item.id} />
               <Text style={{ fontSize: 18, color: '#c7c7cc' }}>›</Text>
             </View>
           </TouchableOpacity>

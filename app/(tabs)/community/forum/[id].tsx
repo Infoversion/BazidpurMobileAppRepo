@@ -9,6 +9,7 @@ import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { ReportButton } from '@/components/ReportButton'
 import type { ForumThread, ForumReply } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -131,12 +132,13 @@ export default function ThreadScreen() {
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <Avatar author={thread.author} />
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>
             {thread.author ? `${thread.author.first_name} ${thread.author.last_name}` : 'Member'}
           </Text>
           <Text style={{ fontSize: 11, color: '#9ca3af' }}>{timeAgo(thread.created_at)}</Text>
         </View>
+        <ReportButton contentType="thread" contentId={thread.id} />
       </View>
       {thread.body ? (
         <Text style={{ fontSize: 15, color: '#374151', lineHeight: 24 }}>{thread.body}</Text>
@@ -192,11 +194,14 @@ export default function ThreadScreen() {
                       {item.author ? `${item.author.first_name} ${item.author.last_name}` : 'Member'}
                     </Text>
                     <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{timeAgo(item.created_at)}</Text>
-                    {isOwn || isAdmin ? (
-                      <Pressable onPress={() => deleteReply(item.id)} style={{ marginLeft: 'auto' }}>
-                        <Text style={{ fontSize: 12, color: '#c7c7cc' }}>✕</Text>
-                      </Pressable>
-                    ) : null}
+                    <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      {!isOwn && <ReportButton contentType="reply" contentId={item.id} />}
+                      {(isOwn || isAdmin) && (
+                        <Pressable onPress={() => deleteReply(item.id)}>
+                          <Text style={{ fontSize: 12, color: '#c7c7cc' }}>✕</Text>
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
                   <Text style={{ fontSize: 14, color: '#374151', lineHeight: 21 }}>{item.body}</Text>
                 </View>

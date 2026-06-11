@@ -7,6 +7,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
+import { ReportButton } from '@/components/ReportButton'
 import type { Poetry, PoetryVerse } from '@/lib/types'
 
 type Tab = 'poetry' | 'ghazal'
@@ -70,15 +71,18 @@ function PoemSheet({ poem, onClose }: { poem: Poetry; onClose: () => void }) {
               <Text style={{ fontSize: 12, color: '#aeaeb2', marginTop: 2 }}>by {poem.author}</Text>
             ) : null}
           </View>
-          <TouchableOpacity
-            onPress={onClose}
-            style={{
-              marginLeft: 16, width: 28, height: 28, borderRadius: 14,
-              backgroundColor: '#e5e5ea', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 16 }}>
+            <ReportButton contentType="poem" contentId={poem.id} />
+            <TouchableOpacity
+              onPress={onClose}
+              style={{
+                width: 28, height: 28, borderRadius: 14,
+                backgroundColor: '#e5e5ea', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
             <Text style={{ fontSize: 14, color: '#8e8e93', fontWeight: '600' }}>✕</Text>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Language badges row */}

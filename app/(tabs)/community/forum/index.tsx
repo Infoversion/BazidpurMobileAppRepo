@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
+import { ReportButton } from '@/components/ReportButton'
 import type { ForumThread } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -212,6 +213,7 @@ export default function ForumScreen() {
                         <Text style={{ fontSize: 11, color: '#8e8e93' }}>💬 {replyCount}</Text>
                       </>
                     ) : null}
+                    <ReportButton contentType="thread" contentId={item.id} />
                   </View>
                 </View>
                 <Text style={{ fontSize: 18, color: '#c7c7cc', alignSelf: 'center' }}>›</Text>
