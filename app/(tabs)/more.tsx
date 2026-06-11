@@ -4,6 +4,7 @@ import {
   TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { DateOfBirthPicker } from '@/components/DateOfBirthPicker'
+import { CountryPicker, StatePicker } from '@/components/CountryStatePicker'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { router } from 'expo-router'
@@ -67,6 +68,7 @@ export default function ProfileScreen() {
   const [city, setCity]               = useState(user?.location_city ?? '')
   const [state, setState]             = useState(user?.location_state ?? '')
   const [country, setCountry]         = useState(user?.location_country ?? '')
+  const [countryCode, setCountryCode] = useState('')
   const [linkToBazidpur, setLink]     = useState(user?.link_to_bazidpur ?? '')
   const [comments, setComments]       = useState(user?.comments ?? '')
   const [saving, setSaving]           = useState(false)
@@ -116,6 +118,22 @@ export default function ProfileScreen() {
   async function saveDetails() {
     if (!firstName.trim() || !lastName.trim()) {
       Alert.alert('Required', 'First and last name cannot be empty.')
+      return
+    }
+    if (!country.trim()) {
+      Alert.alert('Required', 'Please enter your country.')
+      return
+    }
+    if (!state.trim()) {
+      Alert.alert('Required', 'Please enter your state or region.')
+      return
+    }
+    if (!city.trim()) {
+      Alert.alert('Required', 'Please enter your city or village.')
+      return
+    }
+    if (!linkToBazidpur.trim()) {
+      Alert.alert('Required', 'Please describe your connection to Bazidpur.')
       return
     }
     setSaving(true)
@@ -244,10 +262,24 @@ export default function ProfileScreen() {
               <DateOfBirthPicker value={dob} onChange={setDob} />
             </View>
             <Field label="Email"           value={user?.email ?? ''} editable={false} />
-            <Field label="City"        value={city}          onChangeText={setCity}        placeholder="City" />
-            <Field label="State / Province" value={state}   onChangeText={setState}       placeholder="State or province" />
-            <Field label="Country"     value={country}       onChangeText={setCountry}     placeholder="Country" />
-            <Field label="Link to Bazidpur" value={linkToBazidpur} onChangeText={setLink} placeholder="How are you connected?" />
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 }}>Country *</Text>
+              <CountryPicker
+                value={country}
+                countryCode={countryCode}
+                onChange={(name, code) => { setCountry(name); setCountryCode(code); setState('') }}
+              />
+            </View>
+            <View style={{ marginBottom: 14 }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 }}>State / Province *</Text>
+              <StatePicker
+                value={state}
+                countryCode={countryCode}
+                onChange={(name) => setState(name)}
+              />
+            </View>
+            <Field label="City / Village *" value={city} onChangeText={setCity} placeholder="City or village" />
+            <Field label="Link to Bazidpur *" value={linkToBazidpur} onChangeText={setLink} placeholder="How are you connected?" />
             <Field label="About / Comments" value={comments} onChangeText={setComments}   placeholder="Anything you'd like to share…" multiline />
 
             <TouchableOpacity

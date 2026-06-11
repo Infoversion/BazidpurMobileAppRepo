@@ -17,6 +17,7 @@ export default function PublicLayout() {
       <Stack.Screen name="contact" options={{ headerShown: true, title: 'Contact Us' }} />
       <Stack.Screen name="media" options={{ headerShown: true, title: 'Media' }} />
       <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
+      <Stack.Screen name="help" options={{ headerShown: false }} />
     </Stack>
   )
 }

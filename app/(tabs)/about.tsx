@@ -47,12 +47,12 @@ export default function AboutScreen() {
         <View style={{ paddingHorizontal: 16, paddingTop: 20 }}>
 
           {/* Mosque photo */}
-          <View style={{ marginBottom: 24, borderRadius: 16, overflow: 'hidden', height: 200 }}>
+          <View style={{ marginBottom: 8, borderRadius: 16, overflow: 'hidden', height: 200 }}>
             <Image source={{ uri: MOSQUE_PHOTO }} style={{ flex: 1 }} contentFit="cover" />
-            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 14, paddingVertical: 10 }}>
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>The Mosque of Bazidpur</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 2 }}>Resting place of Shah Mahmood and his descendants</Text>
-            </View>
+          </View>
+          <View style={{ marginBottom: 24, paddingHorizontal: 2 }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#1c1c1e' }}>The Mosque of Bazidpur</Text>
+            <Text style={{ fontSize: 11, color: '#8e8e93', marginTop: 2 }}>Resting place of Shah Mahmood and his descendants</Text>
           </View>
 
           {/* Origin */}

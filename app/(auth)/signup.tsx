@@ -4,12 +4,14 @@ import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { DateOfBirthPicker } from '@/components/DateOfBirthPicker'
+import { CountryPicker, StatePicker } from '@/components/CountryStatePicker'
 
 export default function SignupScreen() {
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
     country: '', state: '', city: '', linkToBazidpur: '',
   })
+  const [countryCode, setCountryCode] = useState('')
   const [dob, setDob] = useState('')
   const [sex, setSex] = useState<'male' | 'female' | 'other'>('male')
   const [agreedToPolicy, setAgreedToPolicy] = useState(false)
@@ -22,6 +24,22 @@ export default function SignupScreen() {
   async function handleSignup() {
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
       Alert.alert('Missing fields', 'Please fill in all required fields.')
+      return
+    }
+    if (!form.country.trim()) {
+      Alert.alert('Missing field', 'Please enter your country.')
+      return
+    }
+    if (!form.state.trim()) {
+      Alert.alert('Missing field', 'Please enter your state or region.')
+      return
+    }
+    if (!form.city.trim()) {
+      Alert.alert('Missing field', 'Please enter your city or village.')
+      return
+    }
+    if (!form.linkToBazidpur.trim()) {
+      Alert.alert('Missing field', 'Please describe your connection to Bazidpur.')
       return
     }
     if (!agreedToPolicy) {
@@ -82,15 +100,19 @@ export default function SignupScreen() {
         <Text style={{ fontSize: 32, fontWeight: '800', color: '#111827', textAlign: 'center', letterSpacing: -0.5, marginBottom: 4 }}>
           Create Account
         </Text>
-        <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 28 }}>
+        <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 16 }}>
           Join the Bazidpur family
+        </Text>
+
+        <Text style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', marginBottom: 20 }}>
+          Fields marked <Text style={{ color: '#f87171', fontWeight: '700' }}>*</Text> are mandatory
         </Text>
 
         <View className="flex-row gap-3 mb-4">
           <View className="flex-1">
             <Text className="text-sm font-medium text-gray-700 mb-1.5">First name <Text className="text-red-400">*</Text></Text>
             <TextInput
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
               placeholder="First"
               placeholderTextColor="#9ca3af"
               value={form.firstName}
@@ -100,7 +122,7 @@ export default function SignupScreen() {
           <View className="flex-1">
             <Text className="text-sm font-medium text-gray-700 mb-1.5">Last name <Text className="text-red-400">*</Text></Text>
             <TextInput
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
               placeholder="Last"
               placeholderTextColor="#9ca3af"
               value={form.lastName}
@@ -111,7 +133,7 @@ export default function SignupScreen() {
 
         {/* Gender */}
         <View style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 }}>Gender</Text>
+          <Text style={{ fontSize: 14, fontWeight: '500', color: '#374151', marginBottom: 6 }}>Gender <Text style={{ color: '#f87171' }}>*</Text></Text>
           <View style={{ flexDirection: 'row', backgroundColor: '#f3f4f6', borderRadius: 12, padding: 3 }}>
             {(['male', 'female', 'other'] as const).map(opt => (
               <TouchableOpacity
@@ -142,7 +164,7 @@ export default function SignupScreen() {
         <View className="mb-4">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Email <Text className="text-red-400">*</Text></Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
             placeholder="you@example.com"
             placeholderTextColor="#9ca3af"
             value={form.email}
@@ -156,7 +178,7 @@ export default function SignupScreen() {
         <View className="mb-4">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Password <Text className="text-red-400">*</Text></Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
             placeholder="Min. 8 characters"
             placeholderTextColor="#9ca3af"
             value={form.password}
@@ -168,7 +190,7 @@ export default function SignupScreen() {
         <View className="mb-6">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Confirm password <Text className="text-red-400">*</Text></Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
             placeholder="Repeat password"
             placeholderTextColor="#9ca3af"
             value={form.confirmPassword}
@@ -179,44 +201,42 @@ export default function SignupScreen() {
 
         <Text className="text-xs text-gray-400 uppercase tracking-widest mb-3 font-medium">Location</Text>
 
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">Country</Text>
-          <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
-            placeholder="e.g. United Kingdom"
-            placeholderTextColor="#9ca3af"
+        <View style={{ marginBottom: 14 }}>
+          <Text className="text-sm font-medium text-gray-700 mb-1.5">Country <Text style={{ color: '#f87171' }}>*</Text></Text>
+          <CountryPicker
             value={form.country}
-            onChangeText={set('country')}
+            countryCode={countryCode}
+            onChange={(name, code) => {
+              setForm(f => ({ ...f, country: name, state: '' }))
+              setCountryCode(code)
+            }}
           />
         </View>
 
-        <View className="flex-row gap-3 mb-4">
-          <View className="flex-1">
-            <Text className="text-sm font-medium text-gray-700 mb-1.5">State / Region</Text>
-            <TextInput
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
-              placeholder="State"
-              placeholderTextColor="#9ca3af"
-              value={form.state}
-              onChangeText={set('state')}
-            />
-          </View>
-          <View className="flex-1">
-            <Text className="text-sm font-medium text-gray-700 mb-1.5">City</Text>
-            <TextInput
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
-              placeholder="City"
-              placeholderTextColor="#9ca3af"
-              value={form.city}
-              onChangeText={set('city')}
-            />
-          </View>
+        <View style={{ marginBottom: 14 }}>
+          <Text className="text-sm font-medium text-gray-700 mb-1.5">State / Region <Text style={{ color: '#f87171' }}>*</Text></Text>
+          <StatePicker
+            value={form.state}
+            countryCode={countryCode}
+            onChange={(name) => setForm(f => ({ ...f, state: name }))}
+          />
+        </View>
+
+        <View style={{ marginBottom: 14 }}>
+          <Text className="text-sm font-medium text-gray-700 mb-1.5">City / Village <Text style={{ color: '#f87171' }}>*</Text></Text>
+          <TextInput
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
+            placeholder="e.g. Bazidpur"
+            placeholderTextColor="#9ca3af"
+            value={form.city}
+            onChangeText={set('city')}
+          />
         </View>
 
         <View className="mb-8">
-          <Text className="text-sm font-medium text-gray-700 mb-1.5">Link to Bazidpur</Text>
+          <Text className="text-sm font-medium text-gray-700 mb-1.5">Link to Bazidpur <Text style={{ color: '#f87171' }}>*</Text></Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
             placeholder="e.g. Grandson of Mehdi Hasan"
             placeholderTextColor="#9ca3af"
             value={form.linkToBazidpur}
@@ -250,13 +270,17 @@ export default function SignupScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          className="w-full py-3.5 bg-primary rounded-xl items-center mb-4"
           onPress={handleSignup}
-          disabled={loading}
+          disabled={!agreedToPolicy || loading}
+          style={{
+            width: '100%', paddingVertical: 14, borderRadius: 12,
+            alignItems: 'center', marginBottom: 16,
+            backgroundColor: agreedToPolicy ? '#2d1b69' : '#d1d5db',
+          }}
         >
           {loading
             ? <ActivityIndicator color="#fff" />
-            : <Text className="text-white text-base font-semibold">Create Account</Text>
+            : <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Create Account</Text>
           }
         </TouchableOpacity>
 

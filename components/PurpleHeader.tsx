@@ -5,14 +5,36 @@ import { router } from 'expo-router'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import { RoleBadge } from '@/components/RoleBadge'
-import Svg, { Path, Line, Polyline } from 'react-native-svg'
+import Svg, { Path, Line, Polyline, Circle } from 'react-native-svg'
+
+const W = 'white'
+const SW = 2
 
 function SignOutIcon() {
   return (
     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M16 17l5-5-5-5" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Line x1="21" y1="12" x2="9" y2="12" stroke="white" strokeWidth={2} strokeLinecap="round" />
+      <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke={W} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M16 17l5-5-5-5" stroke={W} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round" />
+      <Line x1="21" y1="12" x2="9" y2="12" stroke={W} strokeWidth={SW} strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+function MailIcon() {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke={W} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round" />
+      <Polyline points="22,6 12,13 2,6" stroke={W} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
+function HelpIcon() {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" stroke={W} strokeWidth={SW} />
+      <Path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke={W} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round" />
+      <Line x1="12" y1="17" x2="12.01" y2="17" stroke={W} strokeWidth={SW} strokeLinecap="round" />
     </Svg>
   )
 }
@@ -62,21 +84,27 @@ export function PurpleHeader({ title, showBack, hideVisitorActions, hideContact 
         </Text>
       </View>
 
-      {/* Centre: Contact */}
-      {!hideContact && (
-        <TouchableOpacity
-          onPress={() => router.push('/(tabs)/contact')}
-          style={{ paddingHorizontal: 14, paddingVertical: 4, alignItems: 'center', marginLeft: 30 }}
-        >
-          <Text style={{ fontSize: 16 }}>✉️</Text>
-          <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', fontWeight: '600', marginTop: 1, letterSpacing: 0.3 }}>
-            Contact
-          </Text>
-        </TouchableOpacity>
-      )}
+      {/* Right: icons + auth */}
+      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
 
-      {/* Right: auth */}
-      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10 }}>
+        {/* Help */}
+        <TouchableOpacity
+          onPress={() => router.push('/(public)/help')}
+          style={{ width: 34, height: 34, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <HelpIcon />
+        </TouchableOpacity>
+
+        {/* Contact */}
+        {!hideContact && (
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/contact')}
+            style={{ width: 34, height: 34, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <MailIcon />
+          </TouchableOpacity>
+        )}
+
         {session ? (
           <>
             <View style={{ position: 'relative' }}>
