@@ -101,7 +101,7 @@ export default function AdminScreen() {
       { count: totalAlbumVideos },
       { count: totalBooks },
     ] = await Promise.all([
-      supabase.from('users').select('*', { count: 'exact', head: true }),
+      supabase.from('users').select('*', { count: 'exact', head: true }).not('role', 'eq', 'pending'),
       supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'member'),
       supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'pending'),
       supabase.from('users').select('*', { count: 'exact', head: true }).in('role', ['admin', 'superadmin']),
@@ -204,7 +204,7 @@ export default function AdminScreen() {
           }}>
           <View style={{ height: 3, backgroundColor: '#2d1b69' }} />
           {[
-            { icon: '👥', label: 'Total Registered', value: s.totalUsers,                              sub: 'all accounts',                                                                highlight: false,              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'all' } }) },
+            { icon: '👥', label: 'Approved Members', value: s.totalUsers,                              sub: 'members + admins',                                                            highlight: false,              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'all' } }) },
             { icon: '⏳', label: 'Pending Review',   value: s.pendingCount,                            sub: 'awaiting approval',                                                           highlight: s.pendingCount > 0, onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'pending' } }) },
             { icon: '🛡️', label: 'Admins & Staff',   value: s.adminCount,                              sub: 'admins + superadmins',                                                        highlight: false,              onPress: null },
             { icon: '🌳', label: 'Family Tree',      value: s.familyTreeNodes,                         sub: 'documented members',                                                          highlight: false,              onPress: () => router.push('/(tabs)/admin/family-tree' as any) },
