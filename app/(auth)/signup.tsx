@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
@@ -17,6 +17,7 @@ export default function SignupScreen() {
   const [agreedToPolicy, setAgreedToPolicy] = useState(false)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
 
   const canSubmit =
     form.firstName.trim() !== '' &&
@@ -31,40 +32,21 @@ export default function SignupScreen() {
     agreedToPolicy
 
   function set(key: keyof typeof form) {
-    return (value: string) => setForm(f => ({ ...f, [key]: value }))
+    return (value: string) => {
+      setForm(f => ({ ...f, [key]: value }))
+      setError('')
+    }
   }
 
   async function handleSignup() {
-    if (!form.firstName || !form.lastName || !form.email || !form.password) {
-      Alert.alert('Missing fields', 'Please fill in all required fields.')
-      return
-    }
-    if (!form.country.trim()) {
-      Alert.alert('Missing field', 'Please enter your country.')
-      return
-    }
-    if (!form.state.trim()) {
-      Alert.alert('Missing field', 'Please enter your state or region.')
-      return
-    }
-    if (!form.city.trim()) {
-      Alert.alert('Missing field', 'Please enter your city or village.')
-      return
-    }
-    if (!form.linkToBazidpur.trim()) {
-      Alert.alert('Missing field', 'Please describe your connection to Bazidpur.')
-      return
-    }
-    if (!agreedToPolicy) {
-      Alert.alert('Privacy Policy', 'Please read and accept the Privacy Policy to continue.')
-      return
-    }
+    setError('')
+
     if (form.password !== form.confirmPassword) {
-      Alert.alert('Password mismatch', 'Passwords do not match.')
+      setError('Passwords do not match — please check and try again.')
       return
     }
     if (form.password.length < 8) {
-      Alert.alert('Weak password', 'Password must be at least 8 characters.')
+      setError('Password must be at least 8 characters long.')
       return
     }
 
@@ -77,7 +59,12 @@ export default function SignupScreen() {
 
     if (authError || !authData.user) {
       setLoading(false)
-      Alert.alert('Request failed', authError?.message ?? 'Something went wrong.')
+      const msg = authError?.message ?? ''
+      if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already been registered')) {
+        setError('An account with this email already exists. Please sign in, or use a different email address.')
+      } else {
+        setError('We couldn\'t create your account right now. Please check your connection and try again.')
+      }
       return
     }
 
@@ -100,65 +87,123 @@ export default function SignupScreen() {
     setLoading(false)
 
     if (profileError) {
-      Alert.alert('Request failed', profileError.message)
+      setError('Your account was created but we couldn\'t save your profile. Please contact us and we\'ll sort it out straight away.')
     } else {
       setSuccess(true)
     }
   }
 
+  // ── Success screen ──────────────────────────────────────────────────────────
+
   if (success) {
+    const submittedAt = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     return (
       <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
         <PurpleHeader title="Request Membership" hideVisitorActions />
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 40, paddingBottom: 60 }}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 36, paddingBottom: 60 }}>
 
-          {/* Icon + greeting */}
+          {/* Celebration header */}
           <View style={{ alignItems: 'center', marginBottom: 28 }}>
-            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-              <Text style={{ fontSize: 38 }}>✓</Text>
+            <View style={{
+              width: 88, height: 88, borderRadius: 44,
+              backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center',
+              marginBottom: 18,
+              shadowColor: '#16a34a', shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15, shadowRadius: 12,
+            }}>
+              <Text style={{ fontSize: 42 }}>✓</Text>
             </View>
-            <Text style={{ fontSize: 28, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 10 }}>
-              Welcome, {form.firstName}! 🎉
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>
+              Request received
             </Text>
-            <Text style={{ fontSize: 15, color: '#6b7280', textAlign: 'center', lineHeight: 24 }}>
-              We are <Text style={{ fontWeight: '700', color: '#111827' }}>so excited</Text> to have received your request and genuinely look forward to welcoming you into the Bazidpur family!
+            <Text style={{ fontSize: 28, fontWeight: '800', color: '#111827', textAlign: 'center', letterSpacing: -0.5, marginBottom: 12, lineHeight: 34 }}>
+              Welcome to the family,{'\n'}{form.firstName}! 🎉
+            </Text>
+            <Text style={{ fontSize: 15, color: '#6b7280', textAlign: 'center', lineHeight: 24, maxWidth: 300 }}>
+              We are <Text style={{ fontWeight: '700', color: '#111827' }}>genuinely thrilled</Text> to have received your membership request. The Bazidpur family grows stronger with every new member — and we can't wait to welcome you in!
             </Text>
           </View>
 
+          {/* Request summary */}
+          <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: '#f3f4f6' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 14 }}>
+              Your request summary
+            </Text>
+            {[
+              { label: 'Name', value: `${form.firstName} ${form.lastName}` },
+              { label: 'Email', value: form.email.trim() },
+              { label: 'Location', value: [form.city, form.state, form.country].filter(Boolean).join(', ') },
+              { label: 'Connection', value: form.linkToBazidpur.trim() },
+              { label: 'Submitted', value: submittedAt },
+            ].map(row => (
+              <View key={row.label} style={{ flexDirection: 'row', marginBottom: 8 }}>
+                <Text style={{ fontSize: 13, color: '#9ca3af', width: 80, flexShrink: 0 }}>{row.label}</Text>
+                <Text style={{ fontSize: 13, color: '#111827', fontWeight: '500', flex: 1 }} numberOfLines={2}>{row.value}</Text>
+              </View>
+            ))}
+          </View>
+
           {/* What happens next */}
-          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#f3f4f6' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 18, padding: 18, marginBottom: 14, borderWidth: 1, borderColor: '#f3f4f6' }}>
             <Text style={{ fontSize: 11, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 16 }}>
               What happens next
             </Text>
             {[
-              { n: '1', color: '#dcfce7', text: '#16a34a', title: 'Acknowledgement email sent', body: `A confirmation has been sent to ${form.email} — check your inbox (and spam, just in case).` },
-              { n: '2', color: '#dbeafe', text: '#2563eb', title: 'Admin reviews your request', body: 'Our admins will review your membership request and a decision will be communicated to you by email very soon!' },
-              { n: '3', color: '#ede9fe', text: '#7c3aed', title: "You're in!", body: 'Once approved, you\'ll gain full member access — family tree, poetry, photo albums, Timeless Moments, and much more.' },
+              {
+                n: '1', bg: '#dcfce7', fg: '#16a34a',
+                title: 'Confirmation email on its way',
+                body: `A confirmation has been sent to ${form.email.trim()}. Please check your inbox — and your spam folder, just in case.`,
+              },
+              {
+                n: '2', bg: '#dbeafe', fg: '#2563eb',
+                title: 'Admin reviews your request',
+                body: 'Our admins personally review every membership request. You\'ll hear back by email very soon — usually within a day or two.',
+              },
+              {
+                n: '3', bg: '#ede9fe', fg: '#7c3aed',
+                title: 'Full access unlocked',
+                body: 'Once approved, you\'ll have full access to the family tree, poetry, photo albums, Timeless Moments, community forum, and much more.',
+              },
             ].map((step, i) => (
               <View key={i} style={{ flexDirection: 'row', gap: 12, marginBottom: i < 2 ? 16 : 0 }}>
-                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: step.color, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: step.text }}>{step.n}</Text>
+                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: step.bg, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: step.fg }}>{step.n}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 2 }}>{step.title}</Text>
-                  <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 19 }}>{step.body}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 3 }}>{step.title}</Text>
+                  <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 20 }}>{step.body}</Text>
                 </View>
               </View>
             ))}
           </View>
 
+          {/* Warm closing note */}
+          <View style={{ backgroundColor: '#faf5ff', borderRadius: 18, padding: 18, marginBottom: 20, borderWidth: 1, borderColor: '#ede9fe' }}>
+            <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 21, textAlign: 'center' }}>
+              <Text style={{ fontSize: 18 }}>🤝{'\n'}</Text>
+              If you have any questions in the meantime, feel free to reach out via the{' '}
+              <Text style={{ fontWeight: '700', color: '#2d1b69' }}>Contact</Text>
+              {' '}page. We're always happy to help!
+            </Text>
+          </View>
+
           {/* CTA */}
           <TouchableOpacity
             onPress={() => router.replace('/(auth)/login')}
-            style={{ backgroundColor: '#2d1b69', borderRadius: 14, paddingVertical: 16, alignItems: 'center' }}
+            style={{ backgroundColor: '#2d1b69', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginBottom: 12 }}
           >
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Back to Sign In</Text>
           </TouchableOpacity>
+          <Text style={{ fontSize: 12, color: '#c4c4c6', textAlign: 'center' }}>
+            You'll receive an email once your request is reviewed
+          </Text>
 
         </ScrollView>
       </View>
     )
   }
+
+  // ── Signup form ─────────────────────────────────────────────────────────────
 
   return (
     <KeyboardAvoidingView
@@ -283,6 +328,7 @@ export default function SignupScreen() {
             onChange={(name, code) => {
               setForm(f => ({ ...f, country: name, state: '' }))
               setCountryCode(code)
+              setError('')
             }}
           />
         </View>
@@ -292,7 +338,7 @@ export default function SignupScreen() {
           <StatePicker
             value={form.state}
             countryCode={countryCode}
-            onChange={(name) => setForm(f => ({ ...f, state: name }))}
+            onChange={(name) => { setForm(f => ({ ...f, state: name })); setError('') }}
           />
         </View>
 
@@ -342,6 +388,18 @@ export default function SignupScreen() {
             </Text>
           </Text>
         </TouchableOpacity>
+
+        {/* Inline error */}
+        {error ? (
+          <View style={{
+            backgroundColor: '#fff1f2', borderRadius: 12, padding: 14,
+            marginBottom: 16, borderWidth: 1, borderColor: '#fecdd3',
+            flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+          }}>
+            <Text style={{ fontSize: 16, marginTop: 1 }}>⚠️</Text>
+            <Text style={{ flex: 1, fontSize: 13, color: '#be123c', lineHeight: 20 }}>{error}</Text>
+          </View>
+        ) : null}
 
         <TouchableOpacity
           onPress={handleSignup}
