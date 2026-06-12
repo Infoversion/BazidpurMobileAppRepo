@@ -11,7 +11,8 @@ const CIRCLE_SIZE = 68
 const OVERLAP = 22
 
 export default function HomeScreen() {
-  const { session } = useAuth()
+  const { session, role } = useAuth()
+  const isMember = ['member', 'admin', 'superadmin'].includes(role ?? '')
   const [photos, setPhotos] = useState<LandingPhoto[]>([])
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export default function HomeScreen() {
               <Text style={{ fontSize: 15, color: '#374151', fontWeight: '600' }}>Sign In</Text>
             </TouchableOpacity>
           </View>
-        ) : (
+        ) : isMember ? (
           <View style={{
             marginTop: 36, backgroundColor: '#f5f3ff',
             borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18,
@@ -85,6 +86,21 @@ export default function HomeScreen() {
               Tap the{' '}
               <Text style={{ fontWeight: '700', color: '#2d1b69' }}>Community</Text>
               {' '}icon in the tab bar below to explore stories, memoirs, family tree, photos and more.
+            </Text>
+          </View>
+        ) : (
+          <View style={{
+            marginTop: 36, backgroundColor: '#fffbeb',
+            borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18,
+            alignItems: 'center', maxWidth: 300,
+            borderWidth: 1, borderColor: '#fde68a',
+          }}>
+            <Text style={{ fontSize: 22, marginBottom: 10 }}>⏳</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#92400e', textAlign: 'center', marginBottom: 8 }}>
+              Request under review
+            </Text>
+            <Text style={{ fontSize: 13, color: '#78350f', textAlign: 'center', lineHeight: 20 }}>
+              Your membership request is being reviewed by our admins. You'll receive an email once it's approved. Jazakallah for your patience!
             </Text>
           </View>
         )}

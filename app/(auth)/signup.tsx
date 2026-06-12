@@ -87,6 +87,7 @@ export default function SignupScreen() {
     setLoading(false)
 
     if (profileError) {
+      await supabase.auth.signOut()
       setError('Your account was created but we couldn\'t save your profile. Please contact us and we\'ll sort it out straight away.')
     } else {
       setSuccess(true)

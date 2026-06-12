@@ -48,11 +48,14 @@ function PortraitIcon({ uri }: { uri: string }) {
   )
 }
 
+const MEMBER_ROLES = ['member', 'admin', 'superadmin']
+
 interface CustomTabBarProps extends BottomTabBarProps {
   session: Session | null
+  role: string | null
 }
 
-function CustomTabBar({ state, descriptors, navigation, session }: CustomTabBarProps) {
+function CustomTabBar({ state, descriptors, navigation, session, role }: CustomTabBarProps) {
   const insets = useSafeAreaInsets()
   const pathname = usePathname()
   const slideY    = useRef(new Animated.Value(0)).current
@@ -139,7 +142,7 @@ function CustomTabBar({ state, descriptors, navigation, session }: CustomTabBarP
 
   const visibleRoutes = state.routes.filter(r => {
     if (HIDDEN.has(r.name)) return false
-    if (r.name === 'community' && !session) return false
+    if (r.name === 'community' && !MEMBER_ROLES.includes(role ?? '')) return false
     return true
   })
 
@@ -279,7 +282,7 @@ function CustomTabBar({ state, descriptors, navigation, session }: CustomTabBarP
 }
 
 export default function TabLayout() {
-  const { session, loading } = useAuth()
+  const { session, role, loading } = useAuth()
 
   if (loading) {
     return (
@@ -293,7 +296,7 @@ export default function TabLayout() {
     <Tabs
       initialRouteName="home"
       screenOptions={{ headerShown: false }}
-      tabBar={(props) => <CustomTabBar {...props} session={session} />}
+      tabBar={(props) => <CustomTabBar {...props} session={session} role={role} />}
     >
       <Tabs.Screen
         name="home"

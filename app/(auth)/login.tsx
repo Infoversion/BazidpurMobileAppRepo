@@ -1,27 +1,63 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
+
+const ALLOWED_ROLES = ['member', 'admin', 'superadmin']
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleLogin() {
     if (!email || !password) {
-      Alert.alert('Missing fields', 'Please enter your email and password.')
+      setError('Please enter your email and password.')
       return
     }
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-    setLoading(false)
-    if (error) {
-      Alert.alert('Login failed', error.message)
-    } else {
-      router.replace('/(tabs)/home')
+    setError('')
+
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
+
+    if (authError || !data.user) {
+      setLoading(false)
+      setError('Incorrect email or password. Please try again.')
+      return
     }
+
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', data.user.id)
+      .single()
+
+    setLoading(false)
+
+    if (!profile) {
+      await supabase.auth.signOut()
+      setError('Your account setup is incomplete. Please contact us and we\'ll sort it out.')
+      return
+    }
+
+    if (profile.role === 'pending') {
+      await supabase.auth.signOut()
+      setError('Your membership request is still under review. You\'ll receive an email once it\'s been approved — usually within a day or two. Jazakallah for your patience! 🤲')
+      return
+    }
+
+    if (!ALLOWED_ROLES.includes(profile.role)) {
+      await supabase.auth.signOut()
+      setError('Your account does not have access. Please contact us if you think this is a mistake.')
+      return
+    }
+
+    router.replace('/(tabs)/home')
   }
 
   return (
@@ -49,7 +85,7 @@ export default function LoginScreen() {
             placeholder="you@example.com"
             placeholderTextColor="#9ca3af"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={v => { setEmail(v); setError('') }}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -63,17 +99,28 @@ export default function LoginScreen() {
             placeholder="Your password"
             placeholderTextColor="#9ca3af"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={v => { setPassword(v); setError('') }}
             secureTextEntry
           />
         </View>
 
         <TouchableOpacity
-          className="self-end mb-8"
+          className="self-end mb-6"
           onPress={() => router.push('/(auth)/forgot-password')}
         >
           <Text className="text-sm text-accent">Forgot password?</Text>
         </TouchableOpacity>
+
+        {error ? (
+          <View style={{
+            backgroundColor: '#fff1f2', borderRadius: 12, padding: 14,
+            marginBottom: 16, borderWidth: 1, borderColor: '#fecdd3',
+            flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+          }}>
+            <Text style={{ fontSize: 16, marginTop: 1 }}>⚠️</Text>
+            <Text style={{ flex: 1, fontSize: 13, color: '#be123c', lineHeight: 20 }}>{error}</Text>
+          </View>
+        ) : null}
 
         <TouchableOpacity
           className="w-full py-3.5 bg-primary rounded-xl items-center mb-4"
