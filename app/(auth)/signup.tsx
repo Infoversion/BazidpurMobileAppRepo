@@ -90,6 +90,16 @@ export default function SignupScreen() {
       await supabase.auth.signOut()
       setError('Your account was created but we couldn\'t save your profile. Please contact us and we\'ll sort it out straight away.')
     } else {
+      // Send welcome + admin notification emails (non-blocking)
+      fetch('https://bazidpur.com/api/signup-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          email: form.email.trim(),
+        }),
+      }).catch(() => {})
       setSuccess(true)
     }
   }
