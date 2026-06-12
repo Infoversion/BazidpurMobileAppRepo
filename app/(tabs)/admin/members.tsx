@@ -82,7 +82,7 @@ function MemberRow({ user, isSuperadmin, onAction, onView }: {
 
   return (
     <TouchableOpacity
-      onPress={() => user.role === 'pending' ? onView(user) : onAction(user)}
+      onPress={() => onView(user)}
       activeOpacity={0.6}
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -191,6 +191,7 @@ export default function MembersScreen() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleCounts, setRoleCounts] = useState({ all: 0, pending: 0, member: 0, admin: 0 })
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const pendingActionRef = useRef<User | null>(null)
 
   // Debounce search — avoids a server call per keystroke
   useEffect(() => {
@@ -558,40 +559,75 @@ export default function MembersScreen() {
                 ) : null}
               </DetailSection>
 
-              <DetailSection title="Application">
-                <DetailField
-                  label="Applied on"
-                  value={new Date(selectedUser.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                />
+              <DetailSection title="Membership">
+                <DetailField label="Status" value={selectedUser.is_active ? 'Active' : 'Suspended'} />
+                {selectedUser.role === 'pending' ? (
+                  <DetailField
+                    label="Applied on"
+                    value={new Date(selectedUser.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  />
+                ) : (
+                  <DetailField
+                    label="Member since"
+                    value={new Date(selectedUser.member_since ?? selectedUser.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  />
+                )}
+                {selectedUser.approved_at ? (
+                  <DetailField
+                    label="Approved on"
+                    value={new Date(selectedUser.approved_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  />
+                ) : null}
+                {selectedUser.approved_by ? (() => {
+                  const approver = users.find(u => u.id === selectedUser.approved_by)
+                  return approver ? (
+                    <DetailField label="Approved by" value={`${approver.first_name} ${approver.last_name}`} />
+                  ) : null
+                })() : null}
               </DetailSection>
 
               {/* Actions */}
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 28 }}>
+              {selectedUser.role === 'pending' ? (
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 28 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: '#d1fae5', borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}
+                    onPress={() => {
+                      const u = selectedUser
+                      Alert.alert('Approve this member?', `${u.first_name} ${u.last_name} will receive a welcome email and get full member access.`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Approve', onPress: () => { setSelectedUser(null); updateRole(u.id, 'member') } },
+                      ])
+                    }}
+                  >
+                    <Text style={{ fontSize: 15, color: '#065f46', fontWeight: '700' }}>✅  Approve</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: '#fee2e2', borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}
+                    onPress={() => {
+                      const u = selectedUser
+                      Alert.alert('Reject this applicant?', `${u.first_name} ${u.last_name} will receive a polite rejection email.`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Reject', style: 'destructive', onPress: () => { setSelectedUser(null); updateRole(u.id, 'visitor') } },
+                      ])
+                    }}
+                  >
+                    <Text style={{ fontSize: 15, color: '#991b1b', fontWeight: '700' }}>✕  Reject</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
                 <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: '#d1fae5', borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}
+                  style={{ backgroundColor: '#2d1b69', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 28 }}
                   onPress={() => {
-                    const u = selectedUser
-                    Alert.alert('Approve this member?', `${u.first_name} ${u.last_name} will receive a welcome email and get full member access.`, [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Approve', onPress: () => { setSelectedUser(null); updateRole(u.id, 'member') } },
-                    ])
+                    pendingActionRef.current = selectedUser
+                    setSelectedUser(null)
+                    setTimeout(() => {
+                      if (pendingActionRef.current) { showActions(pendingActionRef.current); pendingActionRef.current = null }
+                    }, 350)
                   }}
                 >
-                  <Text style={{ fontSize: 15, color: '#065f46', fontWeight: '700' }}>✅  Approve</Text>
+                  <Text style={{ fontSize: 15, color: '#fff', fontWeight: '600' }}>Actions…</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: '#fee2e2', borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}
-                  onPress={() => {
-                    const u = selectedUser
-                    Alert.alert('Reject this applicant?', `${u.first_name} ${u.last_name} will receive a polite rejection email.`, [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Reject', style: 'destructive', onPress: () => { setSelectedUser(null); updateRole(u.id, 'visitor') } },
-                    ])
-                  }}
-                >
-                  <Text style={{ fontSize: 15, color: '#991b1b', fontWeight: '700' }}>✕  Reject</Text>
-                </TouchableOpacity>
-              </View>
+              )}
 
             </ScrollView>
           </View>

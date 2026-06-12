@@ -21,6 +21,10 @@ export interface User {
   location_lat?: number
   location_lng?: number
   privacy_policy_accepted_at?: string
+  member_since?: string
+  approved_by?: string
+  approved_at?: string
+  suspended_at?: string
   created_at: string
   updated_at: string
 }
