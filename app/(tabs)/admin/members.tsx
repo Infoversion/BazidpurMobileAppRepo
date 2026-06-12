@@ -191,7 +191,13 @@ export default function MembersScreen() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleCounts, setRoleCounts] = useState({ all: 0, pending: 0, member: 0, admin: 0 })
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const pendingActionRef = useRef<User | null>(null)
+  const [approverName, setApproverName] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!selectedUser?.approved_by) { setApproverName(null); return }
+    supabase.from('users').select('first_name, last_name').eq('id', selectedUser.approved_by).single()
+      .then(({ data }) => setApproverName(data ? `${data.first_name} ${data.last_name}` : null))
+  }, [selectedUser?.id])
 
   // Debounce search — avoids a server call per keystroke
   useEffect(() => {
@@ -274,7 +280,15 @@ export default function MembersScreen() {
     const targetUser = users.find(x => x.id === userId)
     const oldRole = targetUser?.role
 
-    const { error } = await supabase.from('users').update({ role: newRole }).eq('id', userId)
+    const now = new Date().toISOString()
+    const updateData: Record<string, unknown> = { role: newRole }
+    if (oldRole === 'pending' && newRole === 'member') {
+      updateData.approved_by = currentUser?.id
+      updateData.approved_at = now
+      updateData.member_since = now
+      updateData.is_active = true
+    }
+    const { error } = await supabase.from('users').update(updateData).eq('id', userId)
     if (error) { Alert.alert('Error', error.message); return }
 
     setUsers(prev => {
@@ -578,12 +592,9 @@ export default function MembersScreen() {
                     value={new Date(selectedUser.approved_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                   />
                 ) : null}
-                {selectedUser.approved_by ? (() => {
-                  const approver = users.find(u => u.id === selectedUser.approved_by)
-                  return approver ? (
-                    <DetailField label="Approved by" value={`${approver.first_name} ${approver.last_name}`} />
-                  ) : null
-                })() : null}
+                {approverName ? (
+                  <DetailField label="Approved by" value={approverName} />
+                ) : null}
               </DetailSection>
 
               {/* Actions */}
@@ -614,20 +625,54 @@ export default function MembersScreen() {
                     <Text style={{ fontSize: 15, color: '#991b1b', fontWeight: '700' }}>✕  Reject</Text>
                   </TouchableOpacity>
                 </View>
-              ) : (
-                <TouchableOpacity
-                  style={{ backgroundColor: '#2d1b69', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 28 }}
-                  onPress={() => {
-                    pendingActionRef.current = selectedUser
-                    setSelectedUser(null)
-                    setTimeout(() => {
-                      if (pendingActionRef.current) { showActions(pendingActionRef.current); pendingActionRef.current = null }
-                    }, 350)
-                  }}
-                >
-                  <Text style={{ fontSize: 15, color: '#fff', fontWeight: '600' }}>Actions…</Text>
-                </TouchableOpacity>
-              )}
+              ) : (() => {
+                const u = selectedUser
+                const canAct = u.id !== currentUser?.id && u.role !== 'superadmin'
+                const hasAnyAction = (isSuperadmin && (u.role === 'member' || u.role === 'admin')) || canAct
+                if (!hasAnyAction) return null
+                return (
+                  <View style={{ gap: 10, marginTop: 28 }}>
+                    {u.role === 'member' && isSuperadmin && (
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#eff6ff', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                        onPress={() => Alert.alert('Promote to Admin?', `${u.first_name} ${u.last_name} will be promoted to admin and will receive a notification email.`, [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Promote', onPress: () => { setSelectedUser(null); updateRole(u.id, 'admin') } },
+                        ])}
+                      >
+                        <Text style={{ fontSize: 15, color: '#1d4ed8', fontWeight: '600' }}>⬆️  Promote to Admin</Text>
+                      </TouchableOpacity>
+                    )}
+                    {u.role === 'admin' && isSuperadmin && (
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#fffbeb', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                        onPress={() => Alert.alert('Demote to Member?', `${u.first_name} ${u.last_name} will lose admin access and will receive a notification email.`, [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Demote', onPress: () => { setSelectedUser(null); updateRole(u.id, 'member') } },
+                        ])}
+                      >
+                        <Text style={{ fontSize: 15, color: '#92400e', fontWeight: '600' }}>⬇️  Demote to Member</Text>
+                      </TouchableOpacity>
+                    )}
+                    {canAct && (
+                      <TouchableOpacity
+                        style={{ backgroundColor: u.is_active ? '#fee2e2' : '#d1fae5', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                        onPress={() => {
+                          const action = u.is_active ? 'Deactivate' : 'Reactivate'
+                          Alert.alert(`${action} account?`, `${u.first_name} ${u.last_name}`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: action, style: u.is_active ? 'destructive' : 'default', onPress: () => { setSelectedUser(null); updateActive(u.id, !u.is_active) } },
+                          ])
+                        }}
+                      >
+                        <Text style={{ fontSize: 15, color: u.is_active ? '#991b1b' : '#065f46', fontWeight: '600' }}>
+                          {u.is_active ? '🚫  Deactivate Account' : '✅  Reactivate Account'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )
+              })()}
 
             </ScrollView>
           </View>
