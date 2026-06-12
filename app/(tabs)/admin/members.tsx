@@ -314,21 +314,24 @@ export default function MembersScreen() {
     }
     const { first_name: firstName, email } = targetUser
 
+    const sendEmail = async (url: string, body: object) => {
+      try {
+        const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })
+        if (!res.ok) {
+          const text = await res.text().catch(() => '')
+          console.error(`[email] ${url} → ${res.status}`, text)
+        }
+      } catch (err) {
+        console.error(`[email] network error`, err)
+      }
+    }
+
     if (oldRole === 'pending' && newRole === 'member') {
-      fetch('https://bazidpur.com/api/member-approved', {
-        method: 'POST', headers,
-        body: JSON.stringify({ firstName, email }),
-      }).catch(() => {})
+      sendEmail('https://www.bazidpur.com/api/member-approved', { firstName, email })
     } else if (oldRole === 'pending' && newRole === 'visitor') {
-      fetch('https://bazidpur.com/api/member-rejected', {
-        method: 'POST', headers,
-        body: JSON.stringify({ firstName, email }),
-      }).catch(() => {})
+      sendEmail('https://www.bazidpur.com/api/member-rejected', { firstName, email })
     } else if (newRole === 'admin' || (newRole === 'member' && oldRole === 'admin')) {
-      fetch('https://bazidpur.com/api/role-changed', {
-        method: 'POST', headers,
-        body: JSON.stringify({ firstName, email, newRole }),
-      }).catch(() => {})
+      sendEmail('https://www.bazidpur.com/api/role-changed', { firstName, email, newRole })
     }
   }
 

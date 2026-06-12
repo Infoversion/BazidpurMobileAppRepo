@@ -3,12 +3,37 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl, Linking, Alert,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
+import { RoleBadge } from '@/components/RoleBadge'
+import Svg, { Path, Line, Circle } from 'react-native-svg'
 
 const WEB = 'https://bazidpur.com'
+const W = 'white'
+const SW = 2
+
+function HelpIcon() {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" stroke={W} strokeWidth={SW} />
+      <Path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke={W} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round" />
+      <Line x1="12" y1="17" x2="12.01" y2="17" stroke={W} strokeWidth={SW} strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+function SignOutIcon() {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke={W} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M16 17l5-5-5-5" stroke={W} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round" />
+      <Line x1="21" y1="12" x2="9" y2="12" stroke={W} strokeWidth={SW} strokeLinecap="round" />
+    </Svg>
+  )
+}
 
 interface Stats {
   totalUsers: number
@@ -76,6 +101,14 @@ export default function AdminScreen() {
   const insets = useSafeAreaInsets()
   const { user } = useAuth()
   const isSuperadmin = user?.role === 'superadmin'
+  const initials = user
+    ? [user.first_name?.[0], user.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
+    : '?'
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.replace('/(tabs)/home')
+  }
 
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -184,6 +217,45 @@ export default function AdminScreen() {
             {isSuperadmin ? 'Superadmin' : 'Admin'}
           </Text>
         </View>
+
+        {/* Right icons */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 2 }}>
+          <TouchableOpacity
+            onPress={() => router.push('/(public)/help')}
+            style={{ width: 34, height: 34, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <HelpIcon />
+          </TouchableOpacity>
+
+          <View style={{ position: 'relative' }}>
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/more')}
+              style={{
+                width: 34, height: 34, borderRadius: 17,
+                backgroundColor: 'rgba(255,255,255,0.22)',
+                overflow: 'hidden', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              {user?.photo_url ? (
+                <Image source={{ uri: user.photo_url }} style={{ width: 34, height: 34 }} contentFit="cover" />
+              ) : (
+                <Text style={{ fontSize: 13, color: '#fff', fontWeight: '700' }}>{initials}</Text>
+              )}
+            </TouchableOpacity>
+            {user?.role && (
+              <View style={{ position: 'absolute', bottom: -3, right: -4 }}>
+                <RoleBadge role={user.role} size={14} />
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity
+            onPress={handleLogout}
+            style={{ width: 34, height: 34, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <SignOutIcon />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -206,7 +278,7 @@ export default function AdminScreen() {
           {[
             { icon: '👥', label: 'Approved Members', value: s.totalUsers,                              sub: 'members + admins',                                                            highlight: false,              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'all' } }) },
             { icon: '⏳', label: 'Pending Review',   value: s.pendingCount,                            sub: 'awaiting approval',                                                           highlight: s.pendingCount > 0, onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'pending' } }) },
-            { icon: '🛡️', label: 'Admins & Staff',   value: s.adminCount,                              sub: 'admins + superadmins',                                                        highlight: false,              onPress: null },
+            { icon: '🛡️', label: 'Admins & Staff',   value: s.adminCount,                              sub: 'admins + superadmins',                                                        highlight: false,              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'admin' } }) },
             { icon: '🌳', label: 'Family Tree',      value: s.familyTreeNodes,                         sub: 'documented members',                                                          highlight: false,              onPress: () => router.push('/(tabs)/admin/family-tree' as any) },
             { icon: '📸', label: 'Media',            value: s.totalPhotos + s.totalVideos,             sub: `${s.totalPhotos} photos · ${s.totalVideos} videos`,                          highlight: false,              onPress: () => router.push('/(tabs)/admin/media') },
             { icon: '✨', label: 'Timeless Moments', value: s.totalMoments + s.totalMomentVideos,      sub: `${s.totalMoments} photos · ${s.totalMomentVideos} videos`,                   highlight: false,              onPress: () => router.push('/(tabs)/admin/moments') },
