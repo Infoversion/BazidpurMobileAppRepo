@@ -246,6 +246,7 @@ export default function FamilyTreeScreen() {
   const [traceIds,     setTraceIds]     = useState<Set<string> | null>(null)
   const [toolbarOpen,  setToolbarOpen]  = useState(true)
   const [findMeMsg,    setFindMeMsg]    = useState(false)
+  const [findMeHit,    setFindMeHit]    = useState<string | null>(null)
   const focusAnim   = useRef(new Animated.Value(0)).current
   const toolbarAnim = useRef(new Animated.Value(1)).current
 
@@ -355,6 +356,8 @@ export default function FamilyTreeScreen() {
     }
 
     scrollTarget.current = myNode.id
+    setFindMeHit(myNode.id)
+    setTimeout(() => setFindMeHit(null), 2500)
     setExpanded(toExpand)     // → flatItems updates → effect scrolls
   }
 
@@ -505,7 +508,7 @@ export default function FamilyTreeScreen() {
             depth={item.depth}
             childCount={(childrenOf.get(item.node.id) ?? []).length}
             isExpanded={expanded.has(item.node.id)}
-            isMatch={!!matchIds?.has(item.node.id)}
+            isMatch={!!matchIds?.has(item.node.id) || item.node.id === findMeHit}
             isTraced={!!traceIds?.has(item.node.id)}
             onToggle={() => toggleExpand(item.node.id)}
             onSelect={() => setSelectedNode(item.node)}
