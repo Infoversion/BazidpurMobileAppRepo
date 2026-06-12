@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl, TextInput,
-  Alert, ActionSheetIOS, Platform,
+  Alert, ActionSheetIOS, Platform, Modal, ScrollView,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useLocalSearchParams } from 'expo-router'
@@ -70,10 +70,11 @@ function Avatar({ user }: { user: User }) {
 
 // ─── Member row ───────────────────────────────────────────────────────────────
 
-function MemberRow({ user, isSuperadmin, onAction }: {
+function MemberRow({ user, isSuperadmin, onAction, onView }: {
   user: User
   isSuperadmin: boolean
   onAction: (user: User) => void
+  onView: (user: User) => void
 }) {
   const joinDate = new Date(user.created_at).toLocaleDateString('en-GB', {
     day: 'numeric', month: 'short', year: 'numeric',
@@ -81,7 +82,7 @@ function MemberRow({ user, isSuperadmin, onAction }: {
 
   return (
     <TouchableOpacity
-      onPress={() => onAction(user)}
+      onPress={() => user.role === 'pending' ? onView(user) : onAction(user)}
       activeOpacity={0.6}
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -189,6 +190,7 @@ export default function MembersScreen() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleCounts, setRoleCounts] = useState({ all: 0, pending: 0, member: 0, admin: 0 })
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
 
   // Debounce search — avoids a server call per keystroke
   useEffect(() => {
@@ -461,7 +463,7 @@ export default function MembersScreen() {
           <View style={{ height: 0.5, backgroundColor: 'rgba(60,60,67,0.18)', marginLeft: 72 }} />
         )}
         renderItem={({ item }) => (
-          <MemberRow user={item} isSuperadmin={isSuperadmin} onAction={showActions} />
+          <MemberRow user={item} isSuperadmin={isSuperadmin} onAction={showActions} onView={setSelectedUser} />
         )}
         ListHeaderComponent={
           <View style={{ height: 8, backgroundColor: 'transparent' }} />
@@ -497,6 +499,137 @@ export default function MembersScreen() {
         }
       />
 
+      {/* ── Applicant detail sheet ────────────────────────────────────────────── */}
+      <Modal
+        visible={!!selectedUser}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSelectedUser(null)}
+      >
+        {selectedUser && (
+          <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+
+            {/* Header */}
+            <View style={{
+              backgroundColor: '#fff',
+              paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16,
+              flexDirection: 'row', alignItems: 'center', gap: 14,
+              borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.18)',
+            }}>
+              <Avatar user={selectedUser} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: '600', color: '#000', marginBottom: 4 }}>
+                  {selectedUser.first_name} {selectedUser.last_name}
+                </Text>
+                <RoleBadge role={selectedUser.role} />
+              </View>
+              <TouchableOpacity onPress={() => setSelectedUser(null)} style={{ paddingLeft: 8, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 15, color: '#2d1b69', fontWeight: '600' }}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
+
+              <DetailSection title="Contact">
+                <DetailField label="Email" value={selectedUser.email} />
+              </DetailSection>
+
+              <DetailSection title="Personal Details">
+                <DetailField
+                  label="Sex"
+                  value={selectedUser.sex === 'male' ? 'Male' : selectedUser.sex === 'female' ? 'Female' : selectedUser.sex || '—'}
+                />
+                {selectedUser.dob ? (
+                  <DetailField
+                    label="Date of birth"
+                    value={new Date(selectedUser.dob).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  />
+                ) : null}
+              </DetailSection>
+
+              <DetailSection title="Location">
+                <DetailField label="Place of residence" value={selectedUser.place_of_residence || '—'} />
+              </DetailSection>
+
+              <DetailSection title="Bazidpur Connection">
+                <DetailField label="Connection" value={selectedUser.link_to_bazidpur || '—'} multiline />
+                {selectedUser.comments ? (
+                  <DetailField label="Additional comments" value={selectedUser.comments} multiline />
+                ) : null}
+              </DetailSection>
+
+              <DetailSection title="Application">
+                <DetailField
+                  label="Applied on"
+                  value={new Date(selectedUser.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                />
+              </DetailSection>
+
+              {/* Actions */}
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 28 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: '#d1fae5', borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}
+                  onPress={() => {
+                    const u = selectedUser
+                    Alert.alert('Approve this member?', `${u.first_name} ${u.last_name} will receive a welcome email and get full member access.`, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Approve', onPress: () => { setSelectedUser(null); updateRole(u.id, 'member') } },
+                    ])
+                  }}
+                >
+                  <Text style={{ fontSize: 15, color: '#065f46', fontWeight: '700' }}>✅  Approve</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: '#fee2e2', borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}
+                  onPress={() => {
+                    const u = selectedUser
+                    Alert.alert('Reject this applicant?', `${u.first_name} ${u.last_name} will receive a polite rejection email.`, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Reject', style: 'destructive', onPress: () => { setSelectedUser(null); updateRole(u.id, 'visitor') } },
+                    ])
+                  }}
+                >
+                  <Text style={{ fontSize: 15, color: '#991b1b', fontWeight: '700' }}>✕  Reject</Text>
+                </TouchableOpacity>
+              </View>
+
+            </ScrollView>
+          </View>
+        )}
+      </Modal>
+
+    </View>
+  )
+}
+
+// ─── Detail sheet helpers ─────────────────────────────────────────────────────
+
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={{ marginBottom: 20 }}>
+      <Text style={{ fontSize: 11, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+        {title}
+      </Text>
+      <View style={{ backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 4 }}>
+        {children}
+      </View>
+    </View>
+  )
+}
+
+function DetailField({ label, value, multiline }: { label: string; value: string; multiline?: boolean }) {
+  if (multiline) {
+    return (
+      <View style={{ paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.1)' }}>
+        <Text style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>{label}</Text>
+        <Text style={{ fontSize: 14, color: '#111827', lineHeight: 20 }}>{value}</Text>
+      </View>
+    )
+  }
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.1)' }}>
+      <Text style={{ fontSize: 14, color: '#9ca3af' }}>{label}</Text>
+      <Text style={{ fontSize: 14, color: '#111827', fontWeight: '500', textAlign: 'right', flex: 1, marginLeft: 16 }} numberOfLines={2}>{value}</Text>
     </View>
   )
 }
