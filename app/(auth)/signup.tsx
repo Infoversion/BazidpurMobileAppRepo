@@ -69,27 +69,37 @@ export default function SignupScreen() {
     }
 
     setLoading(true)
-    const { error } = await supabase.auth.signUp({
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: form.email.trim(),
       password: form.password,
-      options: {
-        data: {
-          first_name: form.firstName.trim(),
-          last_name: form.lastName.trim(),
-          sex,
-          dob: dob || null,
-          location_country: form.country.trim(),
-          location_state: form.state.trim(),
-          location_city: form.city.trim(),
-          link_to_bazidpur: form.linkToBazidpur.trim(),
-          privacy_policy_accepted_at: new Date().toISOString(),
-        },
-      },
     })
+
+    if (authError || !authData.user) {
+      setLoading(false)
+      Alert.alert('Request failed', authError?.message ?? 'Something went wrong.')
+      return
+    }
+
+    const { error: profileError } = await supabase.from('users').insert({
+      id: authData.user.id,
+      email: form.email.trim(),
+      first_name: form.firstName.trim(),
+      last_name: form.lastName.trim(),
+      sex,
+      dob: dob || null,
+      location_country: form.country.trim(),
+      location_state: form.state.trim(),
+      location_city: form.city.trim(),
+      link_to_bazidpur: form.linkToBazidpur.trim(),
+      role: 'pending',
+      privacy_policy_accepted_at: new Date().toISOString(),
+    })
+
     setLoading(false)
 
-    if (error) {
-      Alert.alert('Request failed', error.message)
+    if (profileError) {
+      Alert.alert('Request failed', profileError.message)
     } else {
       setSuccess(true)
     }
