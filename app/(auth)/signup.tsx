@@ -103,14 +103,14 @@ export default function SignupScreen() {
       style={{ flex: 1, backgroundColor: '#f2f2f7' }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <PurpleHeader title="Sign Up" showBack hideVisitorActions />
+      <PurpleHeader title="Request Membership" showBack hideVisitorActions />
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 }}>
         <Text style={{ fontSize: 11, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 2, textAlign: 'center', fontWeight: '500', marginBottom: 6 }}>
           Join the community
         </Text>
         <Text style={{ fontSize: 32, fontWeight: '800', color: '#111827', textAlign: 'center', letterSpacing: -0.5, marginBottom: 4 }}>
-          Create Account
+          Request Membership
         </Text>
         <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 16 }}>
           Join the Bazidpur family
@@ -159,7 +159,7 @@ export default function SignupScreen() {
                   elevation: sex === opt ? 1 : 0,
                 }}
               >
-                <Text style={{ fontSize: 13, fontWeight: '600', color: sex === opt ? '#1c1c1e' : '#9ca3af', textTransform: 'capitalize' }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: sex === opt ? '#1c1c1e' : '#9ca3af', textTransform: 'capitalize' }}>
                   {opt === 'male' ? '♂ Male' : opt === 'female' ? '♀ Female' : '⚬ Other'}
                 </Text>
               </TouchableOpacity>

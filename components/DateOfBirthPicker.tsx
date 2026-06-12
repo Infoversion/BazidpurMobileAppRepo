@@ -36,11 +36,11 @@ export function DateOfBirthPicker({ value, onChange, label = 'Date of Birth', de
         onPress={() => setShow(true)}
         style={{
           backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb',
-          borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
+          borderRadius: 12, paddingHorizontal: 14, paddingTop: 13, paddingBottom: 15,
           flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         }}
       >
-        <Text style={{ fontSize: 15, color: dateObj ? '#111827' : '#9ca3af' }}>{display}</Text>
+        <Text style={{ fontSize: 17, color: dateObj ? '#111827' : '#9ca3af' }}>{display}</Text>
         <Text style={{ fontSize: 16, color: '#9ca3af' }}>📅</Text>
       </TouchableOpacity>
 

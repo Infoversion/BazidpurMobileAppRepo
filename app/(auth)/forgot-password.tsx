@@ -67,7 +67,7 @@ export default function ForgotPasswordScreen() {
         <View style={{ marginBottom: 20 }}>
           <Text style={{ fontSize: 13, fontWeight: '500', color: '#374151', marginBottom: 6 }}>Email</Text>
           <TextInput
-            style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: '#111827' }}
+            style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 14, paddingTop: 13, paddingBottom: 15, fontSize: 17, color: '#111827' }}
             placeholder="you@example.com"
             placeholderTextColor="#9ca3af"
             value={email}

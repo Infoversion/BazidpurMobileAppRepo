@@ -100,7 +100,7 @@ export default function ContactScreen() {
                   Name <Text className="text-red-400">*</Text>
                 </Text>
                 <TextInput
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-900"
+                  className="w-full px-4 rounded-xl border border-gray-200 text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
                   placeholder="Your name"
                   placeholderTextColor="#9ca3af"
                   value={form.name}
@@ -112,7 +112,7 @@ export default function ContactScreen() {
                   Email <Text className="text-red-400">*</Text>
                 </Text>
                 <TextInput
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-900"
+                  className="w-full px-4 rounded-xl border border-gray-200 text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
                   placeholder="you@example.com"
                   placeholderTextColor="#9ca3af"
                   value={form.email}
@@ -128,7 +128,7 @@ export default function ContactScreen() {
             <View className="mb-4">
               <Text className="text-sm font-medium text-gray-700 mb-1.5">Subject</Text>
               <TextInput
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-900"
+                className="w-full px-4 rounded-xl border border-gray-200 text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
                 placeholder="What is this about?"
                 placeholderTextColor="#9ca3af"
                 value={form.subject}
@@ -142,7 +142,7 @@ export default function ContactScreen() {
                 Message <Text className="text-red-400">*</Text>
               </Text>
               <TextInput
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-900"
+                className="w-full px-4 rounded-xl border border-gray-200 text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
                 placeholder="Your message..."
                 placeholderTextColor="#9ca3af"
                 value={form.message}
