@@ -88,6 +88,7 @@ export default function SignupScreen() {
       last_name: form.lastName.trim(),
       sex,
       dob: dob || null,
+      place_of_residence: [form.city.trim(), form.state.trim(), form.country.trim()].filter(Boolean).join(', '),
       location_country: form.country.trim(),
       location_state: form.state.trim(),
       location_city: form.city.trim(),
