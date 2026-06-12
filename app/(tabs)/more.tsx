@@ -49,7 +49,7 @@ function Field({
           backgroundColor: editable ? '#fff' : '#f9fafb',
           borderWidth: 1, borderColor: editable ? '#e5e7eb' : '#f3f4f6',
           borderRadius: 10, paddingHorizontal: 13, paddingVertical: 10,
-          fontSize: 15, color: editable ? '#111827' : '#6b7280',
+          fontSize: 17, color: editable ? '#111827' : '#6b7280', paddingTop: 10, paddingBottom: 12,
           minHeight: multiline ? 80 : undefined, textAlignVertical: multiline ? 'top' : undefined,
         }}
       />

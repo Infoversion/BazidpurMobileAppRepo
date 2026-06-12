@@ -44,8 +44,8 @@ function SelectModal({
               placeholder="Search…"
               placeholderTextColor="rgba(255,255,255,0.5)"
               style={{
-                flex: 1, fontSize: 15, color: '#fff',
-                paddingVertical: 9, paddingHorizontal: 14,
+                flex: 1, fontSize: 17, color: '#fff',
+                paddingTop: 10, paddingBottom: 12, paddingHorizontal: 14,
                 backgroundColor: 'rgba(255,255,255,0.15)',
                 borderRadius: 10,
               }}
@@ -66,7 +66,7 @@ function SelectModal({
               onPress={() => { setQuery(''); onSelect(item) }}
               style={{ paddingHorizontal: 16, paddingVertical: 15, backgroundColor: '#fff' }}
             >
-              <Text style={{ fontSize: 15, color: '#111827' }}>{item.name}</Text>
+              <Text style={{ fontSize: 17, color: '#111827' }}>{item.name}</Text>
             </TouchableOpacity>
           )}
         />
@@ -100,7 +100,7 @@ function PickerButton({
         opacity: disabled ? 0.55 : 1,
       }}
     >
-      <Text style={{ fontSize: 15, color: value ? '#111827' : '#9ca3af', flex: 1 }}>
+      <Text style={{ fontSize: 17, color: value ? '#111827' : '#9ca3af', flex: 1 }}>
         {value || placeholder}
       </Text>
       <Text style={{ fontSize: 11, color: '#9ca3af', marginLeft: 6 }}>▼</Text>

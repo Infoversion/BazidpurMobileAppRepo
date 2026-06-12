@@ -17,6 +17,18 @@ export default function SignupScreen() {
   const [agreedToPolicy, setAgreedToPolicy] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  const canSubmit =
+    form.firstName.trim() !== '' &&
+    form.lastName.trim() !== '' &&
+    form.email.trim() !== '' &&
+    form.password !== '' &&
+    form.confirmPassword !== '' &&
+    form.country !== '' &&
+    form.state !== '' &&
+    form.city.trim() !== '' &&
+    form.linkToBazidpur.trim() !== '' &&
+    agreedToPolicy
+
   function set(key: keyof typeof form) {
     return (value: string) => setForm(f => ({ ...f, [key]: value }))
   }
@@ -112,7 +124,7 @@ export default function SignupScreen() {
           <View className="flex-1">
             <Text className="text-sm font-medium text-gray-700 mb-1.5">First name <Text className="text-red-400">*</Text></Text>
             <TextInput
-              className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
+              className="w-full px-4 rounded-xl border border-gray-200 bg-white text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
               placeholder="First"
               placeholderTextColor="#9ca3af"
               value={form.firstName}
@@ -122,7 +134,7 @@ export default function SignupScreen() {
           <View className="flex-1">
             <Text className="text-sm font-medium text-gray-700 mb-1.5">Last name <Text className="text-red-400">*</Text></Text>
             <TextInput
-              className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
+              className="w-full px-4 rounded-xl border border-gray-200 bg-white text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
               placeholder="Last"
               placeholderTextColor="#9ca3af"
               value={form.lastName}
@@ -164,7 +176,7 @@ export default function SignupScreen() {
         <View className="mb-4">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Email <Text className="text-red-400">*</Text></Text>
           <TextInput
-            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
+            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
             placeholder="you@example.com"
             placeholderTextColor="#9ca3af"
             value={form.email}
@@ -178,7 +190,7 @@ export default function SignupScreen() {
         <View className="mb-4">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Password <Text className="text-red-400">*</Text></Text>
           <TextInput
-            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
+            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
             placeholder="Min. 8 characters"
             placeholderTextColor="#9ca3af"
             value={form.password}
@@ -190,7 +202,7 @@ export default function SignupScreen() {
         <View className="mb-6">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Confirm password <Text className="text-red-400">*</Text></Text>
           <TextInput
-            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
+            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
             placeholder="Repeat password"
             placeholderTextColor="#9ca3af"
             value={form.confirmPassword}
@@ -225,7 +237,7 @@ export default function SignupScreen() {
         <View style={{ marginBottom: 14 }}>
           <Text className="text-sm font-medium text-gray-700 mb-1.5">City / Village <Text style={{ color: '#f87171' }}>*</Text></Text>
           <TextInput
-            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
+            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
             placeholder="e.g. Bazidpur"
             placeholderTextColor="#9ca3af"
             value={form.city}
@@ -236,7 +248,7 @@ export default function SignupScreen() {
         <View className="mb-8">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Link to Bazidpur <Text style={{ color: '#f87171' }}>*</Text></Text>
           <TextInput
-            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
+            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-gray-900" style={{ paddingTop: 13, paddingBottom: 15, fontSize: 17 }}
             placeholder="e.g. Grandson of Mehdi Hasan"
             placeholderTextColor="#9ca3af"
             value={form.linkToBazidpur}
@@ -271,16 +283,16 @@ export default function SignupScreen() {
 
         <TouchableOpacity
           onPress={handleSignup}
-          disabled={!agreedToPolicy || loading}
+          disabled={!canSubmit || loading}
           style={{
             width: '100%', paddingVertical: 14, borderRadius: 12,
             alignItems: 'center', marginBottom: 16,
-            backgroundColor: agreedToPolicy ? '#2d1b69' : '#d1d5db',
+            backgroundColor: canSubmit ? '#2d1b69' : '#d1d5db',
           }}
         >
           {loading
             ? <ActivityIndicator color="#fff" />
-            : <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Create Account</Text>
+            : <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Request Membership</Text>
           }
         </TouchableOpacity>
 

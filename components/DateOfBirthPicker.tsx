@@ -11,7 +11,10 @@ interface Props {
 
 export function DateOfBirthPicker({ value, onChange, label = 'Date of Birth', defaultDate }: Props) {
   const [show, setShow] = useState(false)
-  const dateObj = value ? new Date(value) : null
+  const dateObj = value ? (() => {
+    const [y, m, d] = value.split('-').map(Number)
+    return new Date(y, m - 1, d) // local time — avoids UTC midnight timezone shift
+  })() : null
   const display = dateObj
     ? dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     : 'Select date'
