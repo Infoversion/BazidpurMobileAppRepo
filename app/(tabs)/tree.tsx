@@ -244,11 +244,9 @@ export default function FamilyTreeScreen() {
   const [searchQuery,  setSearchQuery]  = useState('')
   const [showInfo,     setShowInfo]     = useState(false)
   const [traceIds,     setTraceIds]     = useState<Set<string> | null>(null)
-  const [toolbarOpen,  setToolbarOpen]  = useState(true)
   const [findMeMsg,    setFindMeMsg]    = useState(false)
   const [findMeHit,    setFindMeHit]    = useState<string | null>(null)
   const focusAnim   = useRef(new Animated.Value(0)).current
-  const toolbarAnim = useRef(new Animated.Value(1)).current
 
   const listRef      = useRef<FlatList<FlatItem>>(null)
   const scrollTarget = useRef<string | null>(null)
@@ -389,16 +387,6 @@ export default function FamilyTreeScreen() {
     listRef.current?.scrollToOffset({ offset: 0, animated: true })
   }
 
-  function toggleToolbar() {
-    const next = !toolbarOpen
-    setToolbarOpen(next)
-    Animated.timing(toolbarAnim, {
-      toValue: next ? 1 : 0,
-      duration: 220,
-      useNativeDriver: false,
-    }).start()
-  }
-
   // ── Stats ───────────────────────────────────────────────────────────────────
   const alive    = nodes.filter(n => n.is_alive).length
   const deceased = nodes.length - alive
@@ -433,38 +421,49 @@ export default function FamilyTreeScreen() {
 
       {/* ── Header ── */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <Animated.View style={[s.searchWrap, {
-          borderColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ['transparent', '#2d1b69'] }),
-          backgroundColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ['#f3f4f6', '#ffffff'] }),
-        }]}>
-          <Text style={s.searchIcon}>🔍</Text>
-          <TextInput
-            style={s.searchInput}
-            placeholder="Search by name…"
-            placeholderTextColor="#c4c9d4"
-            value={searchQuery}
-            onChangeText={q => { setSearchQuery(q); if (q) setTraceIds(null) }}
-            onFocus={() => Animated.timing(focusAnim, { toValue: 1, duration: 180, useNativeDriver: false }).start()}
-            onBlur={() => Animated.timing(focusAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start()}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {searchQuery.length > 0 ? (
-            <TouchableOpacity
-              onPress={() => setSearchQuery('')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <View style={s.clearBtn}>
-                <Text style={s.clearBtnText}>✕</Text>
-              </View>
-            </TouchableOpacity>
-          ) : null}
-        </Animated.View>
-        <TouchableOpacity onPress={findMe} style={s.findBtn}>
-          <Text style={s.toolIcon}>◎</Text>
-          <Text style={s.toolLabel}>Find Me</Text>
-        </TouchableOpacity>
+        {/* Row 1: search + find me */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Animated.View style={[s.searchWrap, {
+            borderColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ['transparent', '#2d1b69'] }),
+            backgroundColor: focusAnim.interpolate({ inputRange: [0, 1], outputRange: ['#f3f4f6', '#ffffff'] }),
+          }]}>
+            <Text style={s.searchIcon}>🔍</Text>
+            <TextInput
+              style={s.searchInput}
+              placeholder="Search by name…"
+              placeholderTextColor="#c4c9d4"
+              value={searchQuery}
+              onChangeText={q => { setSearchQuery(q); if (q) setTraceIds(null) }}
+              onFocus={() => Animated.timing(focusAnim, { toValue: 1, duration: 180, useNativeDriver: false }).start()}
+              onBlur={() => Animated.timing(focusAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start()}
+              returnKeyType="search"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {searchQuery.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <View style={s.clearBtn}>
+                  <Text style={s.clearBtnText}>✕</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+          </Animated.View>
+          <TouchableOpacity onPress={findMe} style={s.findBtn}>
+            <Text style={s.toolIcon}>◎</Text>
+            <Text style={s.toolLabel}>Find Me</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Row 2: tree controls */}
+        <View style={s.controlsRow}>
+          <ToolBtn icon="ℹ" label="Stats"   onPress={() => setShowInfo(true)} />
+          <ToolBtn icon="⊟" label="Compact" onPress={collapseAll} />
+          <ToolBtn icon="⊞" label="Expand"  onPress={expandAll} />
+          <ToolBtn icon="↑" label="Top"     onPress={scrollToTop} />
+        </View>
       </View>
 
       {/* ── Find Me — not linked banner ── */}
@@ -514,7 +513,7 @@ export default function FamilyTreeScreen() {
             onSelect={() => setSelectedNode(item.node)}
           />
         )}
-        contentContainerStyle={{ paddingBottom: 90 }}
+        contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
         getItemLayout={(_, index) => ({ length: ROW_H, offset: ROW_H * index, index })}
         onScrollToIndexFailed={({ index }) => {
           listRef.current?.scrollToOffset({ offset: index * ROW_H, animated: true })
@@ -527,25 +526,6 @@ export default function FamilyTreeScreen() {
           ) : null
         }
       />
-
-      {/* ── Toolbar toggle pill ── */}
-      <View style={s.toolbarToggleStrip}>
-        <TouchableOpacity onPress={toggleToolbar} style={s.toolbarPill} hitSlop={{ top: 8, bottom: 8, left: 40, right: 40 }}>
-          <Text style={s.toolbarPillIcon}>{toolbarOpen ? '⌄' : '⌃'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Bottom toolbar (collapsible) ── */}
-      <Animated.View style={[s.toolbar, {
-        maxHeight: toolbarAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 80] }),
-        overflow: 'hidden',
-        paddingBottom: insets.bottom,
-      }]}>
-        <ToolBtn icon="ℹ" label="Stats"   onPress={() => setShowInfo(true)} />
-        <ToolBtn icon="⊟" label="Compact" onPress={collapseAll} />
-        <ToolBtn icon="⊞" label="Expand"  onPress={expandAll} />
-        <ToolBtn icon="↑" label="Top"     onPress={scrollToTop} />
-      </Animated.View>
 
       {showInfo ? (
         <InfoSheet
@@ -657,10 +637,14 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
     paddingHorizontal: 12,
-    paddingBottom: 10,
+    paddingBottom: 6,
+  },
+  controlsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 2,
   },
   searchWrap: {
     flex: 1,
@@ -726,28 +710,6 @@ const s = StyleSheet.create({
   countText: { fontSize: 10, color: '#6b7280', fontWeight: '600' },
   rowChevron: { fontSize: 22, color: '#2d1b69', marginLeft: 2 },
 
-  // Toolbar toggle
-  toolbarToggleStrip: {
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-    alignItems: 'center',
-    paddingVertical: 5,
-  },
-  toolbarPill: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 3,
-  },
-  toolbarPillIcon: { fontSize: 14, color: '#9ca3af', fontWeight: '600' },
-
-  // Bottom toolbar
-  toolbar: {
-    backgroundColor: '#fff',
-    flexDirection: 'row',
-    paddingTop: 8,
-  },
   toolBtn: {
     flex: 1,
     alignItems: 'center',
