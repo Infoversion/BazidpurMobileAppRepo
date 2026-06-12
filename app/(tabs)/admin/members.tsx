@@ -634,29 +634,29 @@ export default function MembersScreen() {
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 28 }}>
                     {u.role === 'member' && isSuperadmin && (
                       <TouchableOpacity
-                        style={{ flex: 1, minWidth: 140, backgroundColor: '#eff6ff', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                        style={{ flex: 1, minWidth: 140, backgroundColor: '#2d1b69', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
                         onPress={() => Alert.alert('Promote to Admin?', `${u.first_name} ${u.last_name} will be promoted to admin and will receive a notification email.`, [
                           { text: 'Cancel', style: 'cancel' },
                           { text: 'Promote', onPress: () => { setSelectedUser(null); updateRole(u.id, 'admin') } },
                         ])}
                       >
-                        <Text style={{ fontSize: 14, color: '#1d4ed8', fontWeight: '600' }}>⬆️  Promote to Admin</Text>
+                        <Text style={{ fontSize: 14, color: '#fff', fontWeight: '600' }}>⬆️  Promote to Admin</Text>
                       </TouchableOpacity>
                     )}
                     {u.role === 'admin' && isSuperadmin && (
                       <TouchableOpacity
-                        style={{ flex: 1, minWidth: 140, backgroundColor: '#fffbeb', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                        style={{ flex: 1, minWidth: 140, backgroundColor: '#2d1b69', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
                         onPress={() => Alert.alert('Demote to Member?', `${u.first_name} ${u.last_name} will lose admin access and will receive a notification email.`, [
                           { text: 'Cancel', style: 'cancel' },
                           { text: 'Demote', onPress: () => { setSelectedUser(null); updateRole(u.id, 'member') } },
                         ])}
                       >
-                        <Text style={{ fontSize: 14, color: '#92400e', fontWeight: '600' }}>⬇️  Demote to Member</Text>
+                        <Text style={{ fontSize: 14, color: '#fff', fontWeight: '600' }}>⬇️  Demote to Member</Text>
                       </TouchableOpacity>
                     )}
                     {canAct && (
                       <TouchableOpacity
-                        style={{ flex: 1, minWidth: 140, backgroundColor: u.is_active ? '#fee2e2' : '#d1fae5', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                        style={{ flex: 1, minWidth: 140, backgroundColor: u.is_active ? '#fee2e2' : '#2d1b69', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
                         onPress={() => {
                           const action = u.is_active ? 'Deactivate' : 'Reactivate'
                           Alert.alert(`${action} account?`, `${u.first_name} ${u.last_name}`, [
@@ -665,7 +665,7 @@ export default function MembersScreen() {
                           ])
                         }}
                       >
-                        <Text style={{ fontSize: 14, color: u.is_active ? '#991b1b' : '#065f46', fontWeight: '600' }}>
+                        <Text style={{ fontSize: 14, color: u.is_active ? '#991b1b' : '#fff', fontWeight: '600' }}>
                           {u.is_active ? '🚫  Deactivate' : '✅  Reactivate'}
                         </Text>
                       </TouchableOpacity>
