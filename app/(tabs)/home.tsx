@@ -89,19 +89,36 @@ export default function HomeScreen() {
             </Text>
           </View>
         ) : (
-          <View style={{
-            marginTop: 36, backgroundColor: '#fffbeb',
-            borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18,
-            alignItems: 'center', maxWidth: 300,
-            borderWidth: 1, borderColor: '#fde68a',
-          }}>
-            <Text style={{ fontSize: 22, marginBottom: 10 }}>⏳</Text>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#92400e', textAlign: 'center', marginBottom: 8 }}>
-              Request under review
-            </Text>
-            <Text style={{ fontSize: 13, color: '#78350f', textAlign: 'center', lineHeight: 20 }}>
-              Your membership request is being reviewed by our admins. You'll receive an email once it's approved. Thanks for your patience!
-            </Text>
+          <View style={{ alignItems: 'center', maxWidth: 300, marginTop: 36 }}>
+            <View style={{
+              backgroundColor: '#fffbeb',
+              borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18,
+              alignItems: 'center',
+              borderWidth: 1, borderColor: '#fde68a',
+              marginBottom: 20,
+            }}>
+              <Text style={{ fontSize: 22, marginBottom: 10 }}>⏳</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#92400e', textAlign: 'center', marginBottom: 8 }}>
+                Request under review
+              </Text>
+              <Text style={{ fontSize: 13, color: '#78350f', textAlign: 'center', lineHeight: 20 }}>
+                Your membership request is being reviewed by our admins. You'll receive an email once it's approved. Thanks for your patience!
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => router.push('/(auth)/signup')}
+                style={{ backgroundColor: '#2d1b69', borderRadius: 14, paddingHorizontal: 28, paddingVertical: 14 }}
+              >
+                <Text style={{ fontSize: 15, color: '#fff', fontWeight: '700' }}>Join the Community</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/(auth)/login')}
+                style={{ backgroundColor: '#f3f4f6', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 14 }}
+              >
+                <Text style={{ fontSize: 15, color: '#374151', fontWeight: '600' }}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
