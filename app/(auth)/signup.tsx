@@ -16,6 +16,7 @@ export default function SignupScreen() {
   const [sex, setSex] = useState<'male' | 'female' | 'other'>('male')
   const [agreedToPolicy, setAgreedToPolicy] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   const canSubmit =
     form.firstName.trim() !== '' &&
@@ -88,14 +89,64 @@ export default function SignupScreen() {
     setLoading(false)
 
     if (error) {
-      Alert.alert('Signup failed', error.message)
+      Alert.alert('Request failed', error.message)
     } else {
-      Alert.alert(
-        'Account created',
-        'Your account is pending approval by an admin. You will be notified once approved.',
-        [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
-      )
+      setSuccess(true)
     }
+  }
+
+  if (success) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <PurpleHeader title="Request Membership" hideVisitorActions />
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 40, paddingBottom: 60 }}>
+
+          {/* Icon + greeting */}
+          <View style={{ alignItems: 'center', marginBottom: 28 }}>
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+              <Text style={{ fontSize: 38 }}>✓</Text>
+            </View>
+            <Text style={{ fontSize: 28, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 10 }}>
+              Welcome, {form.firstName}! 🎉
+            </Text>
+            <Text style={{ fontSize: 15, color: '#6b7280', textAlign: 'center', lineHeight: 24 }}>
+              We are <Text style={{ fontWeight: '700', color: '#111827' }}>so excited</Text> to have received your request and genuinely look forward to welcoming you into the Bazidpur family!
+            </Text>
+          </View>
+
+          {/* What happens next */}
+          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#f3f4f6' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 16 }}>
+              What happens next
+            </Text>
+            {[
+              { n: '1', color: '#dcfce7', text: '#16a34a', title: 'Acknowledgement email sent', body: `A confirmation has been sent to ${form.email} — check your inbox (and spam, just in case).` },
+              { n: '2', color: '#dbeafe', text: '#2563eb', title: 'Admin reviews your request', body: 'Our admins will review your membership request and a decision will be communicated to you by email very soon!' },
+              { n: '3', color: '#ede9fe', text: '#7c3aed', title: "You're in!", body: 'Once approved, you\'ll gain full member access — family tree, poetry, photo albums, Timeless Moments, and much more.' },
+            ].map((step, i) => (
+              <View key={i} style={{ flexDirection: 'row', gap: 12, marginBottom: i < 2 ? 16 : 0 }}>
+                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: step.color, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: step.text }}>{step.n}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 2 }}>{step.title}</Text>
+                  <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 19 }}>{step.body}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* CTA */}
+          <TouchableOpacity
+            onPress={() => router.replace('/(auth)/login')}
+            style={{ backgroundColor: '#2d1b69', borderRadius: 14, paddingVertical: 16, alignItems: 'center' }}
+          >
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Back to Sign In</Text>
+          </TouchableOpacity>
+
+        </ScrollView>
+      </View>
+    )
   }
 
   return (

@@ -301,7 +301,7 @@ import colorsys
 - ⬜ Submit: `eas submit --platform ios`
 
 **App Store keywords (100 chars):**
-`bihar,india,village,heritage,family,genealogy,community,ancestry,roots,culture,lineage,diaspora,urdu`
+`bihar,india,village,heritage,family,genealogy,community,ancestry,roots,culture,lineage,diaspora,urdu,bazidpur`
 
 **App Store subtitle (30 chars):**
 `Family, Heritage & Community`
