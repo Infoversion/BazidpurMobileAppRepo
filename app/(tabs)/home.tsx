@@ -100,7 +100,7 @@ export default function HomeScreen() {
               Request under review
             </Text>
             <Text style={{ fontSize: 13, color: '#78350f', textAlign: 'center', lineHeight: 20 }}>
-              Your membership request is being reviewed by our admins. You'll receive an email once it's approved. Jazakallah for your patience!
+              Your membership request is being reviewed by our admins. You'll receive an email once it's approved. Thanks for your patience!
             </Text>
           </View>
         )}

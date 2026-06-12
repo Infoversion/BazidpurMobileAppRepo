@@ -47,7 +47,7 @@ export default function LoginScreen() {
 
     if (profile.role === 'pending') {
       await supabase.auth.signOut()
-      setError('Your membership request is still under review. You\'ll receive an email once it\'s been approved — usually within a day or two. Jazakallah for your patience! 🤲')
+      setError('Your membership request is still under review. You\'ll receive an email once it\'s been approved — usually within a day or two. Thanks for your patience!')
       return
     }
 
