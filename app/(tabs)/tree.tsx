@@ -245,6 +245,7 @@ export default function FamilyTreeScreen() {
   const [showInfo,     setShowInfo]     = useState(false)
   const [traceIds,     setTraceIds]     = useState<Set<string> | null>(null)
   const [toolbarOpen,  setToolbarOpen]  = useState(true)
+  const [findMeMsg,    setFindMeMsg]    = useState(false)
   const focusAnim   = useRef(new Animated.Value(0)).current
   const toolbarAnim = useRef(new Animated.Value(1)).current
 
@@ -339,7 +340,11 @@ export default function FamilyTreeScreen() {
   function findMe() {
     if (!user) return
     const myNode = nodes.find(n => n.linked_user_id === user.id)
-    if (!myNode) return
+    if (!myNode) {
+      setFindMeMsg(true)
+      setTimeout(() => setFindMeMsg(false), 3500)
+      return
+    }
 
     // Expand every ancestor so the node appears in the list
     const toExpand = new Set(expanded)
@@ -458,6 +463,20 @@ export default function FamilyTreeScreen() {
           <Text style={s.toolLabel}>Find Me</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ── Find Me — not linked banner ── */}
+      {findMeMsg ? (
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          backgroundColor: '#fefce8', paddingHorizontal: 14, paddingVertical: 8,
+          borderBottomWidth: 1, borderBottomColor: '#fef08a',
+        }}>
+          <Text style={{ fontSize: 14 }}>🔍</Text>
+          <Text style={{ flex: 1, fontSize: 12, color: '#713f12', lineHeight: 17 }}>
+            Your profile isn't linked to the family tree yet. Contact an admin to get connected.
+          </Text>
+        </View>
+      ) : null}
 
       {/* ── Trace banner ── */}
       {traceIds ? (
