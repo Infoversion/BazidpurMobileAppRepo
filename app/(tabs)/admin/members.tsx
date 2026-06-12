@@ -267,11 +267,15 @@ export default function MembersScreen() {
 
   // ── Role / active updates ─────────────────────────────────────────────────────
 
-  async function updateRole(userId: string, role: UserRole) {
-    const { error } = await supabase.from('users').update({ role }).eq('id', userId)
+  async function updateRole(userId: string, newRole: UserRole) {
+    const targetUser = users.find(x => x.id === userId)
+    const oldRole = targetUser?.role
+
+    const { error } = await supabase.from('users').update({ role: newRole }).eq('id', userId)
     if (error) { Alert.alert('Error', error.message); return }
+
     setUsers(prev => {
-      const updated = prev.map(x => x.id === userId ? { ...x, role } : x)
+      const updated = prev.map(x => x.id === userId ? { ...x, role: newRole } : x)
       if (filter === 'all') return updated
       return updated.filter(x => {
         if (filter === 'pending') return x.role === 'pending'
@@ -281,6 +285,34 @@ export default function MembersScreen() {
       })
     })
     await fetchRoleCounts()
+
+    // Send email notification matching web behaviour
+    if (!targetUser) return
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    }
+    const { first_name: firstName, email } = targetUser
+
+    if (oldRole === 'pending' && newRole === 'member') {
+      fetch('https://bazidpur.com/api/member-approved', {
+        method: 'POST', headers,
+        body: JSON.stringify({ firstName, email }),
+      }).catch(() => {})
+    } else if (oldRole === 'pending' && newRole === 'visitor') {
+      fetch('https://bazidpur.com/api/member-rejected', {
+        method: 'POST', headers,
+        body: JSON.stringify({ firstName, email }),
+      }).catch(() => {})
+    } else if (newRole === 'admin' || (newRole === 'member' && oldRole === 'admin')) {
+      fetch('https://bazidpur.com/api/role-changed', {
+        method: 'POST', headers,
+        body: JSON.stringify({ firstName, email, newRole }),
+      }).catch(() => {})
+    }
   }
 
   async function updateActive(userId: string, is_active: boolean) {
