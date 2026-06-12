@@ -112,7 +112,7 @@ export default function SignupScreen() {
           <View className="flex-1">
             <Text className="text-sm font-medium text-gray-700 mb-1.5">First name <Text className="text-red-400">*</Text></Text>
             <TextInput
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
+              className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
               placeholder="First"
               placeholderTextColor="#9ca3af"
               value={form.firstName}
@@ -122,7 +122,7 @@ export default function SignupScreen() {
           <View className="flex-1">
             <Text className="text-sm font-medium text-gray-700 mb-1.5">Last name <Text className="text-red-400">*</Text></Text>
             <TextInput
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
+              className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
               placeholder="Last"
               placeholderTextColor="#9ca3af"
               value={form.lastName}
@@ -164,7 +164,7 @@ export default function SignupScreen() {
         <View className="mb-4">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Email <Text className="text-red-400">*</Text></Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
+            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
             placeholder="you@example.com"
             placeholderTextColor="#9ca3af"
             value={form.email}
@@ -178,7 +178,7 @@ export default function SignupScreen() {
         <View className="mb-4">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Password <Text className="text-red-400">*</Text></Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
+            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
             placeholder="Min. 8 characters"
             placeholderTextColor="#9ca3af"
             value={form.password}
@@ -190,7 +190,7 @@ export default function SignupScreen() {
         <View className="mb-6">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Confirm password <Text className="text-red-400">*</Text></Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
+            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
             placeholder="Repeat password"
             placeholderTextColor="#9ca3af"
             value={form.confirmPassword}
@@ -225,7 +225,7 @@ export default function SignupScreen() {
         <View style={{ marginBottom: 14 }}>
           <Text className="text-sm font-medium text-gray-700 mb-1.5">City / Village <Text style={{ color: '#f87171' }}>*</Text></Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
+            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
             placeholder="e.g. Bazidpur"
             placeholderTextColor="#9ca3af"
             value={form.city}
@@ -236,7 +236,7 @@ export default function SignupScreen() {
         <View className="mb-8">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Link to Bazidpur <Text style={{ color: '#f87171' }}>*</Text></Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-base text-gray-900"
+            className="w-full px-4 rounded-xl border border-gray-200 bg-white text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
             placeholder="e.g. Grandson of Mehdi Hasan"
             placeholderTextColor="#9ca3af"
             value={form.linkToBazidpur}

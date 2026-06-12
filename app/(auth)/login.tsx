@@ -45,7 +45,7 @@ export default function LoginScreen() {
         <View className="mb-4">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Email</Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
+            className="w-full px-4 rounded-xl border border-gray-200 text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
             placeholder="you@example.com"
             placeholderTextColor="#9ca3af"
             value={email}
@@ -59,7 +59,7 @@ export default function LoginScreen() {
         <View className="mb-2">
           <Text className="text-sm font-medium text-gray-700 mb-1.5">Password</Text>
           <TextInput
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base text-gray-900"
+            className="w-full px-4 rounded-xl border border-gray-200 text-base text-gray-900" style={{ paddingVertical: 13, lineHeight: 20 }}
             placeholder="Your password"
             placeholderTextColor="#9ca3af"
             value={password}
