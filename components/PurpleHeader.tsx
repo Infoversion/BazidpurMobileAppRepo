@@ -47,7 +47,8 @@ interface Props {
 }
 
 export function PurpleHeader({ title, showBack, hideVisitorActions, hideContact }: Props) {
-  const { session, user } = useAuth()
+  const { session, user, role } = useAuth()
+  const isMember = ['member', 'admin', 'superadmin'].includes(role ?? '')
   const insets = useSafeAreaInsets()
 
   const initials = user
@@ -105,7 +106,7 @@ export function PurpleHeader({ title, showBack, hideVisitorActions, hideContact 
           </TouchableOpacity>
         )}
 
-        {session ? (
+        {isMember ? (
           <>
             <View style={{ position: 'relative' }}>
               <TouchableOpacity
