@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Modal, Acti
 import { Image } from 'expo-image'
 import { Audio } from 'expo-av'
 import { WebView } from 'react-native-webview'
+import YoutubePlayer from 'react-native-youtube-iframe'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 function extractYouTubeId(url: string): string | null {
@@ -96,23 +97,14 @@ function YouTubeInline({ url, imgW }: { url: string; imgW: number }) {
   const h = imgW * 0.56
 
   if (playing && id) {
-    const html = `<!DOCTYPE html><html><head>
-      <meta name="viewport" content="width=device-width,initial-scale=1">
-      <style>*{margin:0;padding:0;background:#000}iframe{width:100%;height:100vh;border:none}</style>
-    </head><body>
-      <iframe src="https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1"
-        allow="autoplay;fullscreen" allowfullscreen></iframe>
-    </body></html>`
     return (
-      <View style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden', height: h }}>
-        <WebView
-          source={{ html }}
-          style={{ width: imgW, height: h }}
-          allowsInlineMediaPlayback
-          mediaPlaybackRequiresUserAction={false}
-          javaScriptEnabled
-          allowsFullscreenVideo
-          originWhitelist={['*']}
+      <View style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden' }}>
+        <YoutubePlayer
+          videoId={id}
+          height={h}
+          width={imgW}
+          play
+          webViewProps={{ allowsFullscreenVideo: true }}
         />
       </View>
     )
