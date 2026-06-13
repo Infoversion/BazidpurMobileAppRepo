@@ -9,6 +9,7 @@ import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
@@ -268,11 +269,21 @@ export default function AlbumScreen() {
       if (cancelled) break
       const asset = assets[i]
       const ext = (asset.uri.split('.').pop()?.split('?')[0] || 'jpg').toLowerCase()
-      const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg'
+
+      // Convert HEIC/HEIF to JPEG — browsers can't display Apple's native format
+      let uploadUri = asset.uri
+      if (ext === 'heic' || ext === 'heif') {
+        try {
+          const converted = await manipulateAsync(asset.uri, [], { compress: 0.9, format: SaveFormat.JPEG })
+          uploadUri = converted.uri
+        } catch { /* fall back to original URI */ }
+      }
+
+      const mimeType = 'image/jpeg'
       const url = `https://bazidpur.com/api/albums/${id}/photos?_t=${encodeURIComponent(session.access_token)}`
 
       const task = FileSystem.createUploadTask(
-        url, asset.uri,
+        url, uploadUri,
         {
           httpMethod: 'POST',
           uploadType: FileSystem.FileSystemUploadType.MULTIPART,
