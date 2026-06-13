@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, Linking, useWindowDimensions } from 'react-native'
+import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Modal, ActivityIndicator } from 'react-native'
 import { Image } from 'expo-image'
 import { Audio } from 'expo-av'
+import { WebView } from 'react-native-webview'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 function extractYouTubeId(url: string): string | null {
   const patterns = [
@@ -149,10 +151,20 @@ export function AttachmentDisplay({ type, url }: Props) {
   }
 
   if (type === 'pdf') {
-    const filename = url.split('/').pop()?.replace(/^\d+-[a-f0-9]+-/, '') ?? 'Document.pdf'
-    return (
+    return <PdfAttachment url={url} />
+  }
+
+  return null
+}
+
+function PdfAttachment({ url }: { url: string }) {
+  const [show, setShow] = useState(false)
+  const insets = useSafeAreaInsets()
+  const filename = url.split('/').pop()?.replace(/^\d+-[a-f0-9]+-/, '') ?? 'Document.pdf'
+  return (
+    <>
       <TouchableOpacity
-        onPress={() => Linking.openURL(url)}
+        onPress={() => setShow(true)}
         style={{
           flexDirection: 'row', alignItems: 'center', gap: 10,
           backgroundColor: '#fef3c7', borderRadius: 10, padding: 12, marginTop: 10,
@@ -166,8 +178,32 @@ export function AttachmentDisplay({ type, url }: Props) {
         </View>
         <Text style={{ fontSize: 16, color: '#d97706' }}>›</Text>
       </TouchableOpacity>
-    )
-  }
 
-  return null
+      <Modal visible={show} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setShow(false)}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', gap: 12,
+            paddingTop: insets.top + 8, paddingBottom: 10, paddingHorizontal: 16,
+            backgroundColor: '#2d1b69',
+          }}>
+            <TouchableOpacity onPress={() => setShow(false)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 20, color: '#fff' }}>‹</Text>
+              <Text style={{ fontSize: 15, color: '#fff', fontWeight: '600' }}>Back</Text>
+            </TouchableOpacity>
+            <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: '#fff' }} numberOfLines={1}>{filename}</Text>
+          </View>
+          <WebView
+            source={{ uri: url }}
+            style={{ flex: 1 }}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111' }}>
+                <ActivityIndicator color="#fff" size="large" />
+              </View>
+            )}
+          />
+        </View>
+      </Modal>
+    </>
+  )
 }
