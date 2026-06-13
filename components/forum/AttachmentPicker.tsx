@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
+import * as ImageManipulator from 'expo-image-manipulator'
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import { Audio } from 'expo-av'
@@ -80,10 +81,14 @@ export function AttachmentPicker({ value, onChange }: Props) {
     const asset = result.assets[0]
     setUploading(true)
     try {
+      // Force JPEG conversion — handles HEIC/HEIF from iPhone camera roll
+      const jpeg = await ImageManipulator.manipulateAsync(
+        asset.uri, [], { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+      )
       const token = await getToken()
       const filename = `photo_${Date.now()}.jpg`
       const { uploadUrl, publicUrl } = await presign(token, 'photo', filename, 'image/jpeg')
-      await uploadFile(asset.uri, uploadUrl, 'image/jpeg')
+      await uploadFile(jpeg.uri, uploadUrl, 'image/jpeg')
       onChange({ type: 'photo', url: publicUrl })
     } catch (e: any) {
       Alert.alert('Upload failed', e.message)
