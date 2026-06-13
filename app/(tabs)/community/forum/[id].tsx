@@ -9,6 +9,7 @@ import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { PurpleHeader } from '@/components/PurpleHeader'
 import { ReportButton } from '@/components/ReportButton'
 import { AttachmentPicker, type Attachment } from '@/components/forum/AttachmentPicker'
 import { AttachmentDisplay } from '@/components/forum/AttachmentDisplay'
@@ -159,26 +160,22 @@ export default function ThreadScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f2f2f7', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
         <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator color="#2d1b69" />
+        <PurpleHeader title="The Forum" showBack />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#2d1b69" />
+        </View>
       </View>
     )
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
-      <Stack.Screen options={{
-        headerShown: true,
-        title: 'The Forum',
-        headerTintColor: '#2d1b69',
-        headerBackTitle: '',
-        headerShadowVisible: false,
-        headerStyle: { backgroundColor: '#f2f2f7' },
-        headerTitleStyle: { fontWeight: '700', color: '#1c1c1e' },
-      }} />
+      <Stack.Screen options={{ headerShown: false }} />
+      <PurpleHeader title="The Forum" showBack />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={88}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
         <FlatList
           ref={listRef}
           data={replies}
