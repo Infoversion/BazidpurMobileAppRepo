@@ -193,6 +193,15 @@ export interface ExperienceChapter {
   content: string
 }
 
+export interface ThreadMedia {
+  id: string
+  thread_id: string | null
+  reply_id: string | null
+  url: string
+  filename: string | null
+  media_type: 'image' | 'audio' | 'document' | 'youtube'
+}
+
 export interface ForumThread {
   id: string
   title: string
@@ -204,8 +213,7 @@ export interface ForumThread {
   author_id: string
   author?: { first_name: string; last_name: string; photo_url?: string; role?: string }
   replies?: [{ count: number }]
-  attachment_type?: string
-  attachment_url?: string
+  media?: ThreadMedia[]
 }
 
 export interface ForumReply {
@@ -216,6 +224,5 @@ export interface ForumReply {
   created_at: string
   author_id: string
   author?: { first_name: string; last_name: string; photo_url?: string; role?: string }
-  attachment_type?: string
-  attachment_url?: string
+  media?: ThreadMedia[]
 }

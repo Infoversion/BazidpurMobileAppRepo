@@ -17,6 +17,20 @@ import type { ForumThread, ForumReply } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
 
+function mobileTypeToMediaType(type: string): 'image' | 'audio' | 'document' | 'youtube' {
+  if (type === 'photo') return 'image'
+  if (type === 'audio') return 'audio'
+  if (type === 'pdf') return 'document'
+  if (type === 'youtube') return 'youtube'
+  return 'image'
+}
+
+function mediaTypeToDisplayType(mediaType: string): string {
+  if (mediaType === 'image') return 'photo'
+  if (mediaType === 'document') return 'pdf'
+  return mediaType
+}
+
 function avatarUri(url?: string | null) {
   if (!url) return null
   return url.startsWith('http') ? url : `${R2}/${url}`
@@ -69,18 +83,33 @@ export default function ThreadScreen() {
     const [{ data: t }, { data: r }] = await Promise.all([
       supabase
         .from('threads')
-        .select('id, title, body, room, is_pinned, is_deleted, created_at, author_id, attachment_type, attachment_url, author:author_id(first_name, last_name, photo_url)')
+        .select('id, title, body, room, is_pinned, is_deleted, created_at, author_id, author:author_id(first_name, last_name, photo_url)')
         .eq('id', id)
         .single(),
       supabase
         .from('thread_replies')
-        .select('id, thread_id, body, is_deleted, created_at, author_id, attachment_type, attachment_url, author:author_id(first_name, last_name, photo_url)')
+        .select('id, thread_id, body, is_deleted, created_at, author_id, author:author_id(first_name, last_name, photo_url)')
         .eq('thread_id', id)
         .eq('is_deleted', false)
         .order('created_at'),
     ])
-    setThread(t as unknown as ForumThread)
-    setReplies((r ?? []) as unknown as ReplyWithAuthor[])
+
+    const replyIds = (r ?? []).map((x: any) => x.id)
+    const [{ data: threadMedia }, { data: replyMedia }] = await Promise.all([
+      supabase.from('thread_media').select('id, thread_id, reply_id, url, filename, media_type').eq('thread_id', id).is('reply_id', null),
+      replyIds.length > 0
+        ? supabase.from('thread_media').select('id, thread_id, reply_id, url, filename, media_type').in('reply_id', replyIds)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+
+    const replyMediaMap: Record<string, any[]> = {}
+    ;(replyMedia ?? []).forEach((m: any) => {
+      if (!replyMediaMap[m.reply_id]) replyMediaMap[m.reply_id] = []
+      replyMediaMap[m.reply_id].push(m)
+    })
+
+    setThread({ ...(t as any), media: threadMedia ?? [] })
+    setReplies((r ?? []).map((reply: any) => ({ ...reply, media: replyMediaMap[reply.id] ?? [] })) as unknown as ReplyWithAuthor[])
   }
 
   useEffect(() => { load().finally(() => setLoading(false)) }, [id])
@@ -108,11 +137,23 @@ export default function ThreadScreen() {
       author_id: session.user.id,
       user_id: session.user.id,
       is_deleted: false,
-      attachment_type: replyAttachment?.type ?? null,
-      attachment_url: replyAttachment?.url ?? null,
-    }).select('id, thread_id, body, is_deleted, created_at, author_id, attachment_type, attachment_url, author:author_id(first_name, last_name, photo_url)').single()
+    }).select('id, thread_id, body, is_deleted, created_at, author_id, author:author_id(first_name, last_name, photo_url)').single()
     if (!error && data) {
-      setReplies(prev => [...prev, data as unknown as ReplyWithAuthor])
+      let media: any[] = []
+      if (replyAttachment) {
+        const { data: m, error: mediaErr } = await supabase.from('thread_media').insert({
+          thread_id: null,
+          reply_id: data.id,
+          uploader_id: session.user.id,
+          url: replyAttachment.url,
+          filename: replyAttachment.filename ?? null,
+          media_type: mobileTypeToMediaType(replyAttachment.type),
+          file_size: 0,
+        }).select('id, thread_id, reply_id, url, filename, media_type').single()
+        console.log('[thread_media insert]', JSON.stringify({ m, mediaErr }))
+        if (m) media = [m]
+      }
+      setReplies(prev => [...prev, { ...(data as unknown as ReplyWithAuthor), media }])
       setReplyText('')
       setReplyAttachment(null)
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100)
@@ -159,8 +200,8 @@ export default function ThreadScreen() {
       {thread.body ? (
         <Text style={{ fontSize: 15, color: '#374151', lineHeight: 24 }}>{thread.body}</Text>
       ) : null}
-      {thread.attachment_type && thread.attachment_url ? (
-        <AttachmentDisplay type={thread.attachment_type} url={thread.attachment_url} />
+      {thread.media?.[0] ? (
+        <AttachmentDisplay type={mediaTypeToDisplayType(thread.media[0].media_type)} url={thread.media[0].url} />
       ) : null}
     </View>
   ) : null
@@ -223,8 +264,8 @@ export default function ThreadScreen() {
                   {item.body ? (
                     <Text style={{ fontSize: 14, color: '#374151', lineHeight: 21 }}>{item.body}</Text>
                   ) : null}
-                  {item.attachment_type && item.attachment_url ? (
-                    <AttachmentDisplay type={item.attachment_type} url={item.attachment_url} />
+                  {item.media?.[0] ? (
+                    <AttachmentDisplay type={mediaTypeToDisplayType(item.media[0].media_type)} url={item.media[0].url} />
                   ) : null}
                 </View>
               </View>

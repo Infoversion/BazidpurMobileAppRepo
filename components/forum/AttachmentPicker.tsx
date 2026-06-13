@@ -251,6 +251,10 @@ export function AttachmentPicker({ value, onChange }: Props) {
         ))}
       </View>
 
+      <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+        🎵 Audio files: MP3, M4A, WAV · 🎙 Recordings saved as M4A
+      </Text>
+
       <Modal visible={ytModal} transparent animationType="fade" onRequestClose={() => setYtModal(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '100%' }}>

@@ -18,6 +18,14 @@ import type { ForumThread } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
 
+function mobileTypeToMediaType(type: string): 'image' | 'audio' | 'document' | 'youtube' {
+  if (type === 'photo') return 'image'
+  if (type === 'audio') return 'audio'
+  if (type === 'pdf') return 'document'
+  if (type === 'youtube') return 'youtube'
+  return 'image'
+}
+
 function avatarUri(url?: string | null) {
   if (!url) return null
   return url.startsWith('http') ? url : `${R2}/${url}`
@@ -62,7 +70,7 @@ function NewThreadModal({ onClose, onCreated }: { onClose: () => void; onCreated
     if (!session?.user?.id) return
     setSubmitting(true)
     setError('')
-    const { error: err } = await supabase.from('threads').insert({
+    const { data: thread, error: err } = await supabase.from('threads').insert({
       title: title.trim(),
       body: body.trim() || null,
       content: body.trim() || null,
@@ -71,10 +79,19 @@ function NewThreadModal({ onClose, onCreated }: { onClose: () => void; onCreated
       user_id: session.user.id,
       is_pinned: false,
       is_deleted: false,
-      attachment_type: attachment?.type ?? null,
-      attachment_url: attachment?.url ?? null,
-    })
-    if (err) { setError(err.message); setSubmitting(false); return }
+    }).select('id').single()
+    if (err || !thread) { setError(err?.message || 'Failed to post.'); setSubmitting(false); return }
+    if (attachment) {
+      await supabase.from('thread_media').insert({
+        thread_id: thread.id,
+        reply_id: null,
+        uploader_id: session.user.id,
+        url: attachment.url,
+        filename: attachment.filename ?? null,
+        media_type: mobileTypeToMediaType(attachment.type),
+        file_size: 0,
+      })
+    }
     setSubmitting(false)
     onCreated()
   }
@@ -184,14 +201,23 @@ export default function ForumScreen() {
   const [showCreate, setShowCreate] = useState(false)
 
   async function load() {
-    const { data } = await supabase
+    const { data: threads } = await supabase
       .from('threads')
-      .select('id, title, body, room, is_pinned, is_deleted, created_at, author_id, attachment_type, attachment_url, author:author_id(first_name, last_name, photo_url), replies:thread_replies(count)')
+      .select('id, title, body, room, is_pinned, is_deleted, created_at, author_id, author:author_id(first_name, last_name, photo_url), replies:thread_replies(count)')
       .eq('room', 'general')
       .eq('is_deleted', false)
       .order('is_pinned', { ascending: false })
       .order('created_at', { ascending: false })
-    setThreads((data ?? []) as unknown as ForumThread[])
+
+    const threadIds = (threads ?? []).map(t => t.id)
+    const { data: mediaRows } = threadIds.length > 0
+      ? await supabase.from('thread_media').select('thread_id, media_type').in('thread_id', threadIds).is('reply_id', null)
+      : { data: [] }
+
+    const mediaMap: Record<string, string> = {}
+    ;(mediaRows ?? []).forEach((m: any) => { if (!mediaMap[m.thread_id]) mediaMap[m.thread_id] = m.media_type })
+
+    setThreads((threads ?? []).map(t => ({ ...t, media: mediaMap[t.id] ? [{ media_type: mediaMap[t.id] }] : [] })) as unknown as ForumThread[])
   }
 
   useEffect(() => { load().finally(() => setLoading(false)) }, [])
@@ -263,10 +289,10 @@ export default function ForumScreen() {
                         <Text style={{ fontSize: 11, color: '#8e8e93' }}>💬 {replyCount}</Text>
                       </>
                     ) : null}
-                    {item.attachment_type === 'photo'   && <Text style={{ fontSize: 11 }}>📷</Text>}
-                    {item.attachment_type === 'audio'   && <Text style={{ fontSize: 11 }}>🎵</Text>}
-                    {item.attachment_type === 'youtube' && <Text style={{ fontSize: 11 }}>▶️</Text>}
-                    {item.attachment_type === 'pdf'     && <Text style={{ fontSize: 11 }}>📄</Text>}
+                    {item.media?.[0]?.media_type === 'image'    && <Text style={{ fontSize: 11 }}>📷</Text>}
+                    {item.media?.[0]?.media_type === 'audio'    && <Text style={{ fontSize: 11 }}>🎵</Text>}
+                    {item.media?.[0]?.media_type === 'youtube'  && <Text style={{ fontSize: 11 }}>▶️</Text>}
+                    {item.media?.[0]?.media_type === 'document' && <Text style={{ fontSize: 11 }}>📄</Text>}
                     <ReportButton contentType="thread" contentId={item.id} />
                   </View>
                 </View>

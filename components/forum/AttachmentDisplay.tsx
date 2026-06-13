@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Modal, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Modal, ActivityIndicator, Alert } from 'react-native'
 import { Image } from 'expo-image'
 import { Audio } from 'expo-av'
 import { WebView } from 'react-native-webview'
@@ -36,18 +36,22 @@ function AudioPlayer({ url }: { url: string }) {
 
   async function toggle() {
     if (!sound) {
-      const { sound: s } = await Audio.Sound.createAsync(
-        { uri: url },
-        { shouldPlay: true },
-        status => {
-          if (!status.isLoaded) return
-          setPosMs(status.positionMillis)
-          setDurMs(status.durationMillis ?? 0)
-          if (status.didJustFinish) { setPlaying(false); setPosMs(0) }
-        }
-      )
-      setSound(s)
-      setPlaying(true)
+      try {
+        const { sound: s } = await Audio.Sound.createAsync(
+          { uri: url },
+          { shouldPlay: true },
+          status => {
+            if (!status.isLoaded) return
+            setPosMs(status.positionMillis)
+            setDurMs(status.durationMillis ?? 0)
+            if (status.didJustFinish) { setPlaying(false); setPosMs(0) }
+          }
+        )
+        setSound(s)
+        setPlaying(true)
+      } catch {
+        Alert.alert('Cannot play audio', 'This audio format is not supported on this device. Try opening it on a desktop browser.')
+      }
     } else if (playing) {
       await sound.pauseAsync()
       setPlaying(false)
@@ -85,6 +89,64 @@ function AudioPlayer({ url }: { url: string }) {
   )
 }
 
+function YouTubeInline({ url, imgW }: { url: string; imgW: number }) {
+  const [playing, setPlaying] = useState(false)
+  const id = extractYouTubeId(url)
+  const thumb = id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null
+  const embedUrl = id ? `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1` : null
+  const h = imgW * 0.56
+
+  if (playing && embedUrl) {
+    return (
+      <View style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden', height: h }}>
+        <WebView
+          source={{ uri: embedUrl }}
+          style={{ width: imgW, height: h }}
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          javaScriptEnabled
+          allowsFullscreenVideo
+        />
+      </View>
+    )
+  }
+
+  return (
+    <TouchableOpacity
+      onPress={() => setPlaying(true)}
+      style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden' }}
+      activeOpacity={0.85}
+    >
+      {thumb ? (
+        <View>
+          <Image
+            source={{ uri: thumb }}
+            style={{ width: imgW, height: h, borderRadius: 10 }}
+            contentFit="cover"
+          />
+          <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{
+              width: 52, height: 52, borderRadius: 26,
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Text style={{ fontSize: 22, color: '#fff', marginLeft: 4 }}>▶</Text>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={{
+          width: imgW, height: 56, backgroundColor: '#f3f4f6', borderRadius: 10,
+          flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10,
+        }}>
+          <Text style={{ fontSize: 22 }}>▶️</Text>
+          <Text style={{ fontSize: 13, color: '#2563eb', flex: 1 }} numberOfLines={1}>{url}</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  )
+}
+
 interface Props {
   type: string
   url: string
@@ -109,45 +171,7 @@ export function AttachmentDisplay({ type, url }: Props) {
   }
 
   if (type === 'youtube') {
-    const id = extractYouTubeId(url)
-    const thumb = id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null
-    return (
-      <TouchableOpacity
-        onPress={() => Linking.openURL(url)}
-        style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden' }}
-        activeOpacity={0.85}
-      >
-        {thumb ? (
-          <View>
-            <Image
-              source={{ uri: thumb }}
-              style={{ width: imgW, height: imgW * 0.56, borderRadius: 10 }}
-              contentFit="cover"
-            />
-            <View style={{
-              position: 'absolute', inset: 0,
-              alignItems: 'center', justifyContent: 'center',
-            }}>
-              <View style={{
-                width: 52, height: 52, borderRadius: 26,
-                backgroundColor: 'rgba(0,0,0,0.7)',
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Text style={{ fontSize: 22, color: '#fff', marginLeft: 4 }}>▶</Text>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={{
-            width: imgW, height: 56, backgroundColor: '#f3f4f6', borderRadius: 10,
-            flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10,
-          }}>
-            <Text style={{ fontSize: 22 }}>▶️</Text>
-            <Text style={{ fontSize: 13, color: '#2563eb', flex: 1 }} numberOfLines={1}>{url}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    )
+    return <YouTubeInline url={url} imgW={imgW} />
   }
 
   if (type === 'pdf') {
