@@ -166,7 +166,12 @@ export default function ThreadScreen() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove', style: 'destructive', onPress: async () => {
-          await supabase.from('thread_replies').update({ is_deleted: true }).eq('id', replyId)
+          const { data, error } = await supabase.from('thread_replies')
+            .update({ is_deleted: true })
+            .eq('id', replyId)
+            .select('id')
+          if (error) { Alert.alert('Error', error.message); return }
+          if (!data?.length) { Alert.alert('Error', 'Reply could not be removed. You may not have permission.'); return }
           setReplies(prev => prev.filter(r => r.id !== replyId))
         }
       },
