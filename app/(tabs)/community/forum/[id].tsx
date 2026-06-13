@@ -159,7 +159,7 @@ export default function ThreadScreen() {
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
       <Stack.Screen options={{
         headerShown: true,
-        title: 'Thread',
+        title: 'The Forum',
         headerTintColor: '#2d1b69',
         headerBackTitle: '',
         headerShadowVisible: false,
@@ -218,7 +218,7 @@ export default function ThreadScreen() {
         {/* Reply input */}
         <View style={{
           flexDirection: 'row', alignItems: 'flex-end', gap: 10,
-          paddingHorizontal: 14, paddingTop: 10, paddingBottom: insets.bottom + 10,
+          paddingHorizontal: 14, paddingTop: 10, paddingBottom: insets.bottom + 84,
           borderTopWidth: 1, borderTopColor: '#e5e5ea', backgroundColor: '#ffffff',
         }}>
           <Avatar author={user ? { first_name: user.first_name, last_name: user.last_name, photo_url: user.photo_url } : undefined} />

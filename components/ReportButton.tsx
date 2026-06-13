@@ -47,7 +47,7 @@ export function ReportButton({ contentType, contentId }: Props) {
       onPress={onPress}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <Text style={{ fontSize: 13, color: '#c7c7cc' }}>⚑</Text>
+      <Text style={{ fontSize: 18, color: '#ef4444' }}>⚑</Text>
     </TouchableOpacity>
   )
 }

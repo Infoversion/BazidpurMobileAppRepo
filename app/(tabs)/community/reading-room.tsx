@@ -2,8 +2,9 @@ import React, { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, useWindowDimensions, RefreshControl,
-  Modal, ScrollView, Linking, Alert,
+  Modal, ScrollView,
 } from 'react-native'
+import { WebView } from 'react-native-webview'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
@@ -70,16 +71,46 @@ function BookModal({ book, onClose }: { book: Book; onClose: () => void }) {
   const insets = useSafeAreaInsets()
   const uri = coverUri(book.cover_url)
   const [bg, accent] = gradPair(book.id)
+  const [showPdf, setShowPdf] = useState(false)
 
-  async function openPdf() {
-    if (!book.pdf_url) return
-    const url = book.pdf_url.startsWith('http') ? book.pdf_url : `${R2}/${book.pdf_url}`
-    const ok = await Linking.canOpenURL(url)
-    if (ok) {
-      await Linking.openURL(url)
-    } else {
-      Alert.alert('Cannot open', 'No PDF viewer found on this device.')
-    }
+  const pdfUrl = book.pdf_url
+    ? (book.pdf_url.startsWith('http') ? book.pdf_url : `${R2}/${book.pdf_url}`)
+    : null
+
+  if (showPdf && pdfUrl) {
+    return (
+      <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setShowPdf(false)}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <View style={{
+            flexDirection: 'row', alignItems: 'center',
+            paddingTop: insets.top + 8, paddingBottom: 10, paddingHorizontal: 16,
+            backgroundColor: '#2d1b69', gap: 12,
+          }}>
+            <TouchableOpacity
+              onPress={() => setShowPdf(false)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            >
+              <Text style={{ fontSize: 20, color: '#fff' }}>‹</Text>
+              <Text style={{ fontSize: 15, color: '#fff', fontWeight: '600' }}>Back</Text>
+            </TouchableOpacity>
+            <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: '#fff' }} numberOfLines={1}>
+              {book.title}
+            </Text>
+          </View>
+          <WebView
+            source={{ uri: pdfUrl }}
+            style={{ flex: 1 }}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f7' }}>
+                <ActivityIndicator color="#2d1b69" size="large" />
+                <Text style={{ marginTop: 12, color: '#6b7280', fontSize: 14 }}>Loading PDF…</Text>
+              </View>
+            )}
+          />
+        </View>
+      </Modal>
+    )
   }
 
   return (
@@ -137,9 +168,9 @@ function BookModal({ book, onClose }: { book: Book; onClose: () => void }) {
           ) : null}
 
           {/* Open PDF button */}
-          {book.pdf_url ? (
+          {pdfUrl ? (
             <TouchableOpacity
-              onPress={openPdf}
+              onPress={() => setShowPdf(true)}
               style={{
                 marginTop: 28, backgroundColor: '#2d1b69', borderRadius: 14,
                 paddingVertical: 15, alignItems: 'center', flexDirection: 'row',
@@ -147,7 +178,7 @@ function BookModal({ book, onClose }: { book: Book; onClose: () => void }) {
               }}
             >
               <Text style={{ fontSize: 18 }}>📄</Text>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Open PDF</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Read PDF</Text>
             </TouchableOpacity>
           ) : (
             <View style={{ marginTop: 28, backgroundColor: '#f3f4f6', borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}>

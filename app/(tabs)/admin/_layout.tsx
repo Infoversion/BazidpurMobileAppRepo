@@ -22,6 +22,7 @@ export default function AdminLayout() {
       <Stack.Screen name="library" options={{ title: 'The Reading Room' }} />
       <Stack.Screen name="app-stats" options={{ title: 'App Statistics' }} />
       <Stack.Screen name="family-tree" options={{ title: 'Family Tree' }} />
+      <Stack.Screen name="reports" options={{ headerShown: false }} />
     </Stack>
   )
 }

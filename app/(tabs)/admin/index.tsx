@@ -1,17 +1,16 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Linking, Alert,
+  ActivityIndicator, RefreshControl, Alert,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import { RoleBadge } from '@/components/RoleBadge'
 import Svg, { Path, Line, Circle } from 'react-native-svg'
 
-const WEB = 'https://bazidpur.com'
 const W = 'white'
 const SW = 2
 
@@ -53,6 +52,7 @@ interface Stats {
   totalMoments: number
   totalMomentVideos: number
   totalBooks: number
+  reportCount: number
 }
 
 
@@ -133,6 +133,7 @@ export default function AdminScreen() {
       { count: totalVideoAlbums },
       { count: totalAlbumVideos },
       { count: totalBooks },
+      { count: reportCount },
     ] = await Promise.all([
       supabase.from('users').select('*', { count: 'exact', head: true }).not('role', 'eq', 'pending'),
       supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'member'),
@@ -151,6 +152,7 @@ export default function AdminScreen() {
       supabase.from('video_albums').select('*', { count: 'exact', head: true }),
       supabase.from('video_album_items').select('*', { count: 'exact', head: true }),
       supabase.from('library_books').select('*', { count: 'exact', head: true }).eq('is_active', true),
+      supabase.from('reports').select('*', { count: 'exact', head: true }),
     ])
 
     setStats({
@@ -171,10 +173,16 @@ export default function AdminScreen() {
       totalMoments: totalMoments ?? 0,
       totalMomentVideos: totalMomentVideos ?? 0,
       totalBooks: totalBooks ?? 0,
+      reportCount: reportCount ?? 0,
     })
   }
 
+  const initialLoad = useRef(true)
   useEffect(() => { load().finally(() => setLoading(false)) }, [])
+  useFocusEffect(useCallback(() => {
+    if (initialLoad.current) { initialLoad.current = false; return }
+    load()
+  }, []))
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -182,11 +190,7 @@ export default function AdminScreen() {
     setRefreshing(false)
   }, [])
 
-  function openWeb(path: string) {
-    Linking.openURL(`${WEB}${path}`)
-  }
-
-  if (loading) {
+if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f7' }}>
         <ActivityIndicator color="#2d1b69" />
@@ -209,10 +213,7 @@ export default function AdminScreen() {
         alignItems: 'flex-end',
       }}>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>
-            Admin Panel
-          </Text>
-          <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>Admin</Text>
+<Text style={{ fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>Admin</Text>
           <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>
             {isSuperadmin ? 'Superadmin' : 'Admin'}
           </Text>
@@ -287,6 +288,7 @@ export default function AdminScreen() {
             { icon: '✉️', label: 'Contact Submissions', value: s.totalContacts,                        sub: s.unreadContacts > 0 ? `${s.unreadContacts} unread` : 'all read',             highlight: s.unreadContacts > 0, onPress: () => router.push('/(tabs)/admin/contacts') },
             { icon: '💬', label: 'WhatsApp Archive',    value: s.totalChats,                           sub: 'chats imported',                                                              highlight: false,              onPress: () => router.push('/(tabs)/admin/whatsapp') },
             { icon: '📨', label: 'Send Invitations',    value: null,                                   sub: 'invite family to join',                                                       highlight: false,              onPress: () => router.push('/(tabs)/admin/invite') },
+            { icon: '⚑',  label: 'Flagged Content',    value: s.reportCount,                          sub: s.reportCount > 0 ? 'requires review' : 'nothing flagged',                     highlight: s.reportCount > 0,  onPress: () => router.push('/(tabs)/admin/reports' as any) },
           ].map((row, i, arr) => {
             const isPending = row.label === 'Pending Review'
             const bgColor = row.highlight ? (isPending ? '#fffbeb' : '#fff1f2') : 'transparent'
@@ -340,17 +342,43 @@ export default function AdminScreen() {
           </View>
         </View>
 
-        {/* ── Open web admin ───────────────────────────────────────────── */}
-        <TouchableOpacity
-          onPress={() => openWeb('/admin')}
-          style={{
-            backgroundColor: '#1e1b4b', borderRadius: 14,
-            padding: 16, alignItems: 'center',
-          }}
-        >
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Open Full Web Admin ›</Text>
-          <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>bazidpur.com/admin</Text>
-        </TouchableOpacity>
+        {/* ── Fun admin scenes ─────────────────────────────────────────── */}
+        <View style={{ marginTop: 8 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+            Life of an Admin
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#f3f4f6' }}>
+              <Text style={{ fontSize: 36, lineHeight: 44 }}>🧑‍💼</Text>
+              <Text style={{ fontSize: 22, lineHeight: 28 }}>📋✅</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#2d1b69', textAlign: 'center' }}>Stamp of Approval</Text>
+              <Text style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', lineHeight: 14 }}>Carefully vetting every soul seeking entry to the Bazidpur family</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#f3f4f6' }}>
+              <Text style={{ fontSize: 36, lineHeight: 44 }}>👩‍🌾</Text>
+              <Text style={{ fontSize: 22, lineHeight: 28 }}>🌳✨</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#2d1b69', textAlign: 'center' }}>Tree Whisperer</Text>
+              <Text style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', lineHeight: 14 }}>Lovingly growing the family tree, one branch at a time</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#f3f4f6' }}>
+              <Text style={{ fontSize: 36, lineHeight: 44 }}>🛡️</Text>
+              <Text style={{ fontSize: 22, lineHeight: 28 }}>⚔️🏰</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#2d1b69', textAlign: 'center' }}>Guardian of the Village</Text>
+              <Text style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', lineHeight: 14 }}>Standing watch so the community stays safe and wholesome</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#f3f4f6' }}>
+              <Text style={{ fontSize: 36, lineHeight: 44 }}>🌙</Text>
+              <Text style={{ fontSize: 22, lineHeight: 28 }}>💻☕</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#2d1b69', textAlign: 'center' }}>Late-Night Hero</Text>
+              <Text style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', lineHeight: 14 }}>Running on chai and dedication, keeping Bazidpur alive after dark</Text>
+            </View>
+          </View>
+          <Text style={{ fontSize: 12, color: '#c4b5fd', textAlign: 'center', marginTop: 16, marginBottom: 4, fontStyle: 'italic' }}>
+            JazakAllah Khayran for your service 💜
+          </Text>
+        </View>
 
       </ScrollView>
     </View>
