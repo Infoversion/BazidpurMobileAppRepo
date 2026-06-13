@@ -257,15 +257,18 @@ Create Account button is **disabled + grey** until privacy policy is accepted.
 |---|---|
 | `users` | Profile data, role, location, `privacy_policy_accepted_at` |
 | `threads` | Forum threads (`room='general'`, `is_deleted`, `is_pinned`) |
-| `thread_replies` | Forum replies (`is_deleted`) |
+| `thread_replies` | Forum replies (`is_deleted`), supports rich media attachments |
+| `thread_attachments` | Media files attached to forum replies (photo, audio, PDF, YouTube) |
 | `reports` | UGC reports (content_type, content_id, reason) |
 | `timeless_moments` | Photos for Timeless Moments |
 | `timeless_moment_videos` | Videos for Timeless Moments |
 | `experiences` | Memoir stories |
 | `experience_chapters` | Memoir chapters |
 | `poetry_verses` | Verses for poems |
-| `albums` | Community photo albums |
-| `album_photos` | Photos within albums |
+| `photo_albums` | Community photo albums (NOT `albums` — that name is wrong) |
+| `album_photos` | Photos within albums (`r2_url`, `thumbnail_url`, `is_hidden`, `display_order`) |
+| `video_albums` | Community video albums |
+| `video_album_items` | YouTube videos within video albums (`youtube_id`, `display_order`) |
 
 ---
 
@@ -346,4 +349,9 @@ eas submit --platform ios
 10. **Supabase `reports` table** — must be created manually in Supabase dashboard before ReportButton will persist data (SQL is in this file above)
 11. **`autoIncrement: true` in `eas.json`** — EAS auto-increments `buildNumber` on each production build; do NOT manually change it between builds
 12. **React Native SVG** — import individual elements: `import Svg, { Path, Circle, Polyline, Line } from 'react-native-svg'`
-13. **HEIC photos from iPhone** — iOS camera saves in HEIC format by default. Web browsers (Chrome, Firefox) cannot display `.heic` files. Always convert HEIC→JPEG before uploading using `expo-image-manipulator`: `manipulateAsync(uri, [], { compress: 0.9, format: SaveFormat.JPEG })`. Check file extension (`heic`/`heif`) before upload. Server-side `sharp` does NOT support HEIC — conversion must happen on device. If HEIC files slip through, run `scripts/convert-heic-photos.mjs` in the web project to migrate existing rows.
+13. **Photo upload — always resize + convert on device** — ALL photos from the mobile must go through `manipulateAsync` before upload, not just HEIC. Use: `manipulateAsync(uri, [{ resize: { width: 1920 } }], { compress: 0.85, format: SaveFormat.JPEG })`. This handles three things at once: (a) converts HEIC/HEIF → JPEG so browsers can display it, (b) caps file size to ~1–3 MB keeping under Vercel's 4.5 MB body limit, (c) removes need to detect file extension before deciding. Server-side `sharp` does NOT support HEIC — conversion must happen on device. See `app/(tabs)/community/album/[id].tsx` `addPhotos()` for the current implementation.
+14. **Vercel serverless body size limit is 4.5 MB** — any multipart POST to `/api/*` larger than 4.5 MB returns a 413 error. This cannot be raised on the Hobby/Pro plan. The only fix is to resize/compress on the client before sending. Web uploads avoid this by using presigned R2 URLs (direct browser → R2), bypassing the Vercel function entirely. Mobile uploads currently go through the Vercel function as multipart — hence the mandatory resize in rule 13.
+15. **Web vs mobile upload paths are different** — Web: presigned URL flow (`/api/albums/[id]/photos/presign` → direct PUT to R2 → register in DB). Mobile: multipart POST to `/api/albums/[id]/photos` → server generates thumbnail with sharp → uploads to R2. Both paths store `r2_url` and `thumbnail_url` in `album_photos`. If the multipart thumbnail generation fails (e.g. unsupported format), `thumbnail_url` falls back to `r2_url`.
+16. **HEIC migration script** — If HEIC photos slipped through before rule 13 was enforced, run `BazidpurWeb/scripts/convert-heic-photos.mjs` locally. It queries `album_photos` for any `.heic`/`.heif` URLs, downloads from R2, converts with macOS `sips`, generates a thumbnail with `sharp`, re-uploads both as JPEG, and updates the DB rows.
+17. **Empty album visibility** — Empty albums (0 photos) are hidden from other members in the albums list (`/albums`). The album owner always sees their own empty albums. Admins see all albums. This is enforced in `AlbumsClient.tsx` via `visibleOtherAlbums` filter before pagination. The album page (`/albums/[id]`) itself is still accessible by URL regardless.
+18. **Forum rich media attachments** — Forum replies support photo, audio (recorded or uploaded), PDF, and YouTube link attachments. Attachments are stored in `thread_attachments` table and uploaded via presigned R2 URLs (`/api/forum/presign`). On web, attachments render inline (lightbox for photos, audio player, PDF link, YouTube iframe). On mobile, `[id].tsx` in `forum/` handles both upload and display.
