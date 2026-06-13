@@ -138,6 +138,44 @@ function NewThreadModal({ onClose, onCreated }: { onClose: () => void; onCreated
   )
 }
 
+function ForumGuide() {
+  const [open, setOpen] = useState(false)
+  const rows = [
+    { icon: '✏️', title: 'Start a thread', desc: 'Tap the + button (bottom right) to post a new topic.' },
+    { icon: '💬', title: 'Reply', desc: 'Open any thread and type in the reply box at the bottom.' },
+    { icon: '📎', title: 'Attach media', desc: 'Tap 📎 in the reply bar to add a photo, audio clip, PDF, or YouTube link.' },
+    { icon: '🚩', title: 'Flag content', desc: 'Tap the red 🚩 on any post to report it. Admins review all reports privately — the poster is not notified.' },
+  ]
+  return (
+    <Pressable
+      onPress={() => setOpen(v => !v)}
+      style={{
+        marginBottom: 8, backgroundColor: '#ede9ff', borderRadius: 14,
+        paddingHorizontal: 14, paddingVertical: 12,
+        borderWidth: 1, borderColor: '#c4b5fd',
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: '#4c1d95' }}>💡 How The Forum works</Text>
+        <Text style={{ fontSize: 13, color: '#7c3aed' }}>{open ? '▲' : '▼'}</Text>
+      </View>
+      {open ? (
+        <View style={{ marginTop: 10, gap: 10 }}>
+          {rows.map(r => (
+            <View key={r.title} style={{ flexDirection: 'row', gap: 10 }}>
+              <Text style={{ fontSize: 16, width: 22 }}>{r.icon}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#3b0764' }}>{r.title}</Text>
+                <Text style={{ fontSize: 12, color: '#6d28d9', lineHeight: 17, marginTop: 1 }}>{r.desc}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </Pressable>
+  )
+}
+
 export default function ForumScreen() {
   const insets = useSafeAreaInsets()
   const [threads, setThreads] = useState<ForumThread[]>([])
@@ -183,6 +221,7 @@ export default function ForumScreen() {
         keyExtractor={t => t.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
         contentContainerStyle={{ padding: 12, gap: 8, paddingBottom: 90 }}
+        ListHeaderComponent={<ForumGuide />}
         renderItem={({ item }) => {
           const replyCount = item.replies?.[0]?.count ?? 0
           const authorName = item.author ? `${item.author.first_name} ${item.author.last_name}` : 'Member'

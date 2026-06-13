@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, TextInput, KeyboardAvoidingView,
-  Platform, Pressable, Alert,
+  Platform, Pressable, Alert, Keyboard,
 } from 'react-native'
 import { Stack, useLocalSearchParams, router } from 'expo-router'
 import { Image } from 'expo-image'
@@ -61,6 +61,7 @@ export default function ThreadScreen() {
   const [replyText, setReplyText] = useState('')
   const [replyAttachment, setReplyAttachment] = useState<Attachment | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [showAttachMenu, setShowAttachMenu] = useState(false)
 
   async function load() {
     const [{ data: t }, { data: r }] = await Promise.all([
@@ -186,6 +187,8 @@ export default function ThreadScreen() {
           onRefresh={onRefresh}
           ListHeaderComponent={threadHeader}
           contentContainerStyle={{ paddingBottom: 16 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           renderItem={({ item }) => {
             const isOwn = item.author_id === session?.user?.id
             return (
@@ -235,32 +238,40 @@ export default function ThreadScreen() {
           paddingHorizontal: 14, paddingTop: 10, paddingBottom: insets.bottom + 84,
           borderTopWidth: 1, borderTopColor: '#e5e5ea', backgroundColor: '#ffffff',
         }}>
-          {replyAttachment ? (
-            <View style={{ marginBottom: 8, paddingLeft: 46 }}>
-              <AttachmentPicker value={replyAttachment} onChange={setReplyAttachment} />
+          {(showAttachMenu || !!replyAttachment) ? (
+            <View style={{ paddingBottom: 8, paddingLeft: 46 }}>
+              <AttachmentPicker
+                value={replyAttachment}
+                onChange={(a) => { setReplyAttachment(a); if (a) setShowAttachMenu(false) }}
+              />
             </View>
           ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
             <Avatar author={user ? { first_name: user.first_name, last_name: user.last_name, photo_url: user.photo_url } : undefined} />
-            <View style={{ flex: 1, backgroundColor: '#f3f4f6', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 }}>
-              <TextInput
-                value={replyText}
-                onChangeText={setReplyText}
-                placeholder="Write a reply…"
-                placeholderTextColor="#9ca3af"
-                style={{
-                  fontSize: 14, color: '#111827', maxHeight: 100,
-                }}
-                multiline
-                textAlignVertical="top"
-                returnKeyType="default"
-              />
-              {!replyAttachment ? (
-                <View style={{ paddingTop: 4 }}>
-                  <AttachmentPicker value={null} onChange={setReplyAttachment} />
-                </View>
-              ) : null}
-            </View>
+            <TextInput
+              value={replyText}
+              onChangeText={setReplyText}
+              placeholder="Write a reply…"
+              placeholderTextColor="#9ca3af"
+              style={{
+                flex: 1, backgroundColor: '#f3f4f6', borderRadius: 20,
+                paddingHorizontal: 14, paddingVertical: 9,
+                fontSize: 14, color: '#111827', maxHeight: 100,
+              }}
+              multiline
+              textAlignVertical="top"
+              returnKeyType="default"
+            />
+            <TouchableOpacity
+              onPress={() => { setShowAttachMenu(v => !v); Keyboard.dismiss() }}
+              style={{
+                width: 36, height: 36, borderRadius: 18,
+                backgroundColor: replyAttachment ? '#2d1b69' : '#e5e7eb',
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 17 }}>📎</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={submitReply}
               disabled={(!replyText.trim() && !replyAttachment) || submitting}
