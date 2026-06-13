@@ -270,14 +270,16 @@ export default function AlbumScreen() {
       const asset = assets[i]
       const ext = (asset.uri.split('.').pop()?.split('?')[0] || 'jpg').toLowerCase()
 
-      // Convert HEIC/HEIF to JPEG — browsers can't display Apple's native format
+      // Resize to max 1920px and convert to JPEG (handles HEIC + keeps files under 4.5MB Vercel limit)
       let uploadUri = asset.uri
-      if (ext === 'heic' || ext === 'heif') {
-        try {
-          const converted = await manipulateAsync(asset.uri, [], { compress: 0.9, format: SaveFormat.JPEG })
-          uploadUri = converted.uri
-        } catch { /* fall back to original URI */ }
-      }
+      try {
+        const converted = await manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 1920 } }],
+          { compress: 0.85, format: SaveFormat.JPEG },
+        )
+        uploadUri = converted.uri
+      } catch { /* fall back to original URI */ }
 
       const mimeType = 'image/jpeg'
       const url = `https://bazidpur.com/api/albums/${id}/photos?_t=${encodeURIComponent(session.access_token)}`
