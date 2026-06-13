@@ -12,6 +12,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { ReportButton } from '@/components/ReportButton'
+import { AttachmentPicker, type Attachment } from '@/components/forum/AttachmentPicker'
+import { AttachmentDisplay } from '@/components/forum/AttachmentDisplay'
 import type { ForumThread } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -51,6 +53,7 @@ function NewThreadModal({ onClose, onCreated }: { onClose: () => void; onCreated
   const insets = useSafeAreaInsets()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [attachment, setAttachment] = useState<Attachment | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -68,6 +71,8 @@ function NewThreadModal({ onClose, onCreated }: { onClose: () => void; onCreated
       user_id: session.user.id,
       is_pinned: false,
       is_deleted: false,
+      attachment_type: attachment?.type ?? null,
+      attachment_url: attachment?.url ?? null,
     })
     if (err) { setError(err.message); setSubmitting(false); return }
     setSubmitting(false)
@@ -120,6 +125,12 @@ function NewThreadModal({ onClose, onCreated }: { onClose: () => void; onCreated
               textAlignVertical="top"
               maxLength={5000}
             />
+            <View style={{ borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 12, marginTop: 4 }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Attach
+              </Text>
+              <AttachmentPicker value={attachment} onChange={setAttachment} />
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -137,7 +148,7 @@ export default function ForumScreen() {
   async function load() {
     const { data } = await supabase
       .from('threads')
-      .select('id, title, body, room, is_pinned, is_deleted, created_at, author_id, author:author_id(first_name, last_name, photo_url), replies:thread_replies(count)')
+      .select('id, title, body, room, is_pinned, is_deleted, created_at, author_id, attachment_type, attachment_url, author:author_id(first_name, last_name, photo_url), replies:thread_replies(count)')
       .eq('room', 'general')
       .eq('is_deleted', false)
       .order('is_pinned', { ascending: false })
@@ -213,6 +224,10 @@ export default function ForumScreen() {
                         <Text style={{ fontSize: 11, color: '#8e8e93' }}>💬 {replyCount}</Text>
                       </>
                     ) : null}
+                    {item.attachment_type === 'photo'   && <Text style={{ fontSize: 11 }}>📷</Text>}
+                    {item.attachment_type === 'audio'   && <Text style={{ fontSize: 11 }}>🎵</Text>}
+                    {item.attachment_type === 'youtube' && <Text style={{ fontSize: 11 }}>▶️</Text>}
+                    {item.attachment_type === 'pdf'     && <Text style={{ fontSize: 11 }}>📄</Text>}
                     <ReportButton contentType="thread" contentId={item.id} />
                   </View>
                 </View>

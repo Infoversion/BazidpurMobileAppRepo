@@ -10,6 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { ReportButton } from '@/components/ReportButton'
+import { AttachmentPicker, type Attachment } from '@/components/forum/AttachmentPicker'
+import { AttachmentDisplay } from '@/components/forum/AttachmentDisplay'
 import type { ForumThread, ForumReply } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -57,18 +59,19 @@ export default function ThreadScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [replyText, setReplyText] = useState('')
+  const [replyAttachment, setReplyAttachment] = useState<Attachment | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   async function load() {
     const [{ data: t }, { data: r }] = await Promise.all([
       supabase
         .from('threads')
-        .select('id, title, body, room, is_pinned, is_deleted, created_at, author_id, author:author_id(first_name, last_name, photo_url)')
+        .select('id, title, body, room, is_pinned, is_deleted, created_at, author_id, attachment_type, attachment_url, author:author_id(first_name, last_name, photo_url)')
         .eq('id', id)
         .single(),
       supabase
         .from('thread_replies')
-        .select('id, thread_id, body, is_deleted, created_at, author_id, author:author_id(first_name, last_name, photo_url)')
+        .select('id, thread_id, body, is_deleted, created_at, author_id, attachment_type, attachment_url, author:author_id(first_name, last_name, photo_url)')
         .eq('thread_id', id)
         .eq('is_deleted', false)
         .order('created_at'),
@@ -86,19 +89,23 @@ export default function ThreadScreen() {
   }, [id])
 
   async function submitReply() {
-    if (!replyText.trim() || !session?.user?.id) return
+    if (!replyText.trim() && !replyAttachment) return
+    if (!session?.user?.id) return
     setSubmitting(true)
     const { data, error } = await supabase.from('thread_replies').insert({
       thread_id: id,
-      body: replyText.trim(),
-      content: replyText.trim(),
+      body: replyText.trim() || null,
+      content: replyText.trim() || null,
       author_id: session.user.id,
       user_id: session.user.id,
       is_deleted: false,
-    }).select('id, thread_id, body, is_deleted, created_at, author_id, author:author_id(first_name, last_name, photo_url)').single()
+      attachment_type: replyAttachment?.type ?? null,
+      attachment_url: replyAttachment?.url ?? null,
+    }).select('id, thread_id, body, is_deleted, created_at, author_id, attachment_type, attachment_url, author:author_id(first_name, last_name, photo_url)').single()
     if (!error && data) {
       setReplies(prev => [...prev, data as unknown as ReplyWithAuthor])
       setReplyText('')
+      setReplyAttachment(null)
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100)
     }
     setSubmitting(false)
@@ -142,6 +149,9 @@ export default function ThreadScreen() {
       </View>
       {thread.body ? (
         <Text style={{ fontSize: 15, color: '#374151', lineHeight: 24 }}>{thread.body}</Text>
+      ) : null}
+      {thread.attachment_type && thread.attachment_url ? (
+        <AttachmentDisplay type={thread.attachment_type} url={thread.attachment_url} />
       ) : null}
     </View>
   ) : null
@@ -203,7 +213,12 @@ export default function ThreadScreen() {
                       )}
                     </View>
                   </View>
-                  <Text style={{ fontSize: 14, color: '#374151', lineHeight: 21 }}>{item.body}</Text>
+                  {item.body ? (
+                    <Text style={{ fontSize: 14, color: '#374151', lineHeight: 21 }}>{item.body}</Text>
+                  ) : null}
+                  {item.attachment_type && item.attachment_url ? (
+                    <AttachmentDisplay type={item.attachment_type} url={item.attachment_url} />
+                  ) : null}
                 </View>
               </View>
             )
@@ -217,39 +232,50 @@ export default function ThreadScreen() {
 
         {/* Reply input */}
         <View style={{
-          flexDirection: 'row', alignItems: 'flex-end', gap: 10,
           paddingHorizontal: 14, paddingTop: 10, paddingBottom: insets.bottom + 84,
           borderTopWidth: 1, borderTopColor: '#e5e5ea', backgroundColor: '#ffffff',
         }}>
-          <Avatar author={user ? { first_name: user.first_name, last_name: user.last_name, photo_url: user.photo_url } : undefined} />
-          <TextInput
-            value={replyText}
-            onChangeText={setReplyText}
-            placeholder="Write a reply…"
-            placeholderTextColor="#9ca3af"
-            style={{
-              flex: 1, backgroundColor: '#f3f4f6', borderRadius: 20,
-              paddingHorizontal: 14, paddingVertical: 9,
-              fontSize: 14, color: '#111827', maxHeight: 100,
-            }}
-            multiline
-            textAlignVertical="top"
-            returnKeyType="default"
-          />
-          <TouchableOpacity
-            onPress={submitReply}
-            disabled={!replyText.trim() || submitting}
-            style={{
-              width: 36, height: 36, borderRadius: 18,
-              backgroundColor: replyText.trim() ? '#2d1b69' : '#e5e7eb',
-              alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            {submitting
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={{ fontSize: 16, color: replyText.trim() ? '#fff' : '#9ca3af' }}>↑</Text>
-            }
-          </TouchableOpacity>
+          {replyAttachment ? (
+            <View style={{ marginBottom: 8, paddingLeft: 46 }}>
+              <AttachmentPicker value={replyAttachment} onChange={setReplyAttachment} />
+            </View>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
+            <Avatar author={user ? { first_name: user.first_name, last_name: user.last_name, photo_url: user.photo_url } : undefined} />
+            <View style={{ flex: 1, backgroundColor: '#f3f4f6', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 }}>
+              <TextInput
+                value={replyText}
+                onChangeText={setReplyText}
+                placeholder="Write a reply…"
+                placeholderTextColor="#9ca3af"
+                style={{
+                  fontSize: 14, color: '#111827', maxHeight: 100,
+                }}
+                multiline
+                textAlignVertical="top"
+                returnKeyType="default"
+              />
+              {!replyAttachment ? (
+                <View style={{ paddingTop: 4 }}>
+                  <AttachmentPicker value={null} onChange={setReplyAttachment} />
+                </View>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              onPress={submitReply}
+              disabled={(!replyText.trim() && !replyAttachment) || submitting}
+              style={{
+                width: 36, height: 36, borderRadius: 18,
+                backgroundColor: (replyText.trim() || replyAttachment) ? '#2d1b69' : '#e5e7eb',
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              {submitting
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={{ fontSize: 16, color: (replyText.trim() || replyAttachment) ? '#fff' : '#9ca3af' }}>↑</Text>
+              }
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </View>

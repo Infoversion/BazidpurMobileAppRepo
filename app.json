@@ -12,8 +12,9 @@
       "bundleIdentifier": "com.bazidpur.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Used to update your profile photo.",
-        "NSPhotoLibraryAddUsageDescription": "Used to save photos from the app."
+        "NSPhotoLibraryUsageDescription": "Used to update your profile photo and attach images to forum posts.",
+        "NSPhotoLibraryAddUsageDescription": "Used to save photos from the app.",
+        "NSMicrophoneUsageDescription": "Used to record audio messages in The Forum."
       }
     },
     "android": {
