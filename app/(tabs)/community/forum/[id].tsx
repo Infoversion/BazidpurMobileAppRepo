@@ -63,6 +63,7 @@ export default function ThreadScreen() {
   const [replyAttachment, setReplyAttachment] = useState<Attachment | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [showAttachMenu, setShowAttachMenu] = useState(false)
+  const [kbVisible, setKbVisible] = useState(false)
 
   async function load() {
     const [{ data: t }, { data: r }] = await Promise.all([
@@ -83,6 +84,12 @@ export default function ThreadScreen() {
   }
 
   useEffect(() => { load().finally(() => setLoading(false)) }, [id])
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', () => setKbVisible(true))
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKbVisible(false))
+    return () => { show.remove(); hide.remove() }
+  }, [])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -232,7 +239,8 @@ export default function ThreadScreen() {
 
         {/* Reply input */}
         <View style={{
-          paddingHorizontal: 14, paddingTop: 10, paddingBottom: insets.bottom + 84,
+          paddingHorizontal: 14, paddingTop: 10,
+          paddingBottom: kbVisible ? 10 : insets.bottom + 84,
           borderTopWidth: 1, borderTopColor: '#e5e5ea', backgroundColor: '#ffffff',
         }}>
           {(showAttachMenu || !!replyAttachment) ? (
