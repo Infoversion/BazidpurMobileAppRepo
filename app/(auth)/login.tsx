@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, ScrollView } from 'react-native'
 import { router } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
 
@@ -11,6 +12,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [forgotUsernameOpen, setForgotUsernameOpen] = useState(false)
+  const insets = useSafeAreaInsets()
 
   async function handleLogin() {
     if (!email || !password) {
@@ -104,12 +107,14 @@ export default function LoginScreen() {
           />
         </View>
 
-        <TouchableOpacity
-          className="self-end mb-6"
-          onPress={() => router.push('/(auth)/forgot-password')}
-        >
-          <Text className="text-sm text-accent">Forgot password?</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginBottom: 24 }}>
+          <TouchableOpacity onPress={() => setForgotUsernameOpen(true)}>
+            <Text className="text-sm text-accent">Forgot username?</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
+            <Text className="text-sm text-accent">Forgot password?</Text>
+          </TouchableOpacity>
+        </View>
 
         {error ? (
           <View style={{
@@ -151,6 +156,72 @@ export default function LoginScreen() {
           <Text style={{ fontSize: 13, color: '#9ca3af' }}>Privacy Policy</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Forgot username — info sheet */}
+      <Modal visible={forgotUsernameOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setForgotUsernameOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            paddingTop: insets.top + 12, paddingBottom: 14, paddingHorizontal: 20,
+            borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+          }}>
+            <TouchableOpacity onPress={() => setForgotUsernameOpen(false)}>
+              <Text style={{ fontSize: 15, color: '#6b7280' }}>Close</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Forgot username</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
+            <Text style={{ fontSize: 15, color: '#1c1c1e', lineHeight: 24, marginBottom: 14 }}>
+              Bazidpur signs you in using the email address you registered with — we don&apos;t store a separate username.
+            </Text>
+            <Text style={{ fontSize: 14, color: '#374151', lineHeight: 22, marginBottom: 14 }}>
+              If you no longer remember which email you used, our admin team can help identify your account. Please send us the following details via the Contact form so we can match your record accurately:
+            </Text>
+
+            <View style={{ marginLeft: 6, marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, color: '#9ca3af', marginTop: 2 }}>•</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: '#374151', lineHeight: 22 }}>
+                  <Text style={{ fontWeight: '600', color: '#111827' }}>Full name</Text> — exactly as it appears on your account
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, color: '#9ca3af', marginTop: 2 }}>•</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: '#374151', lineHeight: 22 }}>
+                  <Text style={{ fontWeight: '600', color: '#111827' }}>Country of residence</Text>
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, color: '#9ca3af', marginTop: 2 }}>•</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: '#374151', lineHeight: 22 }}>
+                  <Text style={{ fontWeight: '600', color: '#111827' }}>Link to Bazidpur</Text> — for example, &ldquo;grandson of [name]&rdquo;, &ldquo;daughter of [name]&rdquo;, or your family connection
+                </Text>
+              </View>
+            </View>
+
+            <Text style={{ fontSize: 14, color: '#374151', lineHeight: 22, marginBottom: 28 }}>
+              An admin will review your request and reach out to you with the email address on file. You can then sign in normally, or use Forgot password if you need to reset it.
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => { setForgotUsernameOpen(false); router.push('/(public)/contact') }}
+              style={{
+                paddingVertical: 14, backgroundColor: '#2d1b69', borderRadius: 12,
+                alignItems: 'center', marginBottom: 12,
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Open Contact form</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setForgotUsernameOpen(false)}
+              style={{ alignSelf: 'center', padding: 10 }}
+            >
+              <Text style={{ fontSize: 14, color: '#9ca3af' }}>Maybe later</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   )
 }

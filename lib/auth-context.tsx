@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { type Session, type User as SupabaseUser } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { bootstrapNotifications } from './notifications'
 import type { User, UserRole } from './types'
 
 interface AuthContextValue {
@@ -38,14 +39,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session?.user) fetchProfile(session.user).finally(() => setLoading(false))
-      else setLoading(false)
+      if (session?.user) {
+        fetchProfile(session.user).finally(() => setLoading(false))
+        // Notifications bootstrap is delayed and fully sandboxed so a native
+        // module exception during setup can never propagate into the auth
+        // pipeline (we hit a SIGSEGV in TurboModule -> Hermes error handling
+        // on the first build). Runs ~3s after sign-in so the rest of the app
+        // is mounted first.
+        setTimeout(() => {
+          try { bootstrapNotifications().catch(() => {}) } catch { /* swallow */ }
+        }, 3000)
+      } else setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (session?.user) fetchProfile(session.user)
-      else setUser(null)
+      if (session?.user) {
+        fetchProfile(session.user)
+        setTimeout(() => {
+          try { bootstrapNotifications().catch(() => {}) } catch { /* swallow */ }
+        }, 3000)
+      } else setUser(null)
     })
 
     return () => subscription.unsubscribe()

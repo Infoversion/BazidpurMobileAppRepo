@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import type { Photo, Video } from '@/lib/types'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import VideoPlayer from '@/components/gallery/VideoPlayer'
+import { CuratedNotice } from '@/components/CuratedNotice'
 
 const PAGE_SIZE = 40
 
@@ -178,6 +179,8 @@ export default function PublicMediaScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f5f5f7' }}>
+
+      <CuratedNotice message="A curated selection of photos and videos from the Bazidpur admin team." />
 
       {/* Tab switcher */}
       <View style={{ backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>

@@ -2,11 +2,15 @@ import React, { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl, Alert,
+  Modal, TextInput, ScrollView,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
+
+type ReportStatus = 'pending' | 'reviewed_ok' | 'warning_sent' | 'suspended'
 
 interface Report {
   id: string
@@ -14,21 +18,41 @@ interface Report {
   content_id: string
   reason: string
   created_at: string
+  status: ReportStatus
+  action_notes: string | null
+  resolved_at: string | null
+  resolved_by: string | null
   reporter?: { first_name: string; last_name: string } | null
+  resolver?: { first_name: string; last_name: string } | null
+}
+
+const STATUS_LABEL: Record<ReportStatus, { label: string; color: string; bg: string }> = {
+  pending:      { label: 'Pending',       color: '#92400e', bg: '#fef3c7' },
+  reviewed_ok:  { label: 'No action',     color: '#065f46', bg: '#d1fae5' },
+  warning_sent: { label: 'Warning sent',  color: '#9a3412', bg: '#ffedd5' },
+  suspended:    { label: 'User suspended', color: '#991b1b', bg: '#fee2e2' },
 }
 
 const TYPE_LABEL: Record<string, { label: string; emoji: string }> = {
-  thread:  { label: 'Forum Thread',  emoji: '💬' },
-  reply:   { label: 'Forum Reply',   emoji: '↩️' },
-  poem:    { label: 'Poetry',        emoji: '📜' },
-  memoir:  { label: 'Memoir',        emoji: '📖' },
+  thread:           { label: 'Forum Thread',   emoji: '💬' },
+  reply:            { label: 'Forum Reply',    emoji: '↩️' },
+  poem:             { label: 'Poetry',         emoji: '📜' },
+  memoir:           { label: 'Memoir',         emoji: '📖' },
+  photo_album:      { label: 'Photo Album',    emoji: '📷' },
+  album_photo:      { label: 'Album Photo',    emoji: '🖼️' },
+  video_album:      { label: 'Video Album',    emoji: '🎬' },
+  video_album_item: { label: 'Album Video',    emoji: '🎞️' },
 }
 
 const TYPE_COLOR: Record<string, string> = {
-  thread: '#dbeafe',
-  reply:  '#ede9fe',
-  poem:   '#fef9c3',
-  memoir: '#d1fae5',
+  thread:           '#dbeafe',
+  reply:            '#ede9fe',
+  poem:             '#fef9c3',
+  memoir:           '#d1fae5',
+  photo_album:      '#ffedd5',
+  album_photo:      '#fff7ed',
+  video_album:      '#fce7f3',
+  video_album_item: '#fbe6f0',
 }
 
 function timeAgo(dateStr: string) {
@@ -43,18 +67,34 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+// Maps each reportable content_type to the table + column we look up to find
+// the offending user's id. Used when an admin chooses "Suspend user".
+const OFFENDER_LOOKUP: Record<string, { table: string; column: string } | null> = {
+  thread:           { table: 'threads',            column: 'author_id' },
+  reply:            { table: 'thread_replies',     column: 'user_id' },
+  poem:             null, // admin-curated
+  memoir:           null, // admin-curated
+  photo_album:      { table: 'photo_albums',       column: 'user_id' },
+  album_photo:      { table: 'album_photos',       column: 'uploaded_by' },
+  video_album:      { table: 'video_albums',       column: 'user_id' },
+  video_album_item: { table: 'video_album_items',  column: 'uploaded_by' },
+}
+
 export default function ReportsScreen() {
   const insets = useSafeAreaInsets()
+  const { session } = useAuth()
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [filter, setFilter] = useState<'pending' | 'resolved'>('pending')
+  const [actionTarget, setActionTarget] = useState<Report | null>(null)
 
   async function load() {
     const { data } = await supabase
       .from('reports')
-      .select('id, content_type, content_id, reason, created_at, reporter:reporter_id(first_name, last_name)')
+      .select('id, content_type, content_id, reason, created_at, status, action_notes, resolved_at, resolved_by, reporter:reporter_id(first_name, last_name), resolver:resolved_by(first_name, last_name)')
       .order('created_at', { ascending: false })
-    setReports((data ?? []) as Report[])
+    setReports((data ?? []) as unknown as Report[])
   }
 
   useEffect(() => { load().finally(() => setLoading(false)) }, [])
@@ -65,36 +105,136 @@ export default function ReportsScreen() {
     setRefreshing(false)
   }, [])
 
-  function dismiss(id: string) {
-    Alert.alert(
-      'Dismiss report',
-      'Mark this report as reviewed and remove it from the list?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Dismiss', style: 'destructive',
-          onPress: async () => {
-            await supabase.from('reports').delete().eq('id', id)
-            setReports(prev => prev.filter(r => r.id !== id))
-          },
-        },
-      ]
-    )
+  /**
+   * Apply an admin action to a report. Updates the report row with the
+   * chosen status, notes, resolver, and timestamp. If the action is
+   * "suspended", also looks up the offending user via the content_type
+   * mapping and flips their role + suspended_at + suspension_reason.
+   * Finally fires (and forgets) the reporter notification email.
+   */
+  async function applyAction(report: Report, status: ReportStatus, notes: string) {
+    if (!session) return
+
+    // For "suspended", find the offender and lock them out
+    if (status === 'suspended') {
+      const lookup = OFFENDER_LOOKUP[report.content_type]
+      if (!lookup) {
+        Alert.alert('Cannot suspend', `The "${report.content_type}" type is admin-curated and has no offender to suspend.`)
+        return
+      }
+      const { data: contentRow, error: lookupError } = await supabase
+        .from(lookup.table).select(lookup.column).eq('id', report.content_id).single()
+      if (lookupError || !contentRow) {
+        Alert.alert('Cannot suspend', 'The reported content may have been deleted, so the offender could not be identified.')
+        return
+      }
+      const offenderId = (contentRow as Record<string, string | null>)[lookup.column]
+      if (!offenderId) {
+        Alert.alert('Cannot suspend', 'No author is associated with the reported content.')
+        return
+      }
+      const { error: suspendError } = await supabase
+        .from('users')
+        .update({
+          role: 'suspended',
+          suspended_at: new Date().toISOString(),
+          suspension_reason: notes.trim() || `Reported as "${report.reason}"`,
+        })
+        .eq('id', offenderId)
+      if (suspendError) {
+        Alert.alert('Could not suspend user', suspendError.message)
+        return
+      }
+    }
+
+    const { error } = await supabase
+      .from('reports')
+      .update({
+        status,
+        action_notes: notes.trim() || null,
+        resolved_at: new Date().toISOString(),
+        resolved_by: session.user.id,
+      })
+      .eq('id', report.id)
+
+    if (error) {
+      Alert.alert('Could not save action', error.message)
+      return
+    }
+
+    setReports(prev => prev.map(r => r.id === report.id ? {
+      ...r,
+      status, action_notes: notes.trim() || null,
+      resolved_at: new Date().toISOString(),
+      resolved_by: session.user.id,
+    } : r))
+    setActionTarget(null)
+
+    // Notify the reporter — fire and forget.
+    // Note the explicit https://www. host: the apex domain 308-redirects to
+    // www, and iOS NSURLSession does not follow 308 on POST-with-body, which
+    // would hang the request forever. The token is also passed as ?_t= in
+    // case the Authorization header is dropped by NSURLSession on dev builds.
+    const url = `https://www.bazidpur.com/api/report-resolution-notification?_t=${encodeURIComponent(session.access_token)}`
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ reportId: report.id }),
+    }).catch(() => { /* silent — the action is already saved in the DB */ })
   }
 
-  function navigateToContent(report: Report) {
-    if (report.content_type === 'thread' || report.content_type === 'reply') {
-      const threadId = report.content_type === 'thread' ? report.content_id : null
-      if (threadId) {
-        router.push({ pathname: '/(tabs)/community/forum/[id]' as any, params: { id: threadId } })
-      } else {
-        Alert.alert('View Content', 'Navigate to The Forum to find and review this reply.')
-      }
-    } else if (report.content_type === 'poem') {
-      router.push('/(tabs)/community/poetry' as any)
-    } else if (report.content_type === 'memoir') {
-      router.push('/(tabs)/community/memoirs' as any)
+  async function navigateToContent(report: Report) {
+    const { content_type: t, content_id: id } = report
+
+    // Helper to look up a parent id when the reported content is a child row
+    async function lookupParent(table: string, column: string): Promise<string | null> {
+      const { data, error } = await supabase.from(table).select(column).eq('id', id).single()
+      if (error || !data) return null
+      return (data as Record<string, string | null>)[column] ?? null
     }
+
+    if (t === 'thread') {
+      router.push({ pathname: '/(tabs)/community/forum/[id]' as any, params: { id } })
+      return
+    }
+    if (t === 'reply') {
+      const threadId = await lookupParent('thread_replies', 'thread_id')
+      if (!threadId) { Alert.alert('Not found', 'This reply may have been deleted.'); return }
+      router.push({ pathname: '/(tabs)/community/forum/[id]' as any, params: { id: threadId } })
+      return
+    }
+    if (t === 'poem') {
+      router.push('/(tabs)/community/poetry' as any)
+      return
+    }
+    if (t === 'memoir') {
+      router.push('/(tabs)/community/memoirs' as any)
+      return
+    }
+    if (t === 'photo_album') {
+      router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id } })
+      return
+    }
+    if (t === 'album_photo') {
+      const albumId = await lookupParent('album_photos', 'album_id')
+      if (!albumId) { Alert.alert('Not found', 'This photo may have been deleted.'); return }
+      router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: albumId } })
+      return
+    }
+    if (t === 'video_album') {
+      router.push({ pathname: '/(tabs)/community/video-album/[id]' as any, params: { id } })
+      return
+    }
+    if (t === 'video_album_item') {
+      const albumId = await lookupParent('video_album_items', 'album_id')
+      if (!albumId) { Alert.alert('Not found', 'This video may have been deleted.'); return }
+      router.push({ pathname: '/(tabs)/community/video-album/[id]' as any, params: { id: albumId } })
+      return
+    }
+    Alert.alert('Unsupported', `No viewer is wired up for content type: ${t}`)
   }
 
   if (loading) {
@@ -108,37 +248,63 @@ export default function ReportsScreen() {
     )
   }
 
+  const visible = reports.filter(r => filter === 'pending' ? r.status === 'pending' : r.status !== 'pending')
+  const pendingCount = reports.filter(r => r.status === 'pending').length
+  const resolvedCount = reports.length - pendingCount
+
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
       <PurpleHeader title="Flagged Content" showBack />
 
-      {reports.length === 0 ? (
+      {/* Pending / Resolved toggle */}
+      <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e5e5ea' }}>
+        <View style={{ flexDirection: 'row', backgroundColor: '#e5e5ea', borderRadius: 10, padding: 3, gap: 3 }}>
+          {(['pending', 'resolved'] as const).map(opt => {
+            const count = opt === 'pending' ? pendingCount : resolvedCount
+            return (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => setFilter(opt)}
+                style={{
+                  flex: 1, paddingVertical: 9, borderRadius: 7, alignItems: 'center',
+                  backgroundColor: filter === opt ? '#2d1b69' : '#ffffff',
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '600', color: filter === opt ? '#ffffff' : '#374151' }}>
+                  {opt === 'pending' ? '🕒  Pending' : '✅  Resolved'}{count ? `  (${count})` : ''}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+      </View>
+
+      {visible.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <Text style={{ fontSize: 48, marginBottom: 12 }}>🏳️</Text>
-          <Text style={{ fontSize: 17, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No reports</Text>
+          <Text style={{ fontSize: 48, marginBottom: 12 }}>{filter === 'pending' ? '🏳️' : '🗂️'}</Text>
+          <Text style={{ fontSize: 17, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>
+            {filter === 'pending' ? 'No pending reports' : 'No resolved reports yet'}
+          </Text>
           <Text style={{ fontSize: 13, color: '#8e8e93', textAlign: 'center' }}>
-            All clear — no content has been flagged by members.
+            {filter === 'pending'
+              ? 'All clear — no content is awaiting review.'
+              : 'Reports you act on will appear here as an audit trail.'}
           </Text>
         </View>
       ) : (
         <FlatList
-          data={reports}
+          data={visible}
           keyExtractor={r => r.id}
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: insets.bottom + 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
-          ListHeaderComponent={
-            <View style={{ marginBottom: 6 }}>
-              <Text style={{ fontSize: 13, color: '#6b7280' }}>
-                {reports.length} report{reports.length !== 1 ? 's' : ''} awaiting review
-              </Text>
-            </View>
-          }
           renderItem={({ item }) => {
             const meta = TYPE_LABEL[item.content_type] ?? { label: item.content_type, emoji: '⚑' }
             const bgColor = TYPE_COLOR[item.content_type] ?? '#f3f4f6'
             const reporter = item.reporter
               ? `${item.reporter.first_name} ${item.reporter.last_name}`
               : 'Unknown member'
+            const statusMeta = STATUS_LABEL[item.status]
+            const resolver = item.resolver ? `${item.resolver.first_name} ${item.resolver.last_name}` : 'an admin'
 
             return (
               <View style={{
@@ -151,19 +317,39 @@ export default function ReportsScreen() {
                 <View style={{ backgroundColor: bgColor, paddingHorizontal: 14, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={{ fontSize: 14 }}>{meta.emoji}</Text>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>{meta.label}</Text>
-                  <Text style={{ fontSize: 11, color: '#9ca3af', marginLeft: 'auto' }}>{timeAgo(item.created_at)}</Text>
+                  <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ backgroundColor: statusMeta.bg, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: statusMeta.color, textTransform: 'uppercase', letterSpacing: 0.3 }}>{statusMeta.label}</Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: '#9ca3af' }}>{timeAgo(item.created_at)}</Text>
+                  </View>
                 </View>
 
                 <View style={{ padding: 14 }}>
-                  {/* Reason */}
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
-                    <Text style={{ fontSize: 13, color: '#6b7280', width: 64, flexShrink: 0 }}>Reason</Text>
+                    <Text style={{ fontSize: 13, color: '#6b7280', width: 84, flexShrink: 0 }}>Reason</Text>
                     <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#ef4444' }}>{item.reason}</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 14 }}>
-                    <Text style={{ fontSize: 13, color: '#6b7280', width: 64, flexShrink: 0 }}>Reported by</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: item.status === 'pending' ? 14 : 8 }}>
+                    <Text style={{ fontSize: 13, color: '#6b7280', width: 84, flexShrink: 0 }}>Reported by</Text>
                     <Text style={{ flex: 1, fontSize: 13, color: '#374151' }}>{reporter}</Text>
                   </View>
+
+                  {/* Resolution details (resolved tab only) */}
+                  {item.status !== 'pending' && item.resolved_at ? (
+                    <>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+                        <Text style={{ fontSize: 13, color: '#6b7280', width: 84, flexShrink: 0 }}>Resolved by</Text>
+                        <Text style={{ flex: 1, fontSize: 13, color: '#374151' }}>{resolver} · {timeAgo(item.resolved_at)}</Text>
+                      </View>
+                      {item.action_notes ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 14 }}>
+                          <Text style={{ fontSize: 13, color: '#6b7280', width: 84, flexShrink: 0 }}>Notes</Text>
+                          <Text style={{ flex: 1, fontSize: 13, color: '#374151', lineHeight: 18 }}>{item.action_notes}</Text>
+                        </View>
+                      ) : <View style={{ height: 14 }} />}
+                    </>
+                  ) : null}
 
                   {/* Actions */}
                   <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -176,15 +362,27 @@ export default function ReportsScreen() {
                     >
                       <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>View Content</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => dismiss(item.id)}
-                      style={{
-                        flex: 1, backgroundColor: '#f3f4f6', borderRadius: 10,
-                        paddingVertical: 10, alignItems: 'center',
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#6b7280' }}>Dismiss</Text>
-                    </TouchableOpacity>
+                    {item.status === 'pending' ? (
+                      <TouchableOpacity
+                        onPress={() => setActionTarget(item)}
+                        style={{
+                          flex: 1, backgroundColor: '#ef4444', borderRadius: 10,
+                          paddingVertical: 10, alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Take Action</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => setActionTarget(item)}
+                        style={{
+                          flex: 1, backgroundColor: '#f3f4f6', borderRadius: 10,
+                          paddingVertical: 10, alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: '#6b7280' }}>Update Action</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
@@ -192,6 +390,127 @@ export default function ReportsScreen() {
           }}
         />
       )}
+
+      {actionTarget && (
+        <ActionModal
+          report={actionTarget}
+          onClose={() => setActionTarget(null)}
+          onApply={applyAction}
+        />
+      )}
     </View>
+  )
+}
+
+// ── Action modal ─────────────────────────────────────────────────────────────
+function ActionModal({
+  report, onClose, onApply,
+}: {
+  report: Report
+  onClose: () => void
+  onApply: (report: Report, status: ReportStatus, notes: string) => Promise<void>
+}) {
+  const insets = useSafeAreaInsets()
+  const [choice, setChoice] = useState<ReportStatus | null>(
+    report.status !== 'pending' ? report.status : null
+  )
+  const [notes, setNotes] = useState(report.action_notes ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const options: Array<{ key: ReportStatus; title: string; desc: string; tint: string }> = [
+    {
+      key: 'reviewed_ok',
+      title: '✅  Reviewed — no action needed',
+      desc: 'The content complies with the Bazidpur Community Guidelines. The reporter is emailed to let them know no action was taken.',
+      tint: '#065f46',
+    },
+    {
+      key: 'warning_sent',
+      title: '⚠️  Send a warning to the member',
+      desc: 'The content breaches our guidelines but does not warrant suspension. The reporter is emailed that we agreed and issued a warning.',
+      tint: '#9a3412',
+    },
+    {
+      key: 'suspended',
+      title: '🚫  Suspend the member',
+      desc: 'The member is suspended and signed out. Use for repeat or severe breaches. The reporter is emailed that we agreed and suspended the member.',
+      tint: '#991b1b',
+    },
+  ]
+
+  async function submit() {
+    if (!choice) { Alert.alert('Choose an action', 'Pick one of the three options to record what you did.'); return }
+    setSaving(true)
+    try { await onApply(report, choice, notes) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: '#fff' }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          paddingTop: insets.top + 12, paddingBottom: 14, paddingHorizontal: 20,
+          borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+        }}>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={{ fontSize: 15, color: '#6b7280' }}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Record Action</Text>
+          <TouchableOpacity onPress={submit} disabled={saving || !choice}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: saving || !choice ? '#9ca3af' : '#2d1b69' }}>
+              {saving ? 'Saving…' : 'Save'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 12 }}>
+          <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 19, marginBottom: 4 }}>
+            Choose the action you took on this report. Your name and the timestamp are saved as an audit trail.
+          </Text>
+
+          {options.map(opt => {
+            const selected = choice === opt.key
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                onPress={() => setChoice(opt.key)}
+                style={{
+                  borderWidth: 2, borderRadius: 12, padding: 14,
+                  borderColor: selected ? opt.tint : '#e5e7eb',
+                  backgroundColor: selected ? `${opt.tint}10` : '#ffffff',
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: selected ? opt.tint : '#1c1c1e', marginBottom: 4 }}>
+                  {opt.title}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18 }}>{opt.desc}</Text>
+              </TouchableOpacity>
+            )
+          })}
+
+          <View style={{ marginTop: 8 }}>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Notes (optional)
+            </Text>
+            <TextInput
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="e.g. Member already given a verbal reminder last month. Sent follow-up email today."
+              placeholderTextColor="#9ca3af"
+              style={{
+                fontSize: 14, color: '#111827', borderWidth: 1, borderColor: '#e5e7eb',
+                borderRadius: 10, padding: 12, minHeight: 100, textAlignVertical: 'top',
+              }}
+              multiline
+              maxLength={2000}
+            />
+            <Text style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+              Visible to admins only. Used for follow-up if this member is reported again.
+            </Text>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
   )
 }

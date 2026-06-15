@@ -7,6 +7,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
+import { CuratedNotice } from '@/components/CuratedNotice'
 import { ReportButton } from '@/components/ReportButton'
 import type { Poetry, PoetryVerse } from '@/lib/types'
 
@@ -186,6 +187,8 @@ export default function PoetryScreen() {
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
 
       <PurpleHeader title="Rhymes & Roots" showBack />
+
+      <CuratedNotice message="Verses and ghazals curated and published by the Bazidpur admin team." />
 
       {/* iOS Segmented Control */}
       <View style={{ backgroundColor: '#f2f2f7', paddingHorizontal: 16, paddingVertical: 10 }}>

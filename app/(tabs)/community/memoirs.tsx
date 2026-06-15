@@ -7,6 +7,7 @@ import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
+import { CuratedNotice } from '@/components/CuratedNotice'
 import { ReportButton } from '@/components/ReportButton'
 import type { Experience } from '@/lib/types'
 
@@ -80,6 +81,7 @@ export default function MemoirsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
       <PurpleHeader title="Memoirs" showBack />
+      <CuratedNotice message="Stories collected and published by the Bazidpur admin team." />
     <FlatList
       data={experiences}
       keyExtractor={e => e.id}

@@ -13,7 +13,9 @@ import { RoleBadge } from '@/components/RoleBadge'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { supabase } from '@/lib/supabase'
 
-const API = 'https://bazidpur.com/api'
+// Use the www. host explicitly — the apex 308-redirects to www and iOS
+// NSURLSession hangs on 308 redirects for POST-with-body.
+const API = 'https://www.bazidpur.com/api'
 const R2  = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
 
 function resolveUri(url?: string | null) {
@@ -297,6 +299,19 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Community Guidelines */}
+          <TouchableOpacity
+            onPress={() => router.push('/(public)/community-guidelines')}
+            style={{
+              backgroundColor: '#fff', borderRadius: 12,
+              paddingVertical: 15, alignItems: 'center', marginBottom: 12,
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Community Guidelines</Text>
+          </TouchableOpacity>
+
           {/* Privacy Policy */}
           <TouchableOpacity
             onPress={() => router.push('/(public)/privacy-policy')}
@@ -308,6 +323,45 @@ export default function ProfileScreen() {
             }}
           >
             <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Privacy Policy</Text>
+          </TouchableOpacity>
+
+          {/* Notifications inbox */}
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/notifications' as any)}
+            style={{
+              backgroundColor: '#fff', borderRadius: 12,
+              paddingVertical: 15, alignItems: 'center', marginBottom: 12,
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Notifications</Text>
+          </TouchableOpacity>
+
+          {/* Notification settings */}
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/notification-settings' as any)}
+            style={{
+              backgroundColor: '#fff', borderRadius: 12,
+              paddingVertical: 15, alignItems: 'center', marginBottom: 12,
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Notification Settings</Text>
+          </TouchableOpacity>
+
+          {/* Blocked Members */}
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/blocked-users' as any)}
+            style={{
+              backgroundColor: '#fff', borderRadius: 12,
+              paddingVertical: 15, alignItems: 'center', marginBottom: 12,
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Blocked Members</Text>
           </TouchableOpacity>
 
           {/* Sign out */}

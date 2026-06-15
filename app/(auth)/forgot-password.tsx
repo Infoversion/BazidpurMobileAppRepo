@@ -1,28 +1,43 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
 import { router } from 'expo-router'
-import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleReset() {
-    if (!email) {
-      Alert.alert('Enter your email', 'Please enter the email address on your account.')
+    setError('')
+    if (!email.trim()) {
+      setError('Please enter the email address on your account.')
       return
     }
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: 'bazidpur://reset-password',
-    })
-    setLoading(false)
-    if (error) {
-      Alert.alert('Error', error.message)
-    } else {
-      setSent(true)
+    try {
+      // Use the bazidpur.com endpoint so the reset email comes from
+      // support@bazidpur.com (not the bare Supabase Auth template) and the
+      // reset link lands on the web reset-password page in the user's browser.
+      // Explicit https://www. host avoids the iOS 308-redirect POST hang.
+      const res = await fetch('https://www.bazidpur.com/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // Web API returns specific reasons: no_account / unverified / suspended.
+        // body.error is human-readable copy ready to show in the banner.
+        setError(body?.error ?? 'Could not send the reset email. Please try again in a moment.')
+      } else {
+        setSent(true)
+      }
+    } catch (e: any) {
+      setError(e?.message ? `Network error: ${e.message}` : 'Network error. Please check your connection and try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -35,8 +50,11 @@ export default function ForgotPasswordScreen() {
             <Text style={{ fontSize: 28 }}>✓</Text>
           </View>
           <Text style={{ fontSize: 24, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 10 }}>Check your email</Text>
-          <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 22, marginBottom: 32 }}>
-            We sent a password reset link to {email}
+          <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 22, marginBottom: 12 }}>
+            We&apos;ve sent a password reset link to {email}.
+          </Text>
+          <Text style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', lineHeight: 20, marginBottom: 32 }}>
+            Tap the link in the email to open the reset page in your browser. The link is valid for one hour. Once your password is updated, return here and sign in.
           </Text>
           <TouchableOpacity
             onPress={() => router.back()}
@@ -64,14 +82,30 @@ export default function ForgotPasswordScreen() {
           Enter your account email and we'll send you a reset link.
         </Text>
 
+        {error ? (
+          <View style={{
+            backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca',
+            borderRadius: 12, padding: 14, marginBottom: 16,
+            flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+          }}>
+            <Text style={{ fontSize: 16, marginTop: 1 }}>⚠️</Text>
+            <Text style={{ flex: 1, fontSize: 13, color: '#b91c1c', lineHeight: 20 }}>{error}</Text>
+          </View>
+        ) : null}
+
         <View style={{ marginBottom: 20 }}>
           <Text style={{ fontSize: 13, fontWeight: '500', color: '#374151', marginBottom: 6 }}>Email</Text>
           <TextInput
-            style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 14, paddingTop: 13, paddingBottom: 15, fontSize: 17, color: '#111827' }}
+            style={{
+              backgroundColor: '#fff',
+              borderWidth: 1, borderColor: error ? '#fca5a5' : '#e5e7eb',
+              borderRadius: 12, paddingHorizontal: 14, paddingTop: 13, paddingBottom: 15,
+              fontSize: 17, color: '#111827',
+            }}
             placeholder="you@example.com"
             placeholderTextColor="#9ca3af"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(v) => { setEmail(v); if (error) setError('') }}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}

@@ -11,7 +11,9 @@ import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import { supabase } from '@/lib/supabase'
 
-const WEB = 'https://bazidpur.com'
+// Use the www. host explicitly — the apex 308-redirects to www and iOS
+// NSURLSession hangs on 308 redirects for POST-with-body.
+const WEB = 'https://www.bazidpur.com'
 const R2  = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
 
 interface Book {

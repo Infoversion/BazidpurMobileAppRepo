@@ -12,7 +12,7 @@ import { usePathname } from 'expo-router'
 import type { Session } from '@supabase/supabase-js'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
-const HIDDEN = new Set(['index', 'contact', 'tree', 'lineage', 'more', 'admin'])
+const HIDDEN = new Set(['index', 'contact', 'tree', 'lineage', 'more', 'admin', 'blocked-users', 'notifications', 'notification-settings'])
 
 function getSubScreenIcon(pathname: string): string | null {
   if (pathname.includes('/community/gallery') || pathname.includes('/community/album')) return '🖼️'
@@ -383,6 +383,9 @@ export default function TabLayout() {
       <Tabs.Screen name="lineage" options={{ href: null }} />
       <Tabs.Screen name="more"    options={{ href: null }} />
       <Tabs.Screen name="admin"   options={{ href: null }} />
+      <Tabs.Screen name="blocked-users" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="notification-settings" options={{ href: null }} />
     </Tabs>
   )
 }

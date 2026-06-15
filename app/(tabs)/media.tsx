@@ -10,6 +10,7 @@ import type { Photo, Video } from '@/lib/types'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import VideoPlayer from '@/components/gallery/VideoPlayer'
 import { PurpleHeader } from '@/components/PurpleHeader'
+import { CuratedNotice } from '@/components/CuratedNotice'
 
 const PAGE_SIZE = 20
 
@@ -228,6 +229,8 @@ export default function TimelessMomentsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
       <PurpleHeader title="Media" />
+
+      <CuratedNotice message="A curated selection of photos and videos from the Bazidpur admin team." />
 
       {/* Segmented control sub-bar */}
       <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 10 }}>

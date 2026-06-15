@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { ReportButton } from '@/components/ReportButton'
+import { useBlockedUsers, confirmBlockUser } from '@/components/BlockUserButton'
 import { AttachmentPicker, type Attachment } from '@/components/forum/AttachmentPicker'
 import { AttachmentDisplay } from '@/components/forum/AttachmentDisplay'
 import type { ForumThread } from '@/lib/types'
@@ -195,10 +196,12 @@ function ForumGuide() {
 
 export default function ForumScreen() {
   const insets = useSafeAreaInsets()
+  const { session } = useAuth()
   const [threads, setThreads] = useState<ForumThread[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const { isBlocked, refresh: refreshBlocks } = useBlockedUsers()
 
   async function load() {
     const { data: threads } = await supabase
@@ -243,7 +246,7 @@ export default function ForumScreen() {
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
       <PurpleHeader title="The Forum" showBack />
       <FlatList
-        data={threads}
+        data={threads.filter(t => !isBlocked(t.author_id))}
         keyExtractor={t => t.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
         contentContainerStyle={{ padding: 12, gap: 8, paddingBottom: 90 }}
@@ -254,6 +257,15 @@ export default function ForumScreen() {
           return (
             <Pressable
               onPress={() => router.push({ pathname: '/(tabs)/community/forum/[id]' as any, params: { id: item.id } })}
+              onLongPress={() => {
+                if (!session || item.author_id === session.user.id) return
+                confirmBlockUser({
+                  blockerId: session.user.id,
+                  userId: item.author_id,
+                  userName: authorName,
+                  onBlocked: refreshBlocks,
+                })
+              }}
               style={({ pressed }) => ({
                 backgroundColor: pressed ? '#f5f5f5' : '#ffffff',
                 borderRadius: 16, paddingHorizontal: 14, paddingVertical: 14,

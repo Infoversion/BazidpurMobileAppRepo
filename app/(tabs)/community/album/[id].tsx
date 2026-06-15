@@ -13,6 +13,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
+import { ReportButton } from '@/components/ReportButton'
 import type { AlbumPhoto, Album, Photo } from '@/lib/types'
 
 const R2    = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -282,7 +283,10 @@ export default function AlbumScreen() {
       } catch { /* fall back to original URI */ }
 
       const mimeType = 'image/jpeg'
-      const url = `https://bazidpur.com/api/albums/${id}/photos?_t=${encodeURIComponent(session.access_token)}`
+      // Explicit www. host — apex 308-redirects to www; FileSystem.createUploadTask
+      // happens to follow that redirect today, but keeping the chain to a single
+      // hop is defensive (matches every other mobile endpoint).
+      const url = `https://www.bazidpur.com/api/albums/${id}/photos?_t=${encodeURIComponent(session.access_token)}`
 
       const task = FileSystem.createUploadTask(
         url, uploadUri,
@@ -372,7 +376,7 @@ export default function AlbumScreen() {
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
       <Stack.Screen options={{
         title: album?.title || 'Album',
-        headerRight: canManage ? () => (
+        headerRight: () => (
           <View style={{ flexDirection: 'row', gap: 4 }}>
             <TouchableOpacity
               onPress={shareAlbum}
@@ -381,26 +385,20 @@ export default function AlbumScreen() {
             >
               <Text style={{ fontSize: 17 }}>🔗</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setManageMode(m => !m)}
-              style={{
-                paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
-                backgroundColor: manageMode ? '#2d1b69' : '#f3f4f6',
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '600', color: manageMode ? '#fff' : '#374151' }}>
-                {manageMode ? 'Done' : 'Manage'}
-              </Text>
-            </TouchableOpacity>
+            {canManage && (
+              <TouchableOpacity
+                onPress={() => setManageMode(m => !m)}
+                style={{
+                  paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+                  backgroundColor: manageMode ? '#2d1b69' : '#f3f4f6',
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '600', color: manageMode ? '#fff' : '#374151' }}>
+                  {manageMode ? 'Done' : 'Manage'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
-        ) : () => (
-          <TouchableOpacity
-            onPress={shareAlbum}
-            style={{ padding: 8 }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={{ fontSize: 17 }}>🔗</Text>
-          </TouchableOpacity>
         ),
       }} />
 
@@ -418,10 +416,19 @@ export default function AlbumScreen() {
           ListHeaderComponent={
             <>
               {/* Album info */}
-              {(album?.description || author || manageMode) ? (
+              {(album?.description || author || manageMode || !isOwner) ? (
                 <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
-                  {author ? <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 4 }}>by {author}</Text> : null}
-                  {album?.description ? <Text style={{ fontSize: 14, color: '#374151', lineHeight: 20 }}>{album.description}</Text> : null}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1 }}>
+                      {author ? <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 4 }}>by {author}</Text> : null}
+                      {album?.description ? <Text style={{ fontSize: 14, color: '#374151', lineHeight: 20 }}>{album.description}</Text> : null}
+                    </View>
+                    {!isOwner && album ? (
+                      <View style={{ paddingLeft: 12, paddingTop: 2 }}>
+                        <ReportButton contentType="photo_album" contentId={album.id} size="sm" />
+                      </View>
+                    ) : null}
+                  </View>
                   {album?.is_hidden ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
                       <View style={{ backgroundColor: '#fef3c7', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -623,9 +630,10 @@ export default function AlbumScreen() {
 
       {uploadProgress !== null && (
         <View style={{
-          position: 'absolute', left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.75)', padding: 20,
+          position: 'absolute', left: 0, right: 0, top: insets.top,
+          backgroundColor: 'rgba(0,0,0,0.85)', paddingHorizontal: 20, paddingVertical: 14,
           flexDirection: 'row', alignItems: 'center', gap: 14,
+          zIndex: 1000, elevation: 10,
         }}>
           <ActivityIndicator color="#fff" />
           <View style={{ flex: 1 }}>

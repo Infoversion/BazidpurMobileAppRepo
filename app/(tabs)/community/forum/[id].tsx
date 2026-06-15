@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { ReportButton } from '@/components/ReportButton'
+import { useBlockedUsers, confirmBlockUser } from '@/components/BlockUserButton'
 import { AttachmentPicker, type Attachment } from '@/components/forum/AttachmentPicker'
 import { AttachmentDisplay } from '@/components/forum/AttachmentDisplay'
 import type { ForumThread, ForumReply } from '@/lib/types'
@@ -71,6 +72,7 @@ export default function ThreadScreen() {
 
   const [thread, setThread] = useState<ForumThread | null>(null)
   const [replies, setReplies] = useState<ReplyWithAuthor[]>([])
+  const { isBlocked, refresh: refreshBlocks } = useBlockedUsers()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [replyText, setReplyText] = useState('')
@@ -146,7 +148,7 @@ export default function ThreadScreen() {
           reply_id: data.id,
           uploader_id: session.user.id,
           url: replyAttachment.url,
-          filename: replyAttachment.filename ?? null,
+          filename: replyAttachment.filename ?? replyAttachment.type,
           media_type: mobileTypeToMediaType(replyAttachment.type),
           file_size: 0,
         }).select('id, thread_id, reply_id, url, filename, media_type').single()
@@ -157,6 +159,28 @@ export default function ThreadScreen() {
       setReplyText('')
       setReplyAttachment(null)
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100)
+
+      // Fire-and-forget: notify the thread's author (if it isn't the same person)
+      // via the web server, which checks their notification preferences and
+      // dispatches the push + inbox row.
+      if (thread && thread.author_id && thread.author_id !== session.user.id) {
+        const myName = user?.first_name
+          ? `${user.first_name}${user.last_name ? ' ' + user.last_name : ''}`
+          : 'A member'
+        fetch('https://www.bazidpur.com/api/notifications/dispatch-forum-reply', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            thread_id: id,
+            reply_id: data.id,
+            replier_name: myName,
+            snippet: (replyText.trim() || 'sent an attachment').slice(0, 140),
+          }),
+        }).catch(() => { /* silent — reply already saved */ })
+      }
     }
     setSubmitting(false)
   }
@@ -194,12 +218,24 @@ export default function ThreadScreen() {
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <Avatar author={thread.author} />
-        <View style={{ flex: 1 }}>
+        <Pressable
+          style={{ flex: 1 }}
+          onLongPress={() => {
+            if (!session || thread.author_id === session.user.id) return
+            const name = thread.author ? `${thread.author.first_name} ${thread.author.last_name}` : undefined
+            confirmBlockUser({
+              blockerId: session.user.id,
+              userId: thread.author_id,
+              userName: name,
+              onBlocked: refreshBlocks,
+            })
+          }}
+        >
           <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }}>
             {thread.author ? `${thread.author.first_name} ${thread.author.last_name}` : 'Member'}
           </Text>
           <Text style={{ fontSize: 11, color: '#9ca3af' }}>{timeAgo(thread.created_at)}</Text>
-        </View>
+        </Pressable>
         <ReportButton contentType="thread" contentId={thread.id} />
       </View>
       {thread.body ? (
@@ -231,7 +267,7 @@ export default function ThreadScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
         <FlatList
           ref={listRef}
-          data={replies}
+          data={replies.filter(r => !isBlocked(r.author_id))}
           keyExtractor={r => r.id}
           refreshing={refreshing}
           onRefresh={onRefresh}
@@ -253,9 +289,22 @@ export default function ThreadScreen() {
                 <Avatar author={item.author} />
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#1c1c1e' }}>
-                      {item.author ? `${item.author.first_name} ${item.author.last_name}` : 'Member'}
-                    </Text>
+                    <Pressable
+                      onLongPress={() => {
+                        if (!session || isOwn) return
+                        const name = item.author ? `${item.author.first_name} ${item.author.last_name}` : undefined
+                        confirmBlockUser({
+                          blockerId: session.user.id,
+                          userId: item.author_id,
+                          userName: name,
+                          onBlocked: refreshBlocks,
+                        })
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#1c1c1e' }}>
+                        {item.author ? `${item.author.first_name} ${item.author.last_name}` : 'Member'}
+                      </Text>
+                    </Pressable>
                     <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{timeAgo(item.created_at)}</Text>
                     <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       {!isOwn && <ReportButton contentType="reply" contentId={item.id} />}

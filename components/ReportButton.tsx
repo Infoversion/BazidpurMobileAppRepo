@@ -11,11 +11,21 @@ const REASONS = [
 ]
 
 interface Props {
-  contentType: 'thread' | 'reply' | 'poem' | 'memoir'
+  contentType:
+    | 'thread'
+    | 'reply'
+    | 'poem'
+    | 'memoir'
+    | 'photo_album'
+    | 'album_photo'
+    | 'video_album'
+    | 'video_album_item'
   contentId: string
+  /** Optional size tweak — useful for compact spots like grid overlays. */
+  size?: 'sm' | 'md'
 }
 
-export function ReportButton({ contentType, contentId }: Props) {
+export function ReportButton({ contentType, contentId, size = 'md' }: Props) {
   const { session } = useAuth()
 
   if (!session) return null
@@ -23,7 +33,7 @@ export function ReportButton({ contentType, contentId }: Props) {
   function onPress() {
     Alert.alert(
       'Report Content',
-      'Why are you reporting this?',
+      'Why are you reporting this? Our team reviews reports within 24 hours.',
       [
         ...REASONS.map(reason => ({
           text: reason,
@@ -34,7 +44,7 @@ export function ReportButton({ contentType, contentId }: Props) {
               content_id: contentId,
               reason,
             })
-            Alert.alert('Report submitted', 'Thank you. Our team will review this content.')
+            Alert.alert('Report submitted', 'Thank you. Our team will review this content within 24 hours.')
           },
         })),
         { text: 'Cancel', style: 'cancel' },
@@ -47,7 +57,7 @@ export function ReportButton({ contentType, contentId }: Props) {
       onPress={onPress}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <Text style={{ fontSize: 18, color: '#ef4444' }}>⚑</Text>
+      <Text style={{ fontSize: size === 'sm' ? 20 : 26, color: '#ef4444' }}>⚑</Text>
     </TouchableOpacity>
   )
 }

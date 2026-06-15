@@ -82,6 +82,7 @@ export default function SignupScreen() {
       link_to_bazidpur: form.linkToBazidpur.trim(),
       role: 'pending',
       privacy_policy_accepted_at: new Date().toISOString(),
+      community_guidelines_accepted_at: new Date().toISOString(),
     })
 
     setLoading(false)
@@ -90,8 +91,10 @@ export default function SignupScreen() {
       await supabase.auth.signOut()
       setError('Your account was created but we couldn\'t save your profile. Please contact us and we\'ll sort it out straight away.')
     } else {
-      // Send welcome + admin notification emails (non-blocking)
-      fetch('https://bazidpur.com/api/signup-notification', {
+      // Send welcome + admin notification emails (non-blocking).
+      // Explicit www. host — the apex 308-redirects to www and iOS
+      // NSURLSession does not follow 308 on POST with body (it hangs).
+      fetch('https://www.bazidpur.com/api/signup-notification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -396,6 +399,13 @@ export default function SignupScreen() {
               onPress={() => router.push('/(public)/privacy-policy')}
             >
               Privacy Policy
+            </Text>
+            {' '}and{' '}
+            <Text
+              style={{ color: '#2d1b69', fontWeight: '600' }}
+              onPress={() => router.push('/(public)/community-guidelines')}
+            >
+              Community Guidelines
             </Text>
           </Text>
         </TouchableOpacity>

@@ -14,7 +14,8 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Used to update your profile photo and attach images to forum posts.",
         "NSPhotoLibraryAddUsageDescription": "Used to save photos from the app.",
-        "NSMicrophoneUsageDescription": "Used to record audio messages in The Forum."
+        "NSMicrophoneUsageDescription": "Used to record audio messages in The Forum.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -46,7 +47,14 @@
       "expo-font",
       "expo-secure-store",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#2d1b69"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

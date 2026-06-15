@@ -499,7 +499,7 @@ export default function MediaAdminScreen() {
           }
 
           const newPhoto = await webApiUpload(
-            'https://bazidpur.com/api/photos',
+            'https://www.bazidpur.com/api/photos',
             uri,
             { title: form.title.trim(), description: form.description.trim(), display_order: order + i },
             (pct, label) => setUploadState({ current: i + 1, total: form.images.length, pct, label })

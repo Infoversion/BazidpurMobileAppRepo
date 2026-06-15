@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import VideoPlayer from '@/components/gallery/VideoPlayer'
 import { PurpleHeader } from '@/components/PurpleHeader'
+import { CuratedNotice } from '@/components/CuratedNotice'
 import type { Photo, Video } from '@/lib/types'
 
 const PAGE_SIZE = 40
@@ -231,6 +232,8 @@ export default function TimelessMomentsScreen() {
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
 
       <PurpleHeader title="Timeless Moments" showBack />
+
+      <CuratedNotice message="A curated collection of moments selected by the Bazidpur admin team." />
 
       {/* Segmented control sub-bar */}
       <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e5e5ea' }}>

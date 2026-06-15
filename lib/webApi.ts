@@ -1,6 +1,9 @@
 import { supabase } from './supabase'
 
-export const WEB = 'https://bazidpur.com'
+// Use the www. host explicitly — the apex 308-redirects to www and iOS
+// NSURLSession hangs on 308 redirects for POST-with-body. Keeping the
+// chain to a single hop fixes that and is harmless for GETs.
+export const WEB = 'https://www.bazidpur.com'
 
 export async function webAPI(
   path: string,
