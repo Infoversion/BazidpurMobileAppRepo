@@ -8,7 +8,12 @@ import * as ImagePicker from 'expo-image-picker'
 import * as ImageManipulator from 'expo-image-manipulator'
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
-import { Audio } from 'expo-av'
+import {
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioRecorder,
+} from 'expo-audio'
 import { supabase } from '@/lib/supabase'
 
 const API = 'https://www.bazidpur.com/api'
@@ -52,6 +57,20 @@ async function uploadFile(localUri: string, uploadUrl: string, contentType: stri
   })
 }
 
+function audioMimeFromFilename(filename: string | null | undefined, fallback: string | null | undefined): string {
+  const ext = (filename || '').toLowerCase().split('.').pop() || ''
+  switch (ext) {
+    case 'mp3':  return 'audio/mpeg'
+    case 'wav':  return 'audio/wav'
+    case 'ogg':  return 'audio/ogg'
+    case 'webm': return 'audio/webm'
+    case 'm4a':
+    case 'aac':
+    case 'mp4':  return 'audio/mp4'
+    default:     return fallback || 'audio/mp4'
+  }
+}
+
 interface Props {
   value: Attachment | null
   onChange: (a: Attachment | null) => void
@@ -59,7 +78,11 @@ interface Props {
 
 export function AttachmentPicker({ value, onChange }: Props) {
   const [uploading, setUploading] = useState(false)
-  const [recording, setRecording] = useState<Audio.Recording | null>(null)
+  // expo-audio uses a hook-based recorder. The boolean flag tells the rest of
+  // the component when a recording session is active (replaces the old
+  // Audio.Recording state object).
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
+  const [isRecording, setIsRecording] = useState(false)
   const [recordSecs, setRecordSecs] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [ytModal, setYtModal] = useState(false)
@@ -108,7 +131,7 @@ export function AttachmentPicker({ value, onChange }: Props) {
     try {
       const token = await getToken()
       const filename = (asset.name || `audio_${Date.now()}.m4a`).replace(/[^a-zA-Z0-9._-]/g, '_')
-      const ct = asset.mimeType || 'audio/mp4'
+      const ct = audioMimeFromFilename(filename, asset.mimeType)
       const { uploadUrl, publicUrl } = await presign(token, 'audio', filename, ct)
       await uploadFile(asset.uri, uploadUrl, ct)
       onChange({ type: 'audio', url: publicUrl, filename: asset.name })
@@ -142,11 +165,12 @@ export function AttachmentPicker({ value, onChange }: Props) {
 
   async function startRecording() {
     try {
-      const { granted } = await Audio.requestPermissionsAsync()
+      const { granted } = await AudioModule.requestRecordingPermissionsAsync()
       if (!granted) { Alert.alert('Permission needed', 'Allow microphone access to record audio.'); return }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true })
-      const { recording: rec } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY)
-      setRecording(rec)
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
+      await recorder.prepareToRecordAsync()
+      recorder.record()
+      setIsRecording(true)
       setRecordSecs(0)
       timerRef.current = setInterval(() => setRecordSecs(s => s + 1), 1000)
     } catch (e: any) {
@@ -155,13 +179,13 @@ export function AttachmentPicker({ value, onChange }: Props) {
   }
 
   async function stopRecording() {
-    if (!recording) return
+    if (!isRecording) return
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
     try {
-      await recording.stopAndUnloadAsync()
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false })
-      const uri = recording.getURI()
-      setRecording(null)
+      await recorder.stop()
+      await setAudioModeAsync({ allowsRecording: false })
+      const uri = recorder.uri
+      setIsRecording(false)
       if (!uri) return
       setUploading(true)
       const token = await getToken()
@@ -195,7 +219,7 @@ export function AttachmentPicker({ value, onChange }: Props) {
     )
   }
 
-  if (recording) {
+  if (isRecording) {
     return (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444' }} />

@@ -80,6 +80,32 @@ export default function ThreadScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [kbVisible, setKbVisible] = useState(false)
+  const [replyingTo, setReplyingTo] = useState<ReplyWithAuthor | null>(null)
+  const [highlightedReplyId, setHighlightedReplyId] = useState<string | null>(null)
+  const replyInputRef = useRef<TextInput>(null)
+
+  function quoteSnippet(r: ReplyWithAuthor | null | undefined): string {
+    if (!r) return '[reply removed]'
+    if (r.is_deleted) return '[reply removed]'
+    if (r.body) return r.body.length > 80 ? r.body.slice(0, 80) + '…' : r.body
+    if (r.media?.[0]) {
+      const t = r.media[0].media_type
+      if (t === 'image') return '📷 Photo'
+      if (t === 'audio') return '🎵 Audio'
+      if (t === 'document') return '📄 Document'
+      if (t === 'youtube') return '▶️ YouTube video'
+    }
+    return '(empty reply)'
+  }
+
+  function scrollToReply(parentId: string) {
+    const visible = replies.filter(r => !isBlocked(r.author_id))
+    const idx = visible.findIndex(r => r.id === parentId)
+    if (idx < 0) return
+    listRef.current?.scrollToIndex({ index: idx, viewPosition: 0.3, animated: true })
+    setHighlightedReplyId(parentId)
+    setTimeout(() => setHighlightedReplyId(curr => curr === parentId ? null : curr), 1500)
+  }
 
   async function load() {
     const [{ data: t }, { data: r }] = await Promise.all([
@@ -90,7 +116,7 @@ export default function ThreadScreen() {
         .single(),
       supabase
         .from('thread_replies')
-        .select('id, thread_id, body, is_deleted, created_at, author_id, author:author_id(first_name, last_name, photo_url)')
+        .select('id, thread_id, body, is_deleted, created_at, author_id, parent_reply_id, author:author_id(first_name, last_name, photo_url)')
         .eq('thread_id', id)
         .eq('is_deleted', false)
         .order('created_at'),
@@ -139,7 +165,8 @@ export default function ThreadScreen() {
       author_id: session.user.id,
       user_id: session.user.id,
       is_deleted: false,
-    }).select('id, thread_id, body, is_deleted, created_at, author_id, author:author_id(first_name, last_name, photo_url)').single()
+      parent_reply_id: replyingTo?.id ?? null,
+    }).select('id, thread_id, body, is_deleted, created_at, author_id, parent_reply_id, author:author_id(first_name, last_name, photo_url)').single()
     if (!error && data) {
       let media: any[] = []
       if (replyAttachment) {
@@ -158,6 +185,7 @@ export default function ThreadScreen() {
       setReplies(prev => [...prev, { ...(data as unknown as ReplyWithAuthor), media }])
       setReplyText('')
       setReplyAttachment(null)
+      setReplyingTo(null)
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100)
 
       // Fire-and-forget: notify the thread's author (if it isn't the same person)
@@ -275,8 +303,18 @@ export default function ThreadScreen() {
           contentContainerStyle={{ paddingBottom: 16 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          onScrollToIndexFailed={info => {
+            // Target row is virtualized off-screen; retry after a frame
+            // with viewPosition centered. If it still fails, give up
+            // silently — the user can scroll manually.
+            setTimeout(() => {
+              listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.3, animated: true })
+            }, 50)
+          }}
           renderItem={({ item }) => {
             const isOwn = item.author_id === session?.user?.id
+            const parent = item.parent_reply_id ? replies.find(p => p.id === item.parent_reply_id) : null
+            const isHighlighted = highlightedReplyId === item.id
             return (
               <View style={{
                 flexDirection: 'row', gap: 10,
@@ -285,6 +323,8 @@ export default function ThreadScreen() {
                 paddingHorizontal: 14, paddingVertical: 12,
                 shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+                borderWidth: isHighlighted ? 2 : 0,
+                borderColor: isHighlighted ? '#2d1b69' : 'transparent',
               }}>
                 <Avatar author={item.author} />
                 <View style={{ flex: 1 }}>
@@ -307,6 +347,14 @@ export default function ThreadScreen() {
                     </Pressable>
                     <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{timeAgo(item.created_at)}</Text>
                     <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Pressable
+                        onPress={() => {
+                          setReplyingTo(item)
+                          setTimeout(() => replyInputRef.current?.focus(), 50)
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#2d1b69', fontWeight: '600' }}>Reply</Text>
+                      </Pressable>
                       {!isOwn && <ReportButton contentType="reply" contentId={item.id} />}
                       {(isOwn || isAdmin) && (
                         <Pressable onPress={() => deleteReply(item.id)}>
@@ -315,6 +363,27 @@ export default function ThreadScreen() {
                       )}
                     </View>
                   </View>
+                  {item.parent_reply_id ? (
+                    <Pressable
+                      onPress={() => scrollToReply(item.parent_reply_id!)}
+                      style={{
+                        marginBottom: 6,
+                        borderLeftWidth: 3, borderLeftColor: '#2d1b69',
+                        backgroundColor: '#f5f3fb',
+                        borderTopRightRadius: 6, borderBottomRightRadius: 6,
+                        paddingHorizontal: 8, paddingVertical: 4,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#2d1b69' }} numberOfLines={1}>
+                        {parent && !parent.is_deleted && parent.author
+                          ? `${parent.author.first_name} ${parent.author.last_name}`
+                          : 'Reply'}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#6b7280' }} numberOfLines={1}>
+                        {quoteSnippet(parent)}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                   {item.body ? (
                     <Text style={{ fontSize: 14, color: '#374151', lineHeight: 21 }}>{item.body}</Text>
                   ) : null}
@@ -338,6 +407,28 @@ export default function ThreadScreen() {
           paddingBottom: kbVisible ? 10 : insets.bottom + 84,
           borderTopWidth: 1, borderTopColor: '#e5e5ea', backgroundColor: '#ffffff',
         }}>
+          {replyingTo ? (
+            <View style={{
+              flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+              marginBottom: 8, marginLeft: 46,
+              borderLeftWidth: 3, borderLeftColor: '#2d1b69',
+              backgroundColor: '#f5f3fb',
+              borderTopRightRadius: 8, borderBottomRightRadius: 8,
+              paddingHorizontal: 10, paddingVertical: 6,
+            }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#2d1b69' }} numberOfLines={1}>
+                  Replying to {replyingTo.author ? `${replyingTo.author.first_name} ${replyingTo.author.last_name}` : 'reply'}
+                </Text>
+                <Text style={{ fontSize: 11, color: '#6b7280' }} numberOfLines={1}>
+                  {quoteSnippet(replyingTo)}
+                </Text>
+              </View>
+              <Pressable onPress={() => setReplyingTo(null)} hitSlop={8}>
+                <Text style={{ fontSize: 14, color: '#9ca3af' }}>✕</Text>
+              </Pressable>
+            </View>
+          ) : null}
           {(showAttachMenu || !!replyAttachment) ? (
             <View style={{ paddingBottom: 8, paddingLeft: 46 }}>
               <AttachmentPicker
@@ -349,9 +440,10 @@ export default function ThreadScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
             <Avatar author={user ? { first_name: user.first_name, last_name: user.last_name, photo_url: user.photo_url } : undefined} />
             <TextInput
+              ref={replyInputRef}
               value={replyText}
               onChangeText={setReplyText}
-              placeholder="Write a reply…"
+              placeholder={replyingTo ? 'Write your reply…' : 'Write a reply…'}
               placeholderTextColor="#9ca3af"
               style={{
                 flex: 1, backgroundColor: '#f3f4f6', borderRadius: 20,

@@ -4,11 +4,11 @@ import {
   ActivityIndicator, useWindowDimensions, RefreshControl,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { WebView } from 'react-native-webview'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import type { Photo, Video } from '@/lib/types'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
-import VideoPlayer from '@/components/gallery/VideoPlayer'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { CuratedNotice } from '@/components/CuratedNotice'
 
@@ -107,13 +107,78 @@ function PhotoGrid({
   )
 }
 
+// ─── Video card (inline player) ────────────────────────────────────────────────
+
+function VideoCard({ item, cardWidth, thumbHeight }: { item: Video; cardWidth: number; thumbHeight: number }) {
+  const [playing, setPlaying] = useState(false)
+  const thumb = item.thumbnail_url
+    || `https://img.youtube.com/vi/${item.youtube_id}/hqdefault.jpg`
+
+  return (
+    <View
+      style={{
+        borderRadius: 16, overflow: 'hidden', backgroundColor: '#ffffff',
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+      }}
+    >
+      {playing ? (
+        <View style={{ width: cardWidth, height: thumbHeight, backgroundColor: '#000' }}>
+          <WebView
+            source={{ uri: `https://www.youtube.com/embed/${item.youtube_id}?autoplay=1&playsinline=1&modestbranding=1&rel=0` }}
+            style={{ height: thumbHeight, width: cardWidth, backgroundColor: '#000' }}
+            allowsFullscreenVideo
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            javaScriptEnabled
+            domStorageEnabled
+          />
+        </View>
+      ) : (
+        <TouchableOpacity onPress={() => setPlaying(true)} activeOpacity={0.85}>
+          <View style={{ position: 'relative' }}>
+            <Image
+              source={{ uri: thumb }}
+              style={{ width: cardWidth, height: thumbHeight }}
+              contentFit="cover"
+            />
+            <View style={{
+              position: 'absolute', inset: 0,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.2)',
+            }}>
+              <View style={{
+                width: 54, height: 54, borderRadius: 27,
+                backgroundColor: 'rgba(0,0,0,0.55)',
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Text style={{ color: '#fff', fontSize: 22, marginLeft: 4 }}>▶</Text>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      )}
+      {/* Info */}
+      <View style={{ padding: 14 }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: '#1c1c1e', marginBottom: 4, lineHeight: 20 }} numberOfLines={2}>
+          {item.title}
+        </Text>
+        {item.description ? (
+          <Text style={{ fontSize: 13, color: '#8e8e93', lineHeight: 18 }} numberOfLines={2}>
+            {item.description}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  )
+}
+
 // ─── Video list ───────────────────────────────────────────────────────────────
 
 function VideoList({
-  videos, onPress, refreshing, onRefresh,
+  videos, refreshing, onRefresh,
 }: {
   videos: Video[]
-  onPress: (video: Video) => void
   refreshing: boolean
   onRefresh: () => void
 }) {
@@ -137,54 +202,9 @@ function VideoList({
       keyExtractor={v => v.id}
       contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 90 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
-      renderItem={({ item }) => {
-        const thumb = item.thumbnail_url
-          || `https://img.youtube.com/vi/${item.youtube_id}/hqdefault.jpg`
-        return (
-          <TouchableOpacity
-            style={{
-              borderRadius: 16, overflow: 'hidden', backgroundColor: '#ffffff',
-              shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
-            }}
-            onPress={() => onPress(item)}
-            activeOpacity={0.85}
-          >
-            {/* Thumbnail */}
-            <View style={{ position: 'relative' }}>
-              <Image
-                source={{ uri: thumb }}
-                style={{ width: cardWidth, height: thumbHeight }}
-                contentFit="cover"
-              />
-              <View style={{
-                position: 'absolute', inset: 0,
-                alignItems: 'center', justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.2)',
-              }}>
-                <View style={{
-                  width: 54, height: 54, borderRadius: 27,
-                  backgroundColor: 'rgba(0,0,0,0.55)',
-                  alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Text style={{ color: '#fff', fontSize: 22, marginLeft: 4 }}>▶</Text>
-                </View>
-              </View>
-            </View>
-            {/* Info */}
-            <View style={{ padding: 14 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#1c1c1e', marginBottom: 4, lineHeight: 20 }} numberOfLines={2}>
-                {item.title}
-              </Text>
-              {item.description ? (
-                <Text style={{ fontSize: 13, color: '#8e8e93', lineHeight: 18 }} numberOfLines={2}>
-                  {item.description}
-                </Text>
-              ) : null}
-            </View>
-          </TouchableOpacity>
-        )
-      }}
+      renderItem={({ item }) => (
+        <VideoCard item={item} cardWidth={cardWidth} thumbHeight={thumbHeight} />
+      )}
     />
   )
 }
@@ -200,7 +220,6 @@ export default function TimelessMomentsScreen() {
   const [refreshing, setRefreshing] = useState(false)
 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
-  const [activeVideo, setActiveVideo] = useState<Video | null>(null)
 
   async function fetchData() {
     const [{ data: p }, { data: v }] = await Promise.all([
@@ -258,7 +277,6 @@ export default function TimelessMomentsScreen() {
           ) : (
             <VideoList
               videos={videos}
-              onPress={setActiveVideo}
               refreshing={refreshing}
               onRefresh={onRefresh}
             />
@@ -271,13 +289,6 @@ export default function TimelessMomentsScreen() {
           photos={photos}
           startIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
-        />
-      )}
-
-      {activeVideo && (
-        <VideoPlayer
-          video={activeVideo}
-          onClose={() => setActiveVideo(null)}
         />
       )}
 

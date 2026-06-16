@@ -5,10 +5,10 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
+import { WebView } from 'react-native-webview'
 import { supabase } from '@/lib/supabase'
 import type { Photo, Video } from '@/lib/types'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
-import VideoPlayer from '@/components/gallery/VideoPlayer'
 import { CuratedNotice } from '@/components/CuratedNotice'
 
 const PAGE_SIZE = 40
@@ -73,12 +73,12 @@ function VideoList({
   videos, onPress, refreshing, onRefresh,
 }: {
   videos: Video[]
-  onPress: (video: Video) => void
   refreshing: boolean
   onRefresh: () => void
 }) {
   const { width } = useWindowDimensions()
-  const thumbHeight = ((width - 32) * 9) / 16
+  const cardWidth = width - 32
+  const thumbHeight = (cardWidth * 9) / 16
 
   if (videos.length === 0) {
     return (
@@ -95,49 +95,67 @@ function VideoList({
       keyExtractor={v => v.id}
       contentContainerStyle={{ padding: 16, gap: 16 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
-      renderItem={({ item }) => {
-        const thumb = item.thumbnail_url
-          || `https://img.youtube.com/vi/${item.youtube_id}/hqdefault.jpg`
-        return (
-          <TouchableOpacity
-            style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: '#f3f4f6' }}
-            onPress={() => onPress(item)}
-            activeOpacity={0.85}
-          >
-            <View style={{ position: 'relative' }}>
-              <Image
-                source={{ uri: thumb }}
-                style={{ width: width - 32, height: thumbHeight }}
-                contentFit="cover"
-              />
+      renderItem={({ item }) => (
+        <PublicVideoCard item={item} cardWidth={cardWidth} thumbHeight={thumbHeight} />
+      )}
+    />
+  )
+}
+
+function PublicVideoCard({ item, cardWidth, thumbHeight }: { item: Video; cardWidth: number; thumbHeight: number }) {
+  const [playing, setPlaying] = useState(false)
+  const thumb = item.thumbnail_url
+    || `https://img.youtube.com/vi/${item.youtube_id}/hqdefault.jpg`
+
+  return (
+    <View style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: '#f3f4f6' }}>
+      {playing ? (
+        <View style={{ width: cardWidth, height: thumbHeight, backgroundColor: '#000' }}>
+          <WebView
+            source={{ uri: `https://www.youtube.com/embed/${item.youtube_id}?autoplay=1&playsinline=1&modestbranding=1&rel=0` }}
+            style={{ height: thumbHeight, width: cardWidth, backgroundColor: '#000' }}
+            allowsFullscreenVideo
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            javaScriptEnabled
+            domStorageEnabled
+          />
+        </View>
+      ) : (
+        <TouchableOpacity onPress={() => setPlaying(true)} activeOpacity={0.85}>
+          <View style={{ position: 'relative' }}>
+            <Image
+              source={{ uri: thumb }}
+              style={{ width: cardWidth, height: thumbHeight }}
+              contentFit="cover"
+            />
+            <View style={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.25)',
+            }}>
               <View style={{
-                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                width: 52, height: 52, borderRadius: 26,
+                backgroundColor: 'rgba(0,0,0,0.6)',
                 alignItems: 'center', justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.25)',
               }}>
-                <View style={{
-                  width: 52, height: 52, borderRadius: 26,
-                  backgroundColor: 'rgba(0,0,0,0.6)',
-                  alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Text style={{ color: '#fff', fontSize: 22, marginLeft: 4 }}>▶</Text>
-                </View>
+                <Text style={{ color: '#fff', fontSize: 22, marginLeft: 4 }}>▶</Text>
               </View>
             </View>
-            <View style={{ padding: 12 }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 2 }} numberOfLines={2}>
-                {item.title}
-              </Text>
-              {item.description ? (
-                <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18 }} numberOfLines={2}>
-                  {item.description}
-                </Text>
-              ) : null}
-            </View>
-          </TouchableOpacity>
-        )
-      }}
-    />
+          </View>
+        </TouchableOpacity>
+      )}
+      <View style={{ padding: 12 }}>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 2 }} numberOfLines={2}>
+          {item.title}
+        </Text>
+        {item.description ? (
+          <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18 }} numberOfLines={2}>
+            {item.description}
+          </Text>
+        ) : null}
+      </View>
+    </View>
   )
 }
 
@@ -151,7 +169,6 @@ export default function PublicMediaScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
-  const [activeVideo, setActiveVideo] = useState<Video | null>(null)
 
   async function fetchData() {
     const [{ data: p }, { data: v }] = await Promise.all([
@@ -224,7 +241,6 @@ export default function PublicMediaScreen() {
           ) : (
             <VideoList
               videos={videos}
-              onPress={setActiveVideo}
               refreshing={refreshing}
               onRefresh={onRefresh}
             />
@@ -237,13 +253,6 @@ export default function PublicMediaScreen() {
           photos={photos}
           startIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
-        />
-      )}
-
-      {activeVideo && (
-        <VideoPlayer
-          video={activeVideo}
-          onClose={() => setActiveVideo(null)}
         />
       )}
 

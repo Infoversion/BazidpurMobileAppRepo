@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Modal, ActivityIndicator, Alert } from 'react-native'
 import { Image } from 'expo-image'
-import { Audio } from 'expo-av'
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { WebView } from 'react-native-webview'
-import YoutubePlayer from 'react-native-youtube-iframe'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 function extractYouTubeId(url: string): string | null {
@@ -20,49 +19,38 @@ function extractYouTubeId(url: string): string | null {
   return null
 }
 
-function fmtMs(ms: number) {
-  const s = Math.floor(ms / 1000)
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+function fmtSec(s: number) {
+  const sec = Math.floor(s)
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
 }
 
 function AudioPlayer({ url }: { url: string }) {
-  const [sound, setSound] = useState<Audio.Sound | null>(null)
-  const [playing, setPlaying] = useState(false)
-  const [posMs, setPosMs] = useState(0)
-  const [durMs, setDurMs] = useState(0)
+  const player = useAudioPlayer({ uri: url })
+  const status = useAudioPlayerStatus(player)
+  const playing = status?.playing ?? false
+  const posSec = status?.currentTime ?? 0
+  const durSec = status?.duration ?? 0
 
   useEffect(() => {
-    return () => { sound?.unloadAsync() }
-  }, [sound])
+    if (status?.didJustFinish) {
+      player.seekTo(0)
+      player.pause()
+    }
+  }, [status?.didJustFinish, player])
 
-  async function toggle() {
-    if (!sound) {
-      try {
-        const { sound: s } = await Audio.Sound.createAsync(
-          { uri: url },
-          { shouldPlay: true },
-          status => {
-            if (!status.isLoaded) return
-            setPosMs(status.positionMillis)
-            setDurMs(status.durationMillis ?? 0)
-            if (status.didJustFinish) { setPlaying(false); setPosMs(0) }
-          }
-        )
-        setSound(s)
-        setPlaying(true)
-      } catch {
-        Alert.alert('Cannot play audio', 'This audio format is not supported on this device. Try opening it on a desktop browser.')
+  function toggle() {
+    try {
+      if (playing) {
+        player.pause()
+      } else {
+        player.play()
       }
-    } else if (playing) {
-      await sound.pauseAsync()
-      setPlaying(false)
-    } else {
-      await sound.playAsync()
-      setPlaying(true)
+    } catch {
+      Alert.alert('Cannot play audio', 'This audio format is not supported on this device. Try opening it on a desktop browser.')
     }
   }
 
-  const progress = durMs > 0 ? posMs / durMs : 0
+  const progress = durSec > 0 ? posSec / durSec : 0
 
   return (
     <View style={{
@@ -83,7 +71,7 @@ function AudioPlayer({ url }: { url: string }) {
           <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: '#2d1b69', borderRadius: 2 }} />
         </View>
         <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-          {fmtMs(posMs)}{durMs > 0 ? ` / ${fmtMs(durMs)}` : ''}
+          {fmtSec(posSec)}{durSec > 0 ? ` / ${fmtSec(durSec)}` : ''}
         </Text>
       </View>
     </View>
@@ -99,12 +87,14 @@ function YouTubeInline({ url, imgW }: { url: string; imgW: number }) {
   if (playing && id) {
     return (
       <View style={{ marginTop: 10, borderRadius: 10, overflow: 'hidden' }}>
-        <YoutubePlayer
-          videoId={id}
-          height={h}
-          width={imgW}
-          play
-          webViewProps={{ allowsFullscreenVideo: true }}
+        <WebView
+          source={{ uri: `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&modestbranding=1&rel=0` }}
+          style={{ height: h, width: imgW, backgroundColor: '#000' }}
+          allowsFullscreenVideo
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          javaScriptEnabled
+          domStorageEnabled
         />
       </View>
     )

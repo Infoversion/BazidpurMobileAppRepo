@@ -7,7 +7,7 @@ import {
 import { Stack, useLocalSearchParams, router } from 'expo-router'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import YoutubePlayer from 'react-native-youtube-iframe'
+import { WebView } from 'react-native-webview'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { ReportButton } from '@/components/ReportButton'
@@ -165,12 +165,14 @@ function VideoCard({
     >
       {playing && item.youtube_id ? (
         <View style={{ width: cardWidth, height: thumbHeight, backgroundColor: '#000' }}>
-          <YoutubePlayer
-            videoId={item.youtube_id}
-            height={thumbHeight}
-            width={cardWidth}
-            play
-            webViewProps={{ allowsFullscreenVideo: true }}
+          <WebView
+            source={{ uri: `https://www.youtube.com/embed/${item.youtube_id}?autoplay=1&playsinline=1&modestbranding=1&rel=0` }}
+            style={{ height: thumbHeight, width: cardWidth, backgroundColor: '#000' }}
+            allowsFullscreenVideo
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            javaScriptEnabled
+            domStorageEnabled
           />
         </View>
       ) : (
@@ -468,9 +470,8 @@ export default function VideoAlbumScreen() {
               {author ? (
                 <Text style={{ fontSize: 12, color: '#8e8e93' }}>by {author}</Text>
               ) : <View />}
-              {!isOwner ? (
-                <ReportButton contentType="video_album" contentId={album.id} size="sm" />
-              ) : null}
+              {/* Object-level flagging — videos are reported individually inside
+                  the album (VideoCard), not at the container level. */}
             </View>
             {canManage && (
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>

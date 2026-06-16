@@ -223,6 +223,7 @@ export interface ForumReply {
   is_deleted: boolean
   created_at: string
   author_id: string
+  parent_reply_id?: string | null
   author?: { first_name: string; last_name: string; photo_url?: string; role?: string }
   media?: ThreadMedia[]
 }

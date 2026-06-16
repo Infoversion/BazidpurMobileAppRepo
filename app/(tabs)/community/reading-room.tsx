@@ -88,12 +88,12 @@ function BookModal({ book, onClose }: { book: Book; onClose: () => void }) {
           }}>
             <TouchableOpacity
               onPress={() => setShowPdf(false)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
             >
-              <Text style={{ fontSize: 20, color: '#fff' }}>‹</Text>
-              <Text style={{ fontSize: 15, color: '#fff', fontWeight: '600' }}>Back</Text>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: '#fff' }}>‹</Text>
+              <Text style={{ fontSize: 17, fontWeight: '600', color: '#fff' }}>Back</Text>
             </TouchableOpacity>
-            <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: '#fff' }} numberOfLines={1}>
+            <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: '#fff' }} numberOfLines={1}>
               {book.title}
             </Text>
           </View>
