@@ -5,12 +5,22 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { WebView } from 'react-native-webview'
+import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import { LikesComments } from '@/components/LikesComments'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { CuratedNotice } from '@/components/CuratedNotice'
 import type { Photo, Video } from '@/lib/types'
+
+interface TmAlbum {
+  id: string
+  title: string
+  description: string | null
+  cover_photo_url: string | null
+  photo_count: number
+  video_count: number
+}
 
 const PAGE_SIZE = 40
 
@@ -44,6 +54,67 @@ function SegmentedControl<T extends string>({
         </TouchableOpacity>
       ))}
     </View>
+  )
+}
+
+// ─── Album grid ───────────────────────────────────────────────────────────────
+
+function AlbumGrid({
+  albums, width, refreshing, onRefresh,
+}: {
+  albums: TmAlbum[]
+  width: number
+  refreshing: boolean
+  onRefresh: () => void
+}) {
+  const tileSize = (width - 52) / 2
+
+  if (albums.length === 0) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
+        <Text style={{ fontSize: 44, marginBottom: 12 }}>📁</Text>
+        <Text style={{ fontSize: 15, fontWeight: '600', color: '#1c1c1e', marginBottom: 4 }}>No albums yet</Text>
+        <Text style={{ fontSize: 13, color: '#8e8e93' }}>Check back soon.</Text>
+      </View>
+    )
+  }
+
+  return (
+    <FlatList
+      data={albums}
+      keyExtractor={a => a.id}
+      numColumns={2}
+      columnWrapperStyle={{ gap: 12 }}
+      contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 90 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          style={{
+            width: tileSize, borderRadius: 14, overflow: 'hidden',
+            backgroundColor: '#ffffff',
+            shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+          }}
+          onPress={() => router.push({ pathname: '/(tabs)/community/moments/[albumId]' as any, params: { albumId: item.id } })}
+          activeOpacity={0.85}
+        >
+          {item.cover_photo_url ? (
+            <Image source={{ uri: item.cover_photo_url }} style={{ width: tileSize, height: tileSize * 0.75 }} contentFit="cover" />
+          ) : (
+            <View style={{ width: tileSize, height: tileSize * 0.75, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 36 }}>📁</Text>
+            </View>
+          )}
+          <View style={{ padding: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#1c1c1e' }} numberOfLines={1}>{item.title}</Text>
+            <Text style={{ fontSize: 11, color: '#8e8e93', marginTop: 2 }}>
+              {item.photo_count} photo{item.photo_count !== 1 ? 's' : ''}
+              {item.video_count > 0 ? ` · ${item.video_count} video${item.video_count !== 1 ? 's' : ''}` : ''}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
+    />
   )
 }
 
@@ -210,27 +281,41 @@ function VideoList({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function TimelessMomentsScreen() {
-  const [activeTab, setActiveTab] = useState<'photos' | 'videos'>('photos')
+  const [activeTab, setActiveTab] = useState<'albums' | 'photos' | 'videos'>('albums')
+  const [albums, setAlbums] = useState<TmAlbum[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const { width } = useWindowDimensions()
 
   async function fetchData() {
-    const [{ data: p }, { data: v }] = await Promise.all([
+    const [{ data: albs }, { data: p }, { data: v }] = await Promise.all([
+      supabase
+        .from('tm_albums')
+        .select('id, title, description, cover_photo_url, photo_count:timeless_moments(count), video_count:timeless_moment_videos(count)')
+        .eq('is_hidden', false)
+        .order('display_order'),
       supabase
         .from('timeless_moments')
         .select('id, title, description, r2_url, thumbnail_url')
+        .is('album_id', null)
         .order('display_order')
         .limit(PAGE_SIZE),
       supabase
         .from('timeless_moment_videos')
         .select('*')
+        .is('album_id', null)
         .eq('is_active', true)
         .order('display_order', { nullsFirst: false })
         .limit(PAGE_SIZE),
     ])
+    setAlbums((albs ?? []).map((a: any) => ({
+      ...a,
+      photo_count: a.photo_count?.[0]?.count ?? 0,
+      video_count: a.video_count?.[0]?.count ?? 0,
+    })))
     setPhotos((p ?? []) as Photo[])
     setVideos((v ?? []) as Video[])
   }
@@ -243,9 +328,10 @@ export default function TimelessMomentsScreen() {
     setRefreshing(false)
   }, [])
 
-  const tabLabels: Record<'photos' | 'videos', string> = {
-    photos: `✨  Photos${photos.length ? ` (${photos.length})` : ''}`,
-    videos: `🎬  Videos${videos.length ? ` (${videos.length})` : ''}`,
+  const tabLabels: Record<'albums' | 'photos' | 'videos', string> = {
+    albums: `📁  Albums${albums.length ? ` (${albums.length})` : ''}`,
+    photos: `✨  Photos`,
+    videos: `🎬  Videos`,
   }
 
   return (
@@ -258,7 +344,7 @@ export default function TimelessMomentsScreen() {
       {/* Segmented control sub-bar */}
       <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#e5e5ea' }}>
         <SegmentedControl
-          options={['photos', 'videos']}
+          options={['albums', 'photos', 'videos']}
           value={activeTab}
           onChange={setActiveTab}
           labels={tabLabels}
@@ -271,7 +357,14 @@ export default function TimelessMomentsScreen() {
         </View>
       ) : (
         <View style={{ flex: 1 }}>
-          {activeTab === 'photos' ? (
+          {activeTab === 'albums' ? (
+            <AlbumGrid
+              albums={albums}
+              width={width}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+            />
+          ) : activeTab === 'photos' ? (
             <PhotoGrid
               photos={photos}
               onPress={setLightboxIndex}
