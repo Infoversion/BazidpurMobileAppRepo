@@ -1,15 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
 
 type FormState = { name: string; email: string; subject: string; message: string }
 
 export default function ContactScreen() {
+  const { user } = useAuth()
   const [form, setForm] = useState<FormState>({ name: '', email: '', subject: '', message: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+
+  // Auto-fill from auth profile
+  useEffect(() => {
+    if (!user) return
+    setForm(f => ({
+      ...f,
+      name: f.name || `${user.first_name} ${user.last_name}`.trim(),
+      email: f.email || user.email || '',
+    }))
+  }, [user])
 
   function set(key: keyof FormState) {
     return (value: string) => {
