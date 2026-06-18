@@ -209,11 +209,19 @@ const ALL_SECTIONS: HelpSection[] = [
     items: [
       {
         heading: 'What This Section Shows',
-        body: 'Timeless Moments is a curated video collection of significant moments from Bazidpur and the wider community. The admin team selects videos that capture important events, heritage footage, religious occasions, and community gatherings.',
+        body: 'Timeless Moments is a curated collection of photos and videos selected by the admin team — significant events, heritage footage, religious occasions, and community gatherings. Content is organised into albums and also browsable as individual photos and videos.',
+      },
+      {
+        heading: 'Albums',
+        body: 'The default view is the Albums tab. Each album card shows a cover image, the album title, and a photo/video count. Tap an album to open it and browse all the photos and videos inside. Inside an album, switch between the Photos and Videos tabs using the control at the top.',
+      },
+      {
+        heading: 'All Photos and Videos',
+        body: 'Switch to the Photos or Videos tab on the main Timeless Moments screen to browse all unorganised items — content not yet placed in an album. Tap any photo to open the full-screen lightbox and swipe through the collection.',
       },
       {
         heading: 'Watching a Video',
-        body: 'Scroll through the list to browse available moments. Each card shows a thumbnail, title, and brief description. Tap the play button to begin watching. Videos are streamed from YouTube — a good internet connection is recommended. The video opens in the in-app player; tap the full-screen icon to expand it.',
+        body: 'Tap the play button on any video card to begin watching. Videos stream from YouTube — a good internet connection is recommended. Tap the full-screen icon in the video player to expand it.',
       },
       {
         heading: 'How to Access',
@@ -336,6 +344,10 @@ const ALL_SECTIONS: HelpSection[] = [
         body: 'Open any thread and scroll to the bottom. You will see a reply input field. Tap it, type your response, and tap Send (or the send icon). Your reply appears at the bottom of the thread instantly.',
       },
       {
+        heading: 'Quoting a Reply',
+        body: 'Tap the Reply button on any existing reply to quote it. A small preview strip appears above the compose field showing who you are replying to and the start of their message. Your reply will be linked to theirs — readers can tap the quote strip inside your reply to jump back to the original message.\n\nTo cancel the quote and reply to the thread in general, tap × on the preview strip.',
+      },
+      {
         heading: 'Community Standards',
         body: 'The Forum is a family community space. Please:\n\n• Be respectful and considerate to all members\n• Keep discussions relevant to Bazidpur and the community\n• Do not share personal contact details publicly\n• Report any inappropriate posts to the admin team via the Contact form\n\nThe admin team may remove threads or replies that violate community standards, and may revoke membership for serious or repeated violations.',
       },
@@ -432,6 +444,10 @@ const ALL_SECTIONS: HelpSection[] = [
       {
         heading: 'Saving Your Changes',
         body: 'After making any changes, scroll to the bottom of the Personal Details card and tap the Save Changes button. A confirmation message will appear once saved. If required fields (first name, last name) are left empty, you will be prompted to fill them in before saving.',
+      },
+      {
+        heading: 'View in Family Tree',
+        body: 'If the admin team has linked your profile to a node in the Bazidpur family tree, a purple "View in Family Tree 🌳" button will appear near the top of your profile page. Tap it to go directly to the Family Tree screen and find your place in the family.',
       },
       {
         heading: 'Privacy Policy',
@@ -536,6 +552,18 @@ const ALL_SECTIONS: HelpSection[] = [
       {
         heading: 'Invitations',
         body: 'The Invite section allows admins to send direct membership invitations to individuals by email. An invited person receives a link that bypasses the standard application form and takes them directly to an expedited sign-up flow. Use this for known community members you want to bring on board directly.',
+      },
+      {
+        heading: 'Member Flag History',
+        body: 'When viewing a member\'s profile card in the Members section of the web dashboard, a "Flag History" section appears at the bottom. It shows:\n\n• Reports filed by that member against other content\n• Reports filed against that member\'s content, with the resolution verdict\n\nThis gives admins a quick picture of a member\'s reporting behaviour and whether they have been subject to moderation actions in the past.',
+      },
+      {
+        heading: 'Linking Members to the Family Tree',
+        body: 'In the web admin dashboard, go to "Tree ↔ Member Links". This page lists every node in the family tree. For any node not yet linked, select the corresponding app member from the dropdown and tap Link.\n\nOnce linked, the member will see a "View in Family Tree 🌳" button on their profile screen, which takes them directly to the family tree.',
+      },
+      {
+        heading: 'Timeless Moments Albums',
+        body: 'In the web admin, open Timeless Moments and tap "Manage Albums →". From there you can:\n\n• Create new albums with a title and description\n• Rename, hide, or delete albums\n• Switch to the "Assign Photos" or "Assign Videos" tab to bulk-move photos/videos into an album (click to select, choose a destination album, then tap Move)\n\nAlbums appear as the first tab in the Timeless Moments screen for members.',
       },
     ],
   },
