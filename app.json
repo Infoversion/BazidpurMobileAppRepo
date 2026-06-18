@@ -11,6 +11,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.bazidpur.app",
       "buildNumber": "1",
+      "jsEngine": "jsc",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Used to update your profile photo and attach images to forum posts.",
         "NSPhotoLibraryAddUsageDescription": "Used to save photos from the app.",
@@ -47,7 +48,20 @@
       "expo-font",
       "expo-secure-store",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "buildReactNativeFromSource": true
+          }
+        }
+      ],
+      "expo-image",
+      "expo-status-bar",
+      "expo-audio",
+      "expo-asset",
+      "./plugins/withJSC.js"
     ],
     "experiments": {
       "typedRoutes": true

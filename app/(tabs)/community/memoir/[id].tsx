@@ -7,7 +7,7 @@ import { Stack, useLocalSearchParams } from 'expo-router'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GestureDetector, Gesture } from 'react-native-gesture-handler'
-import { runOnJS } from 'react-native-reanimated'
+import { LikesComments } from '@/components/LikesComments'
 import { supabase } from '@/lib/supabase'
 import type { Experience, ExperienceChapter } from '@/lib/types'
 
@@ -132,11 +132,12 @@ export default function MemoirScreen() {
 
   // Horizontal swipe to navigate chapters (doesn't conflict with vertical ScrollView)
   const swipe = Gesture.Pan()
+    .runOnJS(true)
     .activeOffsetX([-25, 25])
     .failOffsetY([-15, 15])
     .onEnd(e => {
-      if (e.translationX < -60 || e.velocityX < -400) runOnJS(goNext)()
-      else if (e.translationX > 60 || e.velocityX > 400) runOnJS(goPrev)()
+      if (e.translationX < -60 || e.velocityX < -400) goNext()
+      else if (e.translationX > 60 || e.velocityX > 400) goPrev()
     })
 
   return (
@@ -259,6 +260,13 @@ export default function MemoirScreen() {
               onNext={goNext}
               style={{ paddingTop: 8 }}
             />
+          ) : null}
+
+          {/* Likes + comments + flag */}
+          {experience ? (
+            <View style={{ marginTop: 16, paddingHorizontal: 20, paddingBottom: 24 }}>
+              <LikesComments entityType="experience" entityId={experience.id} />
+            </View>
           ) : null}
         </ScrollView>
       )}

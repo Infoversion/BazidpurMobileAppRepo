@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { CuratedNotice } from '@/components/CuratedNotice'
 import { ReportButton } from '@/components/ReportButton'
+import { LikesComments } from '@/components/LikesComments'
 import type { Poetry, PoetryVerse } from '@/lib/types'
 
 type Tab = 'poetry' | 'ghazal'
@@ -138,6 +139,11 @@ function PoemSheet({ poem, onClose }: { poem: Poetry; onClose: () => void }) {
                 )
               })
             )}
+          </View>
+
+          {/* Likes + comments + report (flag each comment) */}
+          <View style={{ marginTop: 20, backgroundColor: '#ffffff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
+            <LikesComments entityType="poetry" entityId={poem.id} noTopBorder />
           </View>
         </ScrollView>
       </View>

@@ -10,7 +10,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
-import { ReportButton } from '@/components/ReportButton'
 import { useBlockedUsers, confirmBlockUser } from '@/components/BlockUserButton'
 import type { Album } from '@/lib/types'
 
@@ -571,15 +570,9 @@ export default function GalleryScreen() {
                       <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>Your Album</Text>
                     </View>
                   )}
-                  {!isOwn && (
-                    <View style={{
-                      position: 'absolute', top: 6, right: 6,
-                      backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14,
-                      paddingHorizontal: 6, paddingVertical: 2,
-                    }}>
-                      <ReportButton contentType="photo_album" contentId={item.id} size="sm" />
-                    </View>
-                  )}
+                  {/* Object-level flagging only — albums are containers, not
+                      reportable objects. Photos are reported from the photo
+                      viewer (LightboxToolbar). */}
                 </View>
                 <View style={{ padding: 12 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: '#1c1c1e' }} numberOfLines={1}>{item.title}</Text>
@@ -632,15 +625,8 @@ export default function GalleryScreen() {
                       <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>Your Album</Text>
                     </View>
                   )}
-                  {!isOwn && (
-                    <View style={{
-                      position: 'absolute', top: 6, right: 6,
-                      backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14,
-                      paddingHorizontal: 6, paddingVertical: 2,
-                    }}>
-                      <ReportButton contentType="video_album" contentId={item.id} size="sm" />
-                    </View>
-                  )}
+                  {/* Object-level flagging — videos are reported individually
+                      inside the album, not at the container level. */}
                 </View>
                 <View style={{ padding: 12 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: '#1c1c1e' }} numberOfLines={1}>{item.title}</Text>

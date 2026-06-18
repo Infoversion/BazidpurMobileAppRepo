@@ -62,6 +62,9 @@ function CustomTabBar({ state, descriptors, navigation, session, role }: CustomT
   const pillAlpha = useRef(new Animated.Value(0)).current
   const pillScale = useRef(new Animated.Value(0.8)).current
   const pulseScale = useRef(new Animated.Value(1)).current
+  // Stable derived value so native-driver listeners don't get reattached on
+  // every render (which caused "onAnimatedValueUpdate with no listeners" spam).
+  const combinedScale = useRef(Animated.multiply(pillScale, pulseScale)).current
   const [collapsed, setCollapsed] = useState(false)
   const pulseRef = useRef<Animated.CompositeAnimation | null>(null)
 
@@ -240,7 +243,7 @@ function CustomTabBar({ state, descriptors, navigation, session, role }: CustomT
           opacity: pillAlpha,
         }}
       >
-        <Animated.View style={{ transform: [{ scale: Animated.multiply(pillScale, pulseScale) }] }}>
+        <Animated.View style={{ transform: [{ scale: combinedScale }] }}>
           <TouchableOpacity
             onPress={expand}
             activeOpacity={0.82}

@@ -33,26 +33,40 @@ const STATUS_LABEL: Record<ReportStatus, { label: string; color: string; bg: str
   suspended:    { label: 'User suspended', color: '#991b1b', bg: '#fee2e2' },
 }
 
-const TYPE_LABEL: Record<string, { label: string; emoji: string }> = {
-  thread:           { label: 'Forum Thread',   emoji: '💬' },
-  reply:            { label: 'Forum Reply',    emoji: '↩️' },
-  poem:             { label: 'Poetry',         emoji: '📜' },
-  memoir:           { label: 'Memoir',         emoji: '📖' },
-  photo_album:      { label: 'Photo Album',    emoji: '📷' },
-  album_photo:      { label: 'Album Photo',    emoji: '🖼️' },
-  video_album:      { label: 'Video Album',    emoji: '🎬' },
-  video_album_item: { label: 'Album Video',    emoji: '🎞️' },
+// Each reportable content_type maps to a (section, kind) pair. The section is
+// the user-facing area of the app where the content lives ("The Gallery",
+// "Timeless Moments", etc.), and the kind disambiguates the specific object
+// type within that section.
+const TYPE_LABEL: Record<string, { section: string; kind: string; emoji: string }> = {
+  thread:                 { section: 'The Forum',          kind: 'Thread',     emoji: '💬' },
+  reply:                  { section: 'The Forum',          kind: 'Reply',      emoji: '↩️' },
+  poem:                   { section: 'Rhymes & Roots',     kind: 'Poetry',     emoji: '📜' },
+  poetry:                 { section: 'Rhymes & Roots',     kind: 'Poetry',     emoji: '📜' },
+  memoir:                 { section: 'Memoirs',            kind: 'Memoir',     emoji: '📖' },
+  experience:             { section: 'Memoirs',            kind: 'Memoir',     emoji: '📖' },
+  photo_album:            { section: 'The Gallery',        kind: 'Photo Album',emoji: '📷' },
+  album_photo:            { section: 'The Gallery',        kind: 'Photo',      emoji: '🖼️' },
+  video_album:            { section: 'The Gallery',        kind: 'Video Album',emoji: '🎬' },
+  video_album_item:       { section: 'The Gallery',        kind: 'Video',      emoji: '🎞️' },
+  timeless_moment:        { section: 'Timeless Moments',   kind: 'Photo',      emoji: '✨' },
+  timeless_moment_video:  { section: 'Timeless Moments',   kind: 'Video',      emoji: '🎬' },
+  comment:                { section: 'Community',          kind: 'Comment',    emoji: '🗨️' },
 }
 
 const TYPE_COLOR: Record<string, string> = {
-  thread:           '#dbeafe',
-  reply:            '#ede9fe',
-  poem:             '#fef9c3',
-  memoir:           '#d1fae5',
-  photo_album:      '#ffedd5',
-  album_photo:      '#fff7ed',
-  video_album:      '#fce7f3',
-  video_album_item: '#fbe6f0',
+  thread:                 '#dbeafe',
+  reply:                  '#ede9fe',
+  poem:                   '#fef9c3',
+  poetry:                 '#fef9c3',
+  memoir:                 '#d1fae5',
+  experience:             '#d1fae5',
+  photo_album:            '#ffedd5',
+  album_photo:            '#fff7ed',
+  video_album:            '#fce7f3',
+  video_album_item:       '#fbe6f0',
+  timeless_moment:        '#fef3c7',
+  timeless_moment_video:  '#fde68a',
+  comment:                '#f3f4f6',
 }
 
 function timeAgo(dateStr: string) {
@@ -65,6 +79,25 @@ function timeAgo(dateStr: string) {
   const days = Math.floor(hrs / 24)
   if (days < 30) return `${days}d ago`
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function formatCST(dateStr: string) {
+  // Render the reported date/time in Central Time (America/Chicago) so admins
+  // anywhere in the world see a consistent reference clock for triage.
+  try {
+    return new Date(dateStr).toLocaleString('en-US', {
+      timeZone: 'America/Chicago',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short',
+    })
+  } catch {
+    return dateStr
+  }
 }
 
 // Maps each reportable content_type to the table + column we look up to find
@@ -298,7 +331,7 @@ export default function ReportsScreen() {
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: insets.bottom + 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
           renderItem={({ item }) => {
-            const meta = TYPE_LABEL[item.content_type] ?? { label: item.content_type, emoji: '⚑' }
+            const meta = TYPE_LABEL[item.content_type] ?? { section: 'Unknown', kind: item.content_type, emoji: '⚑' }
             const bgColor = TYPE_COLOR[item.content_type] ?? '#f3f4f6'
             const reporter = item.reporter
               ? `${item.reporter.first_name} ${item.reporter.last_name}`
@@ -313,16 +346,21 @@ export default function ReportsScreen() {
                 shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
               }}>
-                {/* Type banner */}
+                {/* Type banner — shows the section name + object kind, plus
+                    status badge and the reported timestamp in CST. */}
                 <View style={{ backgroundColor: bgColor, paddingHorizontal: 14, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={{ fontSize: 14 }}>{meta.emoji}</Text>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>{meta.label}</Text>
-                  <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>{meta.section}</Text>
+                  <Text style={{ fontSize: 11, color: '#6b7280' }}>•</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#6b7280' }}>{meta.kind}</Text>
+                  <View style={{ marginLeft: 'auto' }}>
                     <View style={{ backgroundColor: statusMeta.bg, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5 }}>
                       <Text style={{ fontSize: 10, fontWeight: '700', color: statusMeta.color, textTransform: 'uppercase', letterSpacing: 0.3 }}>{statusMeta.label}</Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: '#9ca3af' }}>{timeAgo(item.created_at)}</Text>
                   </View>
+                </View>
+                <View style={{ paddingHorizontal: 14, paddingTop: 8 }}>
+                  <Text style={{ fontSize: 11, color: '#9ca3af' }}>Reported {formatCST(item.created_at)}</Text>
                 </View>
 
                 <View style={{ padding: 14 }}>

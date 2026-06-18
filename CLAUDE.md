@@ -333,6 +333,8 @@ eas build --platform ios --profile production
 eas submit --platform ios
 ```
 
+> ⚠️ **iOS builds take ~30–45 min, not ~5 min.** This project ships a custom JavaScript engine (JSC instead of Hermes) to work around an iOS 26 + Hermes V1 crash. The setup requires `expo-build-properties` with `ios.buildReactNativeFromSource: true`, which compiles React Native from source on every EAS build instead of using prebuilt frameworks. Don't be surprised when a build runs ~6× slower than typical Expo iOS builds — this is expected, not broken. Full background: see "Hermes / iOS 26 / SDK 56 — Dead Ends" section at the bottom of this file.
+
 ---
 
 ## Things to Watch Out For
@@ -355,3 +357,117 @@ eas submit --platform ios
 16. **HEIC migration script** — If HEIC photos slipped through before rule 13 was enforced, run `BazidpurWeb/scripts/convert-heic-photos.mjs` locally. It queries `album_photos` for any `.heic`/`.heif` URLs, downloads from R2, converts with macOS `sips`, generates a thumbnail with `sharp`, re-uploads both as JPEG, and updates the DB rows.
 17. **Empty album visibility** — Empty albums (0 photos) are hidden from other members in the albums list (`/albums`). The album owner always sees their own empty albums. Admins see all albums. This is enforced in `AlbumsClient.tsx` via `visibleOtherAlbums` filter before pagination. The album page (`/albums/[id]`) itself is still accessible by URL regardless.
 18. **Forum rich media attachments** — Forum replies support photo, audio (recorded or uploaded), PDF, and YouTube link attachments. Attachments are stored in `thread_attachments` table and uploaded via presigned R2 URLs (`/api/forum/presign`). On web, attachments render inline (lightbox for photos, audio player, PDF link, YouTube iframe). On mobile, `[id].tsx` in `forum/` handles both upload and display.
+
+---
+
+## Hermes / iOS 26 / SDK 56 — Dead Ends That Wasted Days
+
+Background: in June 2026 (around SDK 54→56 migration), the app crashed on launch in every production iOS build on iPhone18,1 / iOS 26.5.1. Dev-client builds worked fine. We burned ~10 EAS build cycles chasing this. **The actual root cause is `Hermes V1`** (the rewritten Hermes that became the default JS engine in React Native 0.84+) has multiple bugs on iOS 26. The fix that worked is swapping in JavaScriptCore via `@react-native-community/javascriptcore`. The plugin is `plugins/withJSC.js`. Everything below is what didn't work, so a future session doesn't go down the same paths.
+
+### Crash signatures we saw (all in Hermes)
+- **SDK 54 main bundle init** — `EXC_BAD_ACCESS / SIGSEGV`, frames in `hermes::vm::GCScope::_newChunkAndPHV` / `defineLazyProperties` / `HiddenClass::addToPropertyMap`. HBC lazy-property init crashing during main bundle load.
+- **SDK 56 worklet runtime init** — `EXC_CRASH / SIGABRT` from `RCTExceptionsManager reportFatal:`, JS thread deep in `worklets::WorkletRuntime::legacyModeInit()` → `evaluateJavaScript()` → `hermes::hbc::BCProviderFromSrc::create` → `hermes::generateIRFromESTree`. Worklets compiling JS source at runtime through Hermes IRGen.
+- **SDK 56 String.split with regex** — `EXC_CRASH / SIGABRT`, JS thread in `hermes::vm::stringPrototypeSplit` → `regExpPrototypeSymbolSplit` → string allocation triggering `HadesGC::youngGenCollection` → `HadesGC::scanDirtyCards` → `EvacAcceptor::visit`. GC corruption during normal regex string operations.
+
+The common thread: **Hermes V1 + iOS 26 = unpredictable crashes in multiple unrelated code paths**. iOS 17/18 are unaffected (dev mode loads JS differently and doesn't hit the same Hermes paths).
+
+### Things that DID NOT work
+1. **Reanimated 3 downgrade** — Tried `react-native-reanimated@^3.19.5` to avoid Reanimated 4's worklets runtime crash. v3 is **C++ incompatible with RN 0.85**: Xcode errors `no type named 'Shared' in facebook::react::ContextContainer`, `UIManagerAnimationDelegate` API changed, `LayoutAnimationsProxy` API changed. Reanimated 3 only works through ~RN 0.79.
+2. **Removing Reanimated entirely** — Refactored `PhotoLightbox.tsx` to use built-in `Animated` and dropped `runOnJS` from memoir. **But `react-native-css-interop`** (which nativewind v4 depends on) has lazy `require('react-native-reanimated')` calls. Metro fails to bundle: `Unable to resolve module react-native-reanimated`. Even if you don't use Tailwind animation classes, the imports still need to resolve at bundle time.
+3. **JS-only reanimated/worklets** — Reinstall the packages so Metro resolves the imports, then exclude their native pods via `react-native.config.js`. Got past JS bundling, but didn't fix the crash because **the crash isn't reanimated/worklets — it's Hermes itself**.
+4. **Worklets bundle mode** (`['react-native-worklets/plugin', { bundleMode: true }]` + `getBundleModeMetroConfig`) — Designed to pre-compile worklets at build time so they don't get eval'd at runtime through Hermes. **Race condition on EAS's eager bundler**: babel writes `.worklets/<hash>.js` files mid-bundle that Metro can't SHA-1, so `expo export:embed --eager` fails with `Error: Failed to get the SHA-1 for: ...react-native-worklets/.worklets/...js`.
+5. **Legacy Hermes** (`useHermesV1: false` + `buildReactNativeFromSource: true` in expo-build-properties + `hermes-compiler: 0.15.0` override) — The escape hatch exists but `hermesc 0.15.0` predates JavaScript private fields (`#x` syntax), and some dependency in our tree uses them. Bundle compile fails with `error: private properties are not supported` × hundreds of lines. Also, even if it built, legacy Hermes likely has its own iOS 26 issues (it's the same lineage that crashed in SDK 54).
+
+### The TextEncoder gotcha (only surfaces after JSC swap)
+Once Hermes is replaced by JSC, the app launches the native shell fine and starts evaluating the JS bundle, then immediately silently fails with `ReferenceError: Can't find variable: TextEncoder`. The splash screen just stays up forever because JS errored out before mounting the root component. **Hermes ships TextEncoder/TextDecoder as built-in globals; JSC does not.** Several libraries in the dep tree need them — Supabase's `@supabase/realtime-js` for websocket framing is the canonical culprit, but the most aggressive caller is **React Native's own URL polyfill**: it does `var e = new TextEncoder()` at module top-level, around line 155k of the dev bundle. That means the polyfill has to run before *any* module evaluates, not just before user code.
+
+**An `index.js` import is NOT early enough.** A previous iteration of this file recommended `import 'text-encoding-polyfill'` from a project-root `index.js` set as `package.json` `"main"`. That fails for two reasons: (a) RN's pre-modules (URL polyfill, etc.) evaluate before the entry module's body runs, and (b) `text-encoding-polyfill`'s IIFE ends with `}(this || {}))` — under Metro's strict-mode CommonJS module wrapper, `this` is `undefined`, so the polyfill sets `TextEncoder` on `{}` and the actual JSC global never gets it.
+
+**The fix that works**: install the polyfill via Metro's `getPolyfills` so it runs as a raw script at the very top of the bundle, before the module system even exists. There's a minimal UTF-8 only implementation in `polyfills/text-encoder.js` (full WHATWG encodings aren't needed — URL polyfill and Supabase realtime only use UTF-8). `metro.config.js` prepends it to the default polyfill list:
+
+```js
+// metro.config.js
+const originalGetPolyfills = config.serializer.getPolyfills
+config.serializer.getPolyfills = (ctx) => [
+  path.resolve(__dirname, 'polyfills/text-encoder.js'),
+  ...originalGetPolyfills(ctx),
+]
+```
+
+Metro polyfills are concatenated as raw scripts at the bundle top — they have NO `require()` available and run before `__d`/module registry is initialized. So the polyfill file must be standalone (no imports, no `require`), and it must assign to `global` directly. The `index.js` entry file is now just `import 'expo-router/entry'` — the TextEncoder polyfill happens earlier, via Metro.
+
+When debugging "app launched but hung on splash" with JSC: always check `xcrun simctl spawn <udid> log show --last 1m --predicate 'process == "Bazidpur"'` and grep for `ReferenceError`. The error appears once in `com.facebook.react.log:javascript` and once in `com.facebook.react.log:native`. The visible app behavior is *just a stuck splash screen* — no red box, no crash dialog. On device (not simulator), the dev-launcher overlay shows `[runtime not ready]: ReferenceError: Can't find variable: TextEncoder` directly. To confirm the polyfill is correctly placed, `curl 'http://localhost:8081/index.bundle?platform=ios&dev=true' | grep -n 'global.TextEncoder'` should show the polyfill in the first ~1000 lines of the bundle, well before the URL polyfill around line 155k.
+
+### `country-state-city` stack overflow on JSC
+Symptom: `RangeError: Maximum call stack size exceeded` at the top-level `import { Country, State } from 'country-state-city'` line. Hermes handled this fine; JSC has a stricter stack limit and chokes parsing the package's data. Root cause is the package's barrel `index.js`:
+
+```js
+import Country from './country';
+import State from './state';
+import City from './city';  // <-- pulls in city.json, 7.7MB
+```
+
+Even if you only destructure `Country` and `State`, the whole barrel evaluates and parses the 7.7MB `city.json`. Fix is to import from the deep paths directly:
+
+```ts
+import Country from 'country-state-city/lib/country'
+import State from 'country-state-city/lib/state'
+```
+
+This skips the City module entirely (`country.json` is 96KB, `state.json` is 544KB — both fine). If the app ever needs city data, add it as a third deep import and load lazily (e.g. inside a `useMemo` triggered by a state-picked-state). General lesson under JSC: any barrel that statically pulls in multi-megabyte JSON should be replaced with deep imports or lazy `require()`.
+
+### `Animated.multiply` / `Animated.add` listener churn
+Symptom: log flood of `WARN  Sending \`onAnimatedValueUpdate\` with no listeners registered.` whenever a `useNativeDriver: true` animation is running. Cause: a derived Animated value created inline in JSX, e.g.
+
+```tsx
+<Animated.View style={{ transform: [{ scale: Animated.multiply(a, b) }] }} />
+```
+
+Every render creates a NEW derived Animated value; the native driver registers a new listener and the old one's updates arrive at a node nobody is listening to. Memoize derived values with `useRef` (or `useMemo` whose deps are the input `useRef.current` values, which never change):
+
+```tsx
+const combinedScale = useRef(Animated.multiply(a, b)).current
+// then in JSX: { scale: combinedScale }
+```
+
+`components/gallery/PhotoLightbox.tsx` already uses the `useMemo` pattern correctly. `app/(tabs)/_layout.tsx` was the offender (pulse + spring scale combined for the collapsed-bar pill).
+
+### Things that DID work
+- **Swap JS engine to JavaScriptCore.**
+  - `npm install @react-native-community/javascriptcore@0.2.0`
+  - Set `ios.jsEngine: "jsc"` in `app.json` (still recognized in SDK 56 for Podfile gating, despite being marked "deprecated").
+  - Local Expo config plugin `plugins/withJSC.js` that:
+    1. Patches `AppDelegate.swift` to `import ReactJSC` and override `createJSRuntimeFactory()` → `jsrt_create_jsc_factory()`.
+    2. Prepends `ENV['USE_THIRD_PARTY_JSC'] = '1'` and `ENV['USE_HERMES'] = '0'` to the Podfile.
+    3. Adds a `post_install` hook (placed **after** `react_native_post_install`, otherwise it gets clobbered) that sets `USE_HERMES=0` in `GCC_PREPROCESSOR_DEFINITIONS` on every pod target, so `RCTCxxBridge.mm`'s `#if !defined(USE_HERMES) || USE_HERMES == 1` guard skips the Hermes header.
+    4. Patches an RN 0.85.3 bug in `node_modules/react-native/Libraries/AppDelegate/React-RCTAppDelegate.podspec`: `other_cflags = "$(inherited) " + new_arch_enabled_flag + js_engine_flags()` is missing a space between `new_arch_enabled_flag` (which ends in `-DRCT_NEW_ARCH_ENABLED=1`) and `js_engine_flags()` (which begins with `-DUSE_THIRD_PARTY_JSC=1`). Without the space, clang sees one bogus token `-DRCT_NEW_ARCH_ENABLED=1-DUSE_THIRD_PARTY_JSC=1` and `USE_THIRD_PARTY_JSC` is never actually defined, so `RCTAppSetupUtils.h`'s `#if USE_THIRD_PARTY_JSC != 1` guard imports the missing Hermes header. Patch adds the space.
+  - Requires `expo-build-properties` plugin with `ios.buildReactNativeFromSource: true` — `@react-native-community/javascriptcore` depends on `RCT-Folly`, which is only declared as a pod when RN is built from source (the prebuilt-frameworks path uses an opaque `ReactNativeDependencies` umbrella). Tradeoff: builds take ~30–45 min instead of ~5 min.
+
+### Apple App Store reviewer warning
+Apple reviews on the latest iOS, which currently means iOS 26+. Do not assume an upcoming iOS bump will magically fix things — verify on the reviewer's likely iOS version (download an iOS 26 simulator or have a beta device) before submitting.
+
+### Future SDK upgrade checklist
+Before the next Expo SDK upgrade, check whether Expo / Hermes has shipped fixes for Hermes V1 on iOS 26 (search `expo/expo` and `facebook/react-native` issues for the symbols above — `GCScope::_newChunkAndPHV`, `HadesGC::scanDirtyCards`, `HiddenClass::addToPropertyMap`). If yes, the JSC workaround can be removed: delete `plugins/withJSC.js`, the `withJSC` plugin entry in `app.json`, the `ios.jsEngine: "jsc"` field, the `@react-native-community/javascriptcore` dep, and the `buildReactNativeFromSource` option. Test thoroughly on the latest iOS before shipping.
+
+---
+
+## PhotoLightbox — Known UX Limitations (post-Reanimated removal)
+
+The Hermes-on-iOS-26 fix forced us to remove `react-native-reanimated` from the native build. `components/gallery/PhotoLightbox.tsx` was rewritten to use built-in `Animated` with legacy `PinchGestureHandler` / `PanGestureHandler` + `Animated.event` (`useNativeDriver: true`). This gives buttery-smooth pinch and pan because per-frame transform updates run entirely on the native thread. The price is **two missing features compared to Apple Photos**:
+
+### Issue 1 — Pinch + simultaneous pan doesn't work
+Two fingers down, pinch and drag at the same time. We can't combine "scale from gesture event" with "translation from gesture event focal-point delta" in a way that maps to Animated.Values natively. Doing it via the Animated.event listener works but requires `useNativeDriver: false`, which downgrades both pinch and pan to JS-thread — visibly less smooth + introduces release-time flicker. User chose smoothness over this feature.
+
+### Issue 2 — Pinching on a corner always zooms toward center, not the corner
+Apple Photos uses *scale-around-focal-point* math: `tx_new = (sFx - cx) * (1 - ratio) + sOx * ratio`. This requires multiplying the focal point's screen offset (from view center) by `(1 - ratio)` in an Animated chain. Implementable as `Animated.add(Animated.multiply(sFxMinusCx, oneMinusRatio), ...)` natively, but `sFx` (focal at pinch start) must be captured per-gesture, which means `setValue` from JS into an Animated.Value, which has a one-frame bridge delay. That delay caused jitter / shake in testing. JS-thread alternative same problem as Issue 1. User chose center-anchored zoom + smoothness over focal-anchored zoom + jitter.
+
+### When to revisit
+Either of these can be fixed cleanly if:
+- **Reanimated 4 + Hermes V1 on iOS 26 stops crashing** (filed upstream): we revert to Reanimated, gestures run on UI thread via worklets, both features come back automatically. See "Hermes / iOS 26 / SDK 56 — Dead Ends" section above.
+- **Reanimated 3 ships RN 0.85+ C++ compatibility**: we install it JS-only with the native pod excluded (same pattern as the current `react-native.config.js` setup), use its worklet APIs in PhotoLightbox.
+- **React Native ships a new native-driver-friendly gesture API** with Animated.event-style multi-mapping or focal compute primitives.
+
+Until then, leave PhotoLightbox alone. The smooth pinch + smooth pan + dismiss + double-tap are the 90% case. The missing 10% is a known acceptable trade-off.
+
+### Related implementation note
+PhotoLightbox uses ONE `PanGestureHandler` (no `key` swapping) with dynamic `failOffsetX` / `activeOffsetY` / event-handler props that change based on the `zoomed` state. We previously used `key={zoomed ? ... : ...}` to force a clean remount when mode flipped — but that caused a one-frame flicker on the first pinch release because the inner Animated.View with the transform was unmounting and losing its native-driver attachment. Stable mount avoids this. If a future change reintroduces the key-remount pattern, it'll bring back the first-pinch flicker.

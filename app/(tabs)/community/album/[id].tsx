@@ -13,7 +13,6 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
-import { ReportButton } from '@/components/ReportButton'
 import type { AlbumPhoto, Album, Photo } from '@/lib/types'
 
 const R2    = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
@@ -416,18 +415,15 @@ export default function AlbumScreen() {
           ListHeaderComponent={
             <>
               {/* Album info */}
-              {(album?.description || author || manageMode || !isOwner) ? (
+              {(album?.description || author || manageMode) ? (
                 <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1 }}>
                       {author ? <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 4 }}>by {author}</Text> : null}
                       {album?.description ? <Text style={{ fontSize: 14, color: '#374151', lineHeight: 20 }}>{album.description}</Text> : null}
                     </View>
-                    {!isOwner && album ? (
-                      <View style={{ paddingLeft: 12, paddingTop: 2 }}>
-                        <ReportButton contentType="photo_album" contentId={album.id} size="sm" />
-                      </View>
-                    ) : null}
+                    {/* Object-level flagging — photos are reported from the
+                        photo viewer (LightboxToolbar), not at album level. */}
                   </View>
                   {album?.is_hidden ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
@@ -438,6 +434,9 @@ export default function AlbumScreen() {
                   ) : null}
                 </View>
               ) : null}
+
+              {/* No album-level likes/comments — those live inside the photo
+                  viewer (LightboxToolbar) on each photo (entity album_photo). */}
 
               {/* Manage: album-level actions */}
               {manageMode && canManage ? (
@@ -603,7 +602,12 @@ export default function AlbumScreen() {
       )}
 
       {lightboxIndex !== null && (
-        <PhotoLightbox photos={mapped} startIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+        <PhotoLightbox
+          photos={mapped}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          entityType="album_photo"
+        />
       )}
 
       {editAlbumOpen && album ? (

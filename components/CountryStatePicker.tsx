@@ -3,7 +3,10 @@ import {
   View, Text, TouchableOpacity, Modal, FlatList,
   TextInput, SafeAreaView,
 } from 'react-native'
-import { Country, State } from 'country-state-city'
+// Direct subpath imports to avoid pulling in the 7.7MB city.json that the
+// barrel re-exports — parsing it blows JSC's stack on iOS.
+import Country from 'country-state-city/lib/country'
+import State from 'country-state-city/lib/state'
 
 interface Option { code: string; name: string }
 

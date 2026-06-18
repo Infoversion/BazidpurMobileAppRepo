@@ -20,6 +20,7 @@ interface Props {
     | 'album_photo'
     | 'video_album'
     | 'video_album_item'
+    | 'comment'
   contentId: string
   /** Optional size tweak — useful for compact spots like grid overlays. */
   size?: 'sm' | 'md'
