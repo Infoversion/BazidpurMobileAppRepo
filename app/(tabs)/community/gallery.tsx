@@ -88,6 +88,7 @@ function AlbumCover({ coverUrl, thumbUrls, size }: { coverUrl?: string | null; t
 
 interface AlbumWithThumbs extends Album {
   _thumbUrls: string[]
+  _photoCount: number
 }
 
 function CreateAlbumModal({ onClose, onCreated }: { onClose: () => void; onCreated: (album: Album) => void }) {
@@ -400,15 +401,17 @@ export default function GalleryScreen() {
       .order('display_order')
 
     const photosByAlbum: Record<string, string[]> = {}
+    const countsByAlbum: Record<string, number> = {}
     for (const p of (photoData ?? []) as { album_id: string; thumbnail_url?: string; r2_url: string }[]) {
       if (!photosByAlbum[p.album_id]) photosByAlbum[p.album_id] = []
+      countsByAlbum[p.album_id] = (countsByAlbum[p.album_id] ?? 0) + 1
       if (photosByAlbum[p.album_id].length < 4) {
         photosByAlbum[p.album_id].push(p.thumbnail_url || p.r2_url)
       }
     }
 
     const withThumbs = raw
-      .map(a => ({ ...a, _thumbUrls: photosByAlbum[a.id] ?? [] }))
+      .map(a => ({ ...a, _thumbUrls: photosByAlbum[a.id] ?? [], _photoCount: countsByAlbum[a.id] ?? 0 }))
       .filter(a => a._thumbUrls.length > 0 || a.cover_photo_url || a.user_id === user?.id)
     setAlbums([
       ...withThumbs.filter(a => a.user_id === user?.id),
@@ -580,7 +583,7 @@ export default function GalleryScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
                     <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{timeAgo(item.created_at)}</Text>
                     {item._thumbUrls.length > 0 ? (
-                      <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{item._thumbUrls.length >= 4 ? '4+' : item._thumbUrls.length} photos</Text>
+                      <Text style={{ fontSize: 11, color: '#aeaeb2' }}>{item._photoCount} photo{item._photoCount !== 1 ? 's' : ''}</Text>
                     ) : null}
                   </View>
                 </View>
@@ -665,7 +668,7 @@ export default function GalleryScreen() {
         <CreateAlbumModal
           onClose={() => setCreateOpen(false)}
           onCreated={album => {
-            setAlbums(prev => prev.length ? [{ ...album, _thumbUrls: [] }, ...prev] : [{ ...album, _thumbUrls: [] }])
+            setAlbums(prev => prev.length ? [{ ...album, _thumbUrls: [], _photoCount: 0 }, ...prev] : [{ ...album, _thumbUrls: [], _photoCount: 0 }])
             setCreateOpen(false)
             router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: album.id } })
           }}
