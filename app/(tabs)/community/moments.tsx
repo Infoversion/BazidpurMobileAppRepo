@@ -129,7 +129,7 @@ function PhotoGrid({
   onRefresh: () => void
 }) {
   const { width } = useWindowDimensions()
-  const tileSize = (width - 52) / 2
+  const tileSize = (width - 44) / 3
 
   if (photos.length === 0) {
     return (
@@ -145,9 +145,9 @@ function PhotoGrid({
     <FlatList
       data={photos}
       keyExtractor={p => p.id}
-      numColumns={2}
-      columnWrapperStyle={{ gap: 12 }}
-      contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 90 }}
+      numColumns={3}
+      columnWrapperStyle={{ gap: 6 }}
+      contentContainerStyle={{ padding: 16, gap: 6, paddingBottom: 90 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
       renderItem={({ item, index }) => (
         <TouchableOpacity
