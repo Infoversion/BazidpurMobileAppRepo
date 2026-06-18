@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView,
   TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -76,6 +76,17 @@ export default function ProfileScreen() {
   const [saving, setSaving]           = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [localPhotoUri, setLocalPhotoUri]   = useState<string | null>(null)
+  const [linkedNodeId, setLinkedNodeId]     = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user?.id) return
+    supabase
+      .from('family_tree_nodes')
+      .select('id')
+      .eq('linked_user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => setLinkedNodeId(data?.id ?? null))
+  }, [user?.id])
 
   const avatarUri = localPhotoUri ?? resolveUri(user?.photo_url)
   const initials  = user ? `${user.first_name?.charAt(0) ?? ''}${user.last_name?.charAt(0) ?? ''}` : '?'
@@ -222,6 +233,24 @@ export default function ProfileScreen() {
               <Text style={{ fontSize: 13, color: '#8e8e93', marginTop: 2 }}>{user.email}</Text>
             ) : null}
           </View>
+
+          {/* Family tree link */}
+          {linkedNodeId ? (
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/tree' as any)}
+              style={{
+                backgroundColor: '#2d1b69', borderRadius: 12,
+                paddingVertical: 13, paddingHorizontal: 16,
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: 8, marginBottom: 16,
+                shadowColor: '#2d1b69', shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2, shadowRadius: 6, elevation: 3,
+              }}
+            >
+              <Text style={{ fontSize: 18 }}>🌳</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>View in Family Tree</Text>
+            </TouchableOpacity>
+          ) : null}
 
           {/* Edit form */}
           <View style={{
