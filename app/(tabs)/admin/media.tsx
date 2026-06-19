@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView, PanResponder, useWindowDimensions,
 } from 'react-native'
 import { Image } from 'expo-image'
+import Svg, { Line } from 'react-native-svg'
 import * as ImagePicker from 'expo-image-picker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
@@ -76,6 +77,14 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function friendlyError(msg: string): string {
+  const l = msg.toLowerCase()
+  if (l.includes('row-level security') || l.includes('rls') || l.includes('policy')) {
+    return 'Permission denied. Your account does not have access to modify this item. Please contact the administrator.'
+  }
+  return msg
+}
+
 async function webApiUpload(
   apiUrl: string, uri: string,
   fields: { title: string; description: string; display_order: number },
@@ -107,6 +116,18 @@ async function webApiUpload(
   }
   const parsed = JSON.parse(result.body)
   return (parsed.photo as Record<string, unknown>) ?? parsed
+}
+
+// ─── Sort icon ────────────────────────────────────────────────────────────────
+
+function SortIcon({ size = 16, color = '#2d1b69' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <Line x1="2" y1="3.5" x2="14" y2="3.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <Line x1="2" y1="8" x2="10" y2="8" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <Line x1="2" y1="12.5" x2="6" y2="12.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  )
 }
 
 // ─── Cover grid ───────────────────────────────────────────────────────────────
@@ -164,8 +185,6 @@ function AlbumRail({
         Albums ({albums.length})
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-
-        {/* Root card */}
         <TouchableOpacity onPress={() => onSelect(null)}
           style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: selectedId === null ? '#2d1b69' : '#e5e5ea', overflow: 'hidden', backgroundColor: '#f9f9f9' }}
           activeOpacity={0.75}>
@@ -180,7 +199,6 @@ function AlbumRail({
           </View>
         </TouchableOpacity>
 
-        {/* Album cards */}
         {albums.map(album => {
           const active = selectedId === album.id
           const covers = coversForAlbum(album.id)
@@ -207,7 +225,6 @@ function AlbumRail({
           )
         })}
 
-        {/* Add album button */}
         <TouchableOpacity onPress={onAdd}
           style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: '#e5e5ea', borderStyle: 'dashed', overflow: 'hidden', backgroundColor: '#f9f9f9', alignItems: 'center', justifyContent: 'center', height: IMG_H + 28 }}
           activeOpacity={0.75}>
@@ -435,6 +452,7 @@ function MediaTile({ item, mediaType, size, selected, selectMode, onPress, onLon
     ? ((item as MediaPhoto).thumbnail_url || (item as MediaPhoto).r2_url)
     : ((item as MediaVideo).thumbnail_url || `https://img.youtube.com/vi/${(item as MediaVideo).youtube_id}/mqdefault.jpg`)
   const isActive = (item as MediaVideo).is_active !== false
+  const title = (item as any).title as string | undefined // eslint-disable-line @typescript-eslint/no-explicit-any
 
   return (
     <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={0.85}
@@ -447,14 +465,14 @@ function MediaTile({ item, mediaType, size, selected, selectMode, onPress, onLon
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' }} />
         )}
 
-        {/* Video play badge */}
+        {/* Video play badge — top-left */}
         {mediaType === 'videos' && (
-          <View style={{ position: 'absolute', bottom: 3, left: 3, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 }}>
+          <View style={{ position: 'absolute', top: 3, left: 3, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 }}>
             <Text style={{ color: '#fff', fontSize: 7 }}>▶</Text>
           </View>
         )}
 
-        {/* Status dot (hidden when select mode active) */}
+        {/* Status dot — top-right (non-select mode) */}
         {!selectMode && (
           <View style={{
             position: 'absolute', top: 3, right: 3,
@@ -464,7 +482,7 @@ function MediaTile({ item, mediaType, size, selected, selectMode, onPress, onLon
           }} />
         )}
 
-        {/* Select checkbox */}
+        {/* Select checkbox — top-right (select mode) */}
         {selectMode && (
           <View style={{
             position: 'absolute', top: 3, right: 3,
@@ -476,6 +494,16 @@ function MediaTile({ item, mediaType, size, selected, selectMode, onPress, onLon
             {selected && <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>✓</Text>}
           </View>
         )}
+
+        {/* Title overlay — bottom */}
+        {title ? (
+          <View style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 3, paddingVertical: 2,
+          }}>
+            <Text style={{ fontSize: 8, color: '#fff', fontWeight: '500' }} numberOfLines={1}>{title}</Text>
+          </View>
+        ) : null}
       </View>
     </TouchableOpacity>
   )
@@ -489,7 +517,7 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
   onClose: () => void
   onReorder: (newOrder: (MediaPhoto | MediaVideo)[]) => void
 }) {
-  const ITEM_H = 62
+  const ITEM_H = 64
   const insets = useSafeAreaInsets()
   const [displayOrder, setDisplayOrder] = useState(() => [...items])
   const [saving, setSaving] = useState(false)
@@ -498,16 +526,21 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
   const orderRef = useRef([...items])
   const draggingIdxRef = useRef(-1)
   const anchorIdxRef = useRef(-1)
-  // Maps item.id → current visual position (kept in sync after each reorder)
   const positionMapRef = useRef(new Map(items.map((it, i) => [it.id, i])))
+  // Direct ref to ScrollView for synchronous scroll-disable (avoids re-render race)
+  const scrollRef = useRef<any>(null) // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  // Create one PanResponder per original item (stable, not recreated)
   const panResponders = useRef(
     items.map(it =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 2,
+        // Claim moves immediately — no threshold — so ScrollView can't intercept
+        onMoveShouldSetPanResponder: () => true,
+        // Never yield the gesture back to a parent (ScrollView) once we have it
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
+          // Disable scroll synchronously (no re-render lag)
+          scrollRef.current?.setNativeProps({ scrollEnabled: false })
           const idx = positionMapRef.current.get(it.id) ?? 0
           draggingIdxRef.current = idx
           anchorIdxRef.current = idx
@@ -529,6 +562,13 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
           }
         },
         onPanResponderRelease: () => {
+          scrollRef.current?.setNativeProps({ scrollEnabled: true })
+          draggingIdxRef.current = -1
+          anchorIdxRef.current = -1
+          setDraggingId(null)
+        },
+        onPanResponderTerminate: () => {
+          scrollRef.current?.setNativeProps({ scrollEnabled: true })
           draggingIdxRef.current = -1
           anchorIdxRef.current = -1
           setDraggingId(null)
@@ -537,7 +577,7 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
     )
   ).current
 
-  // Map original item id → its panResponder index (stable)
+  // Stable map: item id → original index in panResponders array
   const idToOrigIdx = new Map(items.map((it, i) => [it.id, i]))
 
   async function handleSave() {
@@ -552,7 +592,7 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
       onReorder(orderRef.current.map((it, i) => ({ ...it, display_order: i })))
       onClose()
     } catch {
-      Alert.alert('Error', 'Could not save order. Please try again.')
+      Alert.alert('Error', 'Could not save order. Please try again.', [{ text: 'OK' }])
       setSaving(false)
     }
   }
@@ -570,7 +610,12 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={{ flex: 1 }} scrollEnabled={draggingId === null} contentContainerStyle={{ paddingVertical: 10 }}>
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          scrollEnabled={draggingId === null}
+          contentContainerStyle={{ paddingVertical: 10 }}
+        >
           {displayOrder.map(it => {
             const prIdx = idToOrigIdx.get(it.id) ?? 0
             const pr = panResponders[prIdx]
@@ -587,9 +632,10 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
               }}>
                 <Image source={{ uri: thumb }} style={{ width: 44, height: 44, borderRadius: 6 }} contentFit="cover" />
                 <Text style={{ flex: 1, fontSize: 14, color: '#1c1c1e' }} numberOfLines={1}>
-                  {(it as any).title || '(Untitled)'}
+                  {(it as any).title || '(Untitled)'} {/* eslint-disable-line @typescript-eslint/no-explicit-any */}
                 </Text>
-                <View {...(pr?.panHandlers ?? {})} style={{ paddingHorizontal: 10, paddingVertical: 12 }}>
+                {/* Drag handle — spread panHandlers here */}
+                <View {...(pr?.panHandlers ?? {})} style={{ paddingHorizontal: 14, paddingVertical: 14 }}>
                   <Text style={{ fontSize: 22, color: isDragging ? '#2d1b69' : '#c7c7cc' }}>≡</Text>
                 </View>
               </View>
@@ -599,7 +645,7 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
 
         <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 8, paddingTop: 6 }}>
           <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.45)', textAlign: 'center' }}>
-            Drag ≡ to reorder · tap Save to apply
+            Hold and drag ≡ to reorder · tap Save to apply
           </Text>
         </View>
       </View>
@@ -760,13 +806,9 @@ export default function MediaAdminScreen() {
       const allAlbums = await fetchAlbums()
       const pAlbs = allAlbums.filter(a => a.album_type === 'photos')
       const vAlbs = allAlbums.filter(a => a.album_type === 'videos')
-      setAlbums(allAlbums)
-      setPhotoAlbums(pAlbs)
-      setVideoAlbums(vAlbs)
+      setAlbums(allAlbums); setPhotoAlbums(pAlbs); setVideoAlbums(vAlbs)
       await Promise.all([
-        fetchPage('photos', 'all', '', 0, { pAlbs, vAlbs, pId: null, vId: null }).then(rows => {
-          setPhotos(rows); setHasMore(rows.length === PAGE_SIZE)
-        }),
+        fetchPage('photos', 'all', '', 0, { pAlbs, vAlbs, pId: null, vId: null }).then(rows => { setPhotos(rows); setHasMore(rows.length === PAGE_SIZE) }),
         fetchPage('videos', 'all', '', 0, { pAlbs, vAlbs, pId: null, vId: null }).then(rows => setVideos(rows)),
         fetchCounts(),
         fetchAlbumCoverData(allAlbums),
@@ -827,9 +869,7 @@ export default function MediaAdminScreen() {
     if (error) throw new Error(error.message)
     const newAlb = data as MediaAlbum
     const updated = [...albums, newAlb]
-    setAlbums(updated)
-    setPhotoAlbums(updated.filter(a => a.album_type === 'photos'))
-    setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
+    setAlbums(updated); setPhotoAlbums(updated.filter(a => a.album_type === 'photos')); setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
     setAlbumCoverData(prev => ({ ...prev, [newAlb.id]: { covers: [], count: 0 } }))
     setShowCreateAlbum(false)
     if (type === 'photos') setSelectedPhotoAlbumId(newAlb.id)
@@ -846,7 +886,7 @@ export default function MediaAdminScreen() {
             text: 'Rename', onPress: async (newTitle?: string) => {
               if (!newTitle?.trim()) return
               const { error } = await supabase.from('media_albums').update({ title: newTitle.trim() }).eq('id', album.id)
-              if (error) { Alert.alert('Error', error.message); return }
+              if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
               const updated = albums.map(a => a.id === album.id ? { ...a, title: newTitle.trim() } : a)
               setAlbums(updated); setPhotoAlbums(updated.filter(a => a.album_type === 'photos')); setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
             },
@@ -855,7 +895,7 @@ export default function MediaAdminScreen() {
       } else if (i === 1) {
         const next = !album.is_hidden
         supabase.from('media_albums').update({ is_hidden: next }).eq('id', album.id).then(({ error }) => {
-          if (error) { Alert.alert('Error', error.message); return }
+          if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
           const updated = albums.map(a => a.id === album.id ? { ...a, is_hidden: next } : a)
           setAlbums(updated); setPhotoAlbums(updated.filter(a => a.album_type === 'photos')); setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
         })
@@ -894,10 +934,10 @@ export default function MediaAdminScreen() {
     setMovePicker(null)
     const table = mediaTab === 'photos' ? 'photos' : 'videos'
     const { error } = await supabase.from(table).update({ album_id: albumId }).eq('id', item.id)
-    if (error) { Alert.alert('Error', error.message); return }
+    if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
     if (mediaTab === 'photos') setPhotos(prev => prev.filter(x => x.id !== item.id))
     else setVideos(prev => prev.filter(x => x.id !== item.id))
-    fetchAlbumCoverData(albums)  // refresh rail counts after move
+    fetchAlbumCoverData(albums)
   }
 
   // ── Select mode actions ───────────────────────────────────────────────────
@@ -929,7 +969,7 @@ export default function MediaAdminScreen() {
     const ids = Array.from(selectedIds)
     const table = mediaTab === 'photos' ? 'photos' : 'videos'
     const { error } = await supabase.from(table).update({ album_id: albumId }).in('id', ids)
-    if (error) { Alert.alert('Error', error.message); return }
+    if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
     if (mediaTab === 'photos') setPhotos(prev => prev.filter(x => !selectedIds.has(x.id)))
     else setVideos(prev => prev.filter(x => !selectedIds.has(x.id)))
     cancelSelectMode()
@@ -945,7 +985,7 @@ export default function MediaAdminScreen() {
     })
     const newActive = !allActive
     const { error } = await supabase.from(table).update({ is_active: newActive }).in('id', ids)
-    if (error) { Alert.alert('Error', error.message); return }
+    if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
     if (mediaTab === 'photos') setPhotos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
     else setVideos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
     cancelSelectMode()
@@ -959,14 +999,9 @@ export default function MediaAdminScreen() {
         text: 'Delete', style: 'destructive', onPress: async () => {
           const table = mediaTab === 'photos' ? 'photos' : 'videos'
           const { error } = await supabase.from(table).delete().in('id', ids)
-          if (error) { Alert.alert('Error', error.message); return }
-          if (mediaTab === 'photos') {
-            setPhotos(prev => prev.filter(x => !selectedIds.has(x.id)))
-            setCounts(c => ({ ...c, photos: Math.max(0, c.photos - ids.length) }))
-          } else {
-            setVideos(prev => prev.filter(x => !selectedIds.has(x.id)))
-            setCounts(c => ({ ...c, videos: Math.max(0, c.videos - ids.length) }))
-          }
+          if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
+          if (mediaTab === 'photos') { setPhotos(prev => prev.filter(x => !selectedIds.has(x.id))); setCounts(c => ({ ...c, photos: Math.max(0, c.photos - ids.length) })) }
+          else { setVideos(prev => prev.filter(x => !selectedIds.has(x.id))); setCounts(c => ({ ...c, videos: Math.max(0, c.videos - ids.length) })) }
           cancelSelectMode()
           fetchAlbumCoverData(albums)
         },
@@ -991,7 +1026,7 @@ export default function MediaAdminScreen() {
           if (yid) { update.youtube_id = yid; update.youtube_url = `https://www.youtube.com/watch?v=${yid}` }
         }
         const { error } = await supabase.from(mediaTab === 'photos' ? 'photos' : 'videos').update(update).eq('id', editingId)
-        if (error) throw new Error(error.message)
+        if (error) throw new Error(friendlyError(error.message))
         if (mediaTab === 'photos') setPhotos(prev => prev.map(x => x.id === editingId ? { ...x, ...update } as MediaPhoto : x))
         else setVideos(prev => prev.map(x => x.id === editingId ? { ...x, ...update } as MediaVideo : x))
 
@@ -999,15 +1034,11 @@ export default function MediaAdminScreen() {
         const yid = extractYouTubeId(form.youtubeUrl.trim())
         if (!yid) throw new Error('Could not extract a YouTube video ID from that URL.')
         const { data, error } = await supabase.from('videos').insert({
-          youtube_id: yid,
-          youtube_url: `https://www.youtube.com/watch?v=${yid}`,
-          title: form.title.trim() || null,
-          description: form.description.trim() || null,
-          display_order: order,
-          is_active: true,
-          album_id: selectedVideoAlbumId ?? null,
+          youtube_id: yid, youtube_url: `https://www.youtube.com/watch?v=${yid}`,
+          title: form.title.trim() || null, description: form.description.trim() || null,
+          display_order: order, is_active: true, album_id: selectedVideoAlbumId ?? null,
         }).select().single()
-        if (error) throw new Error(error.message)
+        if (error) throw new Error(friendlyError(error.message))
         setVideos(prev => [data as MediaVideo, ...prev])
         setCounts(c => ({ ...c, videos: c.videos + 1 }))
 
@@ -1032,7 +1063,7 @@ export default function MediaAdminScreen() {
       }
       setModalVisible(false)
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+      Alert.alert('Error', e instanceof Error ? e.message : 'Something went wrong. Please try again.', [{ text: 'OK' }])
     } finally {
       setSaving(false); setUploadState(null)
     }
@@ -1045,7 +1076,7 @@ export default function MediaAdminScreen() {
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
           const { error } = await supabase.from(table).delete().eq('id', id)
-          if (error) { Alert.alert('Error', error.message); return }
+          if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
           if (mediaTab === 'photos') { setPhotos(prev => prev.filter(x => x.id !== id)); setCounts(c => ({ ...c, photos: c.photos - 1 })) }
           else { setVideos(prev => prev.filter(x => x.id !== id)); setCounts(c => ({ ...c, videos: c.videos - 1 })) }
         },
@@ -1056,14 +1087,17 @@ export default function MediaAdminScreen() {
   async function toggleActive(id: string, current: boolean) {
     const table = mediaTab === 'photos' ? 'photos' : 'videos'
     const { error } = await supabase.from(table).update({ is_active: !current }).eq('id', id)
-    if (error) { Alert.alert('Error', error.message); return }
+    if (error) {
+      Alert.alert('Cannot Update', friendlyError(error.message), [{ text: 'OK' }])
+      return
+    }
     if (mediaTab === 'photos') setPhotos(prev => prev.map(x => x.id === id ? { ...x, is_active: !current } : x))
     else setVideos(prev => prev.map(x => x.id === id ? { ...x, is_active: !current } : x))
   }
 
   function showActions(item: MediaPhoto | MediaVideo) {
     const active = (item as MediaVideo).is_active !== false
-    const options = ['✏️  Edit', '📁  Move to Album', active ? '🚫  Hide' : '✅  Make Active', '🗑️  Delete', 'Cancel']
+    const options = ['✏️  Edit', '📁  Move to another Album', active ? '🚫  Hide' : '✅  Make Active', '🗑️  Delete', 'Cancel']
     const handle = (i: number) => {
       const label = options[i]
       if (label.includes('Edit')) {
@@ -1072,7 +1106,7 @@ export default function MediaAdminScreen() {
         setModalForm({ title: v.title ?? '', description: v.description ?? '', displayOrder: String(item.display_order), youtubeUrl: v.youtube_url ?? '', images: [] })
         setModalTitle('Edit')
         setModalVisible(true)
-      } else if (label.includes('Move to Album')) {
+      } else if (label.includes('Move to another Album')) {
         setMovePicker({ item })
       } else if (label.includes('Hide') || label.includes('Active')) {
         toggleActive(item.id, active)
@@ -1113,7 +1147,7 @@ export default function MediaAdminScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
 
-      {/* Combined toolbar: media type + status filter in one row */}
+      {/* Combined toolbar */}
       <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 8, gap: 5, borderBottomWidth: 0.5, borderBottomColor: '#e5e5ea' }}>
         <Pill label={`📷 ${counts.photos}`} active={mediaTab === 'photos'} onPress={() => { setMediaTab('photos'); setStatusFilter('all'); cancelSelectMode() }} />
         <Pill label={`🎬 ${counts.videos}`} active={mediaTab === 'videos'} onPress={() => { setMediaTab('videos'); setStatusFilter('all'); cancelSelectMode() }} />
@@ -1123,7 +1157,7 @@ export default function MediaAdminScreen() {
         <Pill label="○ Hidden" active={statusFilter === 'hidden'} onPress={() => setStatusFilter('hidden')} />
       </View>
 
-      {/* Search row with + button (or select mode header) */}
+      {/* Search row or select mode header */}
       {selectMode ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: '#e5e5ea' }}>
           <TouchableOpacity onPress={cancelSelectMode}>
@@ -1172,13 +1206,13 @@ export default function MediaAdminScreen() {
         mediaType={mediaTab}
       />
 
-      {/* Album heading + Reorder button */}
+      {/* Album heading + sort icon button */}
       <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f2f2f7' }}>
         <Text style={{ fontSize: 16, fontWeight: '700', color: '#1c1c1e' }}>{currentAlbumName}</Text>
         {currentData.length > 1 && !debouncedSearch && (
           <TouchableOpacity onPress={() => setShowReorderModal(true)}
-            style={{ backgroundColor: '#ede9fe', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: '#2d1b69' }}>Reorder</Text>
+            style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
+            <SortIcon size={16} color="#2d1b69" />
           </TouchableOpacity>
         )}
       </View>
@@ -1222,38 +1256,37 @@ export default function MediaAdminScreen() {
         }
       />
 
-      {/* Bulk action bar (above tab bar when items selected) */}
+      {/* Bulk action bar — shown above tab bar when items are selected */}
       {selectMode && selectedIds.size > 0 && (
         <View style={{
-          position: 'absolute', bottom: insets.bottom + 49, left: 0, right: 0,
+          position: 'absolute', bottom: insets.bottom + 86, left: 0, right: 0,
           flexDirection: 'row', backgroundColor: '#fff',
-          borderTopWidth: 0.5, borderTopColor: '#e5e5ea',
+          borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: '#e5e5ea',
           paddingVertical: 13, paddingHorizontal: 20, alignItems: 'center',
+          shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 4,
         }}>
-          <TouchableOpacity onPress={() => setBulkMovePicker(true)} style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#2d1b69' }}>Move</Text>
+          <TouchableOpacity onPress={() => setBulkMovePicker(true)} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+            <Text style={{ fontSize: 18 }}>📁</Text>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: '#2d1b69' }}>Move</Text>
           </TouchableOpacity>
-          <View style={{ width: 1, height: 18, backgroundColor: '#e5e5ea' }} />
-          <TouchableOpacity onPress={handleBulkToggle} style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#2d1b69' }}>Toggle</Text>
+          <View style={{ width: 1, height: 36, backgroundColor: '#e5e5ea' }} />
+          <TouchableOpacity onPress={handleBulkToggle} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+            <Text style={{ fontSize: 18 }}>👁</Text>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: '#2d1b69' }}>Toggle</Text>
           </TouchableOpacity>
-          <View style={{ width: 1, height: 18, backgroundColor: '#e5e5ea' }} />
-          <TouchableOpacity onPress={handleBulkDelete} style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#ef4444' }}>Delete</Text>
+          <View style={{ width: 1, height: 36, backgroundColor: '#e5e5ea' }} />
+          <TouchableOpacity onPress={handleBulkDelete} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+            <Text style={{ fontSize: 18 }}>🗑️</Text>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: '#ef4444' }}>Delete</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {/* Modals */}
       <FormModal
-        visible={modalVisible}
-        title={modalTitle}
-        mediaType={mediaTab}
-        initial={modalForm}
-        saving={saving}
-        uploadState={uploadState}
-        onSave={handleSave}
-        onClose={() => { if (!saving) setModalVisible(false) }}
+        visible={modalVisible} title={modalTitle} mediaType={mediaTab}
+        initial={modalForm} saving={saving} uploadState={uploadState}
+        onSave={handleSave} onClose={() => { if (!saving) setModalVisible(false) }}
         albumName={editingId ? undefined : currentAlbumName}
       />
 
