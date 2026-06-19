@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import type { Photo, Video } from '@/lib/types'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
+import { LikesComments } from '@/components/LikesComments'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { CuratedNotice } from '@/components/CuratedNotice'
 
@@ -184,10 +185,10 @@ function PhotoGrid({
       renderItem={({ item, index }) => (
         <TouchableOpacity
           style={{
-            width: tileSize, borderRadius: 14, overflow: 'hidden',
+            width: tileSize, borderRadius: 10, overflow: 'hidden',
             backgroundColor: '#ffffff',
-            shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+            shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
           }}
           onPress={() => onPress(index)}
           activeOpacity={0.85}
@@ -197,13 +198,6 @@ function PhotoGrid({
             style={{ width: tileSize, height: tileSize }}
             contentFit="cover"
           />
-          {item.title ? (
-            <View style={{ padding: 8 }}>
-              <Text style={{ fontSize: 11, fontWeight: '500', color: '#374151' }} numberOfLines={1}>
-                {item.title}
-              </Text>
-            </View>
-          ) : null}
         </TouchableOpacity>
       )}
     />
@@ -262,7 +256,6 @@ function VideoCard({ item, cardWidth, thumbHeight }: { item: Video; cardWidth: n
           </View>
         </TouchableOpacity>
       )}
-      {/* Info */}
       <View style={{ padding: 14 }}>
         <Text style={{ fontSize: 15, fontWeight: '700', color: '#1c1c1e', marginBottom: 4, lineHeight: 20 }} numberOfLines={2}>
           {item.title}
@@ -272,6 +265,7 @@ function VideoCard({ item, cardWidth, thumbHeight }: { item: Video; cardWidth: n
             {item.description}
           </Text>
         ) : null}
+        <LikesComments entityType="video" entityId={item.id} />
       </View>
     </View>
   )
