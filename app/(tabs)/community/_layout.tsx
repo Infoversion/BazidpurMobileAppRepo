@@ -22,6 +22,7 @@ export default function CommunityLayout() {
       <Stack.Screen name="memoir/[id]" options={{ title: '' }} />
       <Stack.Screen name="forum/index" options={{ headerShown: false }} />
       <Stack.Screen name="forum/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="scattered-roots" options={{ headerShown: false }} />
     </Stack>
   )
 }
