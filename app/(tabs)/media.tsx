@@ -95,8 +95,8 @@ function AlbumRail({
   coversForAlbum: (id: string) => string[]
   mediaType: 'photos' | 'videos'
 }) {
-  if (rootCount === 0 && albums.length === 0) return null
   const { width } = useWindowDimensions()
+  if (rootCount === 0 && albums.length === 0) return null
   const CARD_W = Math.floor((width - 44) / 3)
   const IMG_H = CARD_W
   const itemWord = mediaType === 'photos' ? 'photo' : 'video'
