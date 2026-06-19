@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, Modal,
   ActivityIndicator, RefreshControl, TextInput,
   Alert, ActionSheetIOS, Platform, ScrollView,
-  KeyboardAvoidingView,
+  KeyboardAvoidingView, PanResponder, useWindowDimensions,
 } from 'react-native'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
@@ -17,6 +17,7 @@ type MediaTab = 'photos' | 'videos'
 type StatusFilter = 'all' | 'active' | 'hidden'
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024
+const PAGE_SIZE = 40
 
 interface PickedImage { uri: string; fileSize?: number }
 interface UploadState { current: number; total: number; pct: number; label: string }
@@ -61,7 +62,6 @@ interface FormState {
   images: PickedImage[]
 }
 
-const PAGE_SIZE = 25
 const EMPTY_FORM: FormState = { title: '', description: '', displayOrder: '', youtubeUrl: '', images: [] }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -109,33 +109,6 @@ async function webApiUpload(
   return (parsed.photo as Record<string, unknown>) ?? parsed
 }
 
-// ─── Segmented control ────────────────────────────────────────────────────────
-
-function Seg<T extends string>({ tabs, selected, onSelect }: { tabs: { key: T; label: string }[]; selected: T; onSelect: (k: T) => void }) {
-  return (
-    <View style={{ flexDirection: 'row', backgroundColor: 'rgba(118,118,128,0.12)', borderRadius: 9, padding: 2, marginHorizontal: 16, marginTop: 10, marginBottom: 8 }}>
-      {tabs.map(tab => {
-        const active = tab.key === selected
-        return (
-          <TouchableOpacity key={tab.key} onPress={() => onSelect(tab.key)} activeOpacity={0.8}
-            style={[{ flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 7 }, active && { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }]}>
-            <Text style={{ fontSize: 12, fontWeight: active ? '600' : '400', color: active ? '#000' : 'rgba(60,60,67,0.6)' }}>{tab.label}</Text>
-          </TouchableOpacity>
-        )
-      })}
-    </View>
-  )
-}
-
-function ActiveBadge({ active }: { active: boolean | undefined }) {
-  if (active === undefined) return null
-  return (
-    <View style={{ borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: active ? '#d1fae5' : '#fee2e2' }}>
-      <Text style={{ fontSize: 10, fontWeight: '600', color: active ? '#065f46' : '#991b1b' }}>{active ? 'ACTIVE' : 'HIDDEN'}</Text>
-    </View>
-  )
-}
-
 // ─── Cover grid ───────────────────────────────────────────────────────────────
 
 function CoverGrid({ covers, size }: { covers: string[]; size: number }) {
@@ -148,9 +121,7 @@ function CoverGrid({ covers, size }: { covers: string[]; size: number }) {
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: size, height: '100%' }}>
       {[0, 1, 2, 3].map(i => (
         <View key={i} style={{ width: half, height: '50%', backgroundColor: '#d1d1d6' }}>
-          {covers[i] && (
-            <Image source={{ uri: covers[i] }} style={{ width: half, height: '100%' }} contentFit="cover" />
-          )}
+          {covers[i] && <Image source={{ uri: covers[i] }} style={{ width: half, height: '100%' }} contentFit="cover" />}
         </View>
       ))}
     </View>
@@ -182,30 +153,26 @@ function AlbumRail({
     <>
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.32)' }} />
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 5, paddingVertical: 4 }}>
-        <Text
-          style={{ fontSize: 10, fontWeight: '800', color: '#fff', lineHeight: 13, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}
-          numberOfLines={2}
-        >{label}</Text>
+        <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', lineHeight: 13, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} numberOfLines={2}>{label}</Text>
       </View>
     </>
   )
 
   return (
     <View style={{ backgroundColor: '#fff', borderBottomWidth: 0.5, borderBottomColor: '#e5e5ea', paddingTop: 8, paddingBottom: 10 }}>
-      <Text style={{ fontSize: 10, fontWeight: '600', color: '#8e8e93', letterSpacing: 1, paddingHorizontal: 16, marginBottom: 6, textTransform: 'uppercase' }}>Albums</Text>
+      <Text style={{ fontSize: 10, fontWeight: '600', color: '#8e8e93', letterSpacing: 1, paddingHorizontal: 16, marginBottom: 6, textTransform: 'uppercase' }}>
+        Albums ({albums.length})
+      </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
 
         {/* Root card */}
-        <TouchableOpacity
-          onPress={() => onSelect(null)}
+        <TouchableOpacity onPress={() => onSelect(null)}
           style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: selectedId === null ? '#2d1b69' : '#e5e5ea', overflow: 'hidden', backgroundColor: '#f9f9f9' }}
-          activeOpacity={0.75}
-        >
+          activeOpacity={0.75}>
           <View style={{ width: CARD_W, height: IMG_H, backgroundColor: '#ede9fe', overflow: 'hidden' }}>
             {rootCovers.length > 0
               ? <CoverGrid covers={rootCovers} size={CARD_W} />
-              : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 20 }}>📂</Text></View>
-            }
+              : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 20 }}>📂</Text></View>}
             {nameOverlay('Root')}
           </View>
           <View style={{ paddingHorizontal: 5, paddingVertical: 4, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
@@ -219,18 +186,13 @@ function AlbumRail({
           const covers = coversForAlbum(album.id)
           const count = countForAlbum(album.id)
           return (
-            <TouchableOpacity
-              key={album.id}
-              onPress={() => onSelect(album.id)}
-              onLongPress={() => onLongPress(album)}
+            <TouchableOpacity key={album.id} onPress={() => onSelect(album.id)} onLongPress={() => onLongPress(album)}
               style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: active ? '#2d1b69' : '#e5e5ea', overflow: 'hidden', backgroundColor: '#f9f9f9', opacity: album.is_hidden ? 0.55 : 1 }}
-              activeOpacity={0.75}
-            >
+              activeOpacity={0.75}>
               <View style={{ width: CARD_W, height: IMG_H, backgroundColor: '#ede9fe', overflow: 'hidden' }}>
                 {covers.length > 0
                   ? <CoverGrid covers={covers} size={CARD_W} />
-                  : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 20 }}>📁</Text></View>
-                }
+                  : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 20 }}>📁</Text></View>}
                 {album.is_hidden && (
                   <View style={{ position: 'absolute', top: 2, right: 2, zIndex: 10, backgroundColor: '#f59e0b', borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 }}>
                     <Text style={{ fontSize: 8, fontWeight: '700', color: '#fff' }}>H</Text>
@@ -246,21 +208,18 @@ function AlbumRail({
         })}
 
         {/* Add album button */}
-        <TouchableOpacity
-          onPress={onAdd}
+        <TouchableOpacity onPress={onAdd}
           style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: '#e5e5ea', borderStyle: 'dashed', overflow: 'hidden', backgroundColor: '#f9f9f9', alignItems: 'center', justifyContent: 'center', height: IMG_H + 28 }}
-          activeOpacity={0.75}
-        >
+          activeOpacity={0.75}>
           <Text style={{ fontSize: 22, color: '#8e8e93' }}>+</Text>
           <Text style={{ fontSize: 9, color: '#8e8e93', marginTop: 2 }}>Album</Text>
         </TouchableOpacity>
-
       </ScrollView>
     </View>
   )
 }
 
-// ─── Album picker modal (move-to-album) ──────────────────────────────────────
+// ─── Album picker modal ────────────────────────────────────────────────────────
 
 function AlbumPickerModal({
   albums, mediaType, onPick, onClose,
@@ -329,15 +288,9 @@ function CreateAlbumModal({
         <View style={{ padding: 16 }}>
           <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 16 }}>
             <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)', marginBottom: 4 }}>Album title</Text>
-            <TextInput
-              autoFocus
-              style={{ fontSize: 16, color: '#000', paddingVertical: 4 }}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Enter album name…"
-              returnKeyType="done"
-              onSubmitEditing={save}
-            />
+            <TextInput autoFocus style={{ fontSize: 16, color: '#000', paddingVertical: 4 }}
+              value={title} onChangeText={setTitle} placeholder="Enter album name…"
+              returnKeyType="done" onSubmitEditing={save} />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -467,49 +420,190 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
   )
 }
 
-// ─── Row components ───────────────────────────────────────────────────────────
+// ─── Media tile (4-per-row grid item) ────────────────────────────────────────
 
-function PhotoRow({ item, onAction }: { item: MediaPhoto; onAction: () => void }) {
+function MediaTile({ item, mediaType, size, selected, selectMode, onPress, onLongPress }: {
+  item: MediaPhoto | MediaVideo
+  mediaType: MediaTab
+  size: number
+  selected: boolean
+  selectMode: boolean
+  onPress: () => void
+  onLongPress: () => void
+}) {
+  const thumb = mediaType === 'photos'
+    ? ((item as MediaPhoto).thumbnail_url || (item as MediaPhoto).r2_url)
+    : ((item as MediaVideo).thumbnail_url || `https://img.youtube.com/vi/${(item as MediaVideo).youtube_id}/mqdefault.jpg`)
+  const isActive = (item as MediaVideo).is_active !== false
+
   return (
-    <TouchableOpacity onPress={onAction} activeOpacity={0.6}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10 }}>
-      <View style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', backgroundColor: '#f2f2f7', flexShrink: 0 }}>
-        <Image source={{ uri: item.thumbnail_url || item.r2_url }} style={{ width: 52, height: 52 }} contentFit="cover" />
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 15, fontWeight: '500', color: '#000', marginBottom: 2 }} numberOfLines={1}>{item.title || '(Untitled)'}</Text>
-        {item.description ? <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)' }} numberOfLines={1}>{item.description}</Text> : null}
-        <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.35)', marginTop: 1 }}>Order: {item.display_order}</Text>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
-        <ActiveBadge active={item.is_active} />
-        <Text style={{ fontSize: 20, color: '#c7c7cc' }}>›</Text>
+    <TouchableOpacity onPress={onPress} onLongPress={onLongPress} activeOpacity={0.85}
+      style={{ width: size, height: size }}>
+      <View style={{ flex: 1, borderRadius: 3, overflow: 'hidden', backgroundColor: '#d1d1d6' }}>
+        <Image source={{ uri: thumb }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+
+        {/* Dim overlay for hidden items */}
+        {!isActive && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' }} />
+        )}
+
+        {/* Video play badge */}
+        {mediaType === 'videos' && (
+          <View style={{ position: 'absolute', bottom: 3, left: 3, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 }}>
+            <Text style={{ color: '#fff', fontSize: 7 }}>▶</Text>
+          </View>
+        )}
+
+        {/* Status dot (hidden when select mode active) */}
+        {!selectMode && (
+          <View style={{
+            position: 'absolute', top: 3, right: 3,
+            width: 8, height: 8, borderRadius: 4,
+            backgroundColor: isActive ? '#22c55e' : '#ef4444',
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)',
+          }} />
+        )}
+
+        {/* Select checkbox */}
+        {selectMode && (
+          <View style={{
+            position: 'absolute', top: 3, right: 3,
+            width: 18, height: 18, borderRadius: 9,
+            backgroundColor: selected ? '#2d1b69' : 'rgba(255,255,255,0.85)',
+            borderWidth: 1.5, borderColor: selected ? '#2d1b69' : 'rgba(0,0,0,0.25)',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            {selected && <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>✓</Text>}
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   )
 }
 
-function VideoRow({ item, onAction }: { item: MediaVideo; onAction: () => void }) {
-  const thumb = item.thumbnail_url || `https://img.youtube.com/vi/${item.youtube_id}/mqdefault.jpg`
+// ─── Reorder modal (PanResponder drag-and-drop) ───────────────────────────────
+
+function ReorderModal({ items, mediaType, onClose, onReorder }: {
+  items: (MediaPhoto | MediaVideo)[]
+  mediaType: MediaTab
+  onClose: () => void
+  onReorder: (newOrder: (MediaPhoto | MediaVideo)[]) => void
+}) {
+  const ITEM_H = 62
+  const insets = useSafeAreaInsets()
+  const [displayOrder, setDisplayOrder] = useState(() => [...items])
+  const [saving, setSaving] = useState(false)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+
+  const orderRef = useRef([...items])
+  const draggingIdxRef = useRef(-1)
+  const anchorIdxRef = useRef(-1)
+  // Maps item.id → current visual position (kept in sync after each reorder)
+  const positionMapRef = useRef(new Map(items.map((it, i) => [it.id, i])))
+
+  // Create one PanResponder per original item (stable, not recreated)
+  const panResponders = useRef(
+    items.map(it =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 2,
+        onPanResponderGrant: () => {
+          const idx = positionMapRef.current.get(it.id) ?? 0
+          draggingIdxRef.current = idx
+          anchorIdxRef.current = idx
+          setDraggingId(it.id)
+        },
+        onPanResponderMove: (_, gs) => {
+          const from = draggingIdxRef.current
+          if (from < 0) return
+          const n = orderRef.current.length
+          const toIdx = Math.max(0, Math.min(n - 1, Math.round(anchorIdxRef.current + gs.dy / ITEM_H)))
+          if (toIdx !== from) {
+            const next = [...orderRef.current]
+            const [moved] = next.splice(from, 1)
+            next.splice(toIdx, 0, moved)
+            orderRef.current = next
+            next.forEach((x, i) => positionMapRef.current.set(x.id, i))
+            draggingIdxRef.current = toIdx
+            setDisplayOrder([...next])
+          }
+        },
+        onPanResponderRelease: () => {
+          draggingIdxRef.current = -1
+          anchorIdxRef.current = -1
+          setDraggingId(null)
+        },
+      })
+    )
+  ).current
+
+  // Map original item id → its panResponder index (stable)
+  const idToOrigIdx = new Map(items.map((it, i) => [it.id, i]))
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const table = mediaType === 'photos' ? 'photos' : 'videos'
+      await Promise.all(
+        orderRef.current.map((it, i) =>
+          supabase.from(table).update({ display_order: i }).eq('id', it.id)
+        )
+      )
+      onReorder(orderRef.current.map((it, i) => ({ ...it, display_order: i })))
+      onClose()
+    } catch {
+      Alert.alert('Error', 'Could not save order. Please try again.')
+      setSaving(false)
+    }
+  }
+
   return (
-    <TouchableOpacity onPress={onAction} activeOpacity={0.6}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10 }}>
-      <View style={{ width: 72, height: 52, borderRadius: 8, overflow: 'hidden', backgroundColor: '#000', flexShrink: 0, alignItems: 'center', justifyContent: 'center' }}>
-        <Image source={{ uri: thumb }} style={{ width: 72, height: 52 }} contentFit="cover" />
-        <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: '#fff', fontSize: 9, marginLeft: 2 }}>▶</Text>
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <View style={{ backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, paddingTop: insets.top + 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.18)' }}>
+          <TouchableOpacity onPress={onClose} disabled={saving}>
+            <Text style={{ fontSize: 16, color: saving ? 'rgba(60,60,67,0.3)' : '#2d1b69' }}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 16, fontWeight: '600' }}>Reorder {mediaType === 'photos' ? 'Photos' : 'Videos'}</Text>
+          <TouchableOpacity onPress={handleSave} disabled={saving}>
+            {saving ? <ActivityIndicator color="#2d1b69" /> : <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Save</Text>}
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={{ flex: 1 }} scrollEnabled={draggingId === null} contentContainerStyle={{ paddingVertical: 10 }}>
+          {displayOrder.map(it => {
+            const prIdx = idToOrigIdx.get(it.id) ?? 0
+            const pr = panResponders[prIdx]
+            const isDragging = draggingId === it.id
+            const thumb = mediaType === 'photos'
+              ? ((it as MediaPhoto).thumbnail_url || (it as MediaPhoto).r2_url)
+              : ((it as MediaVideo).thumbnail_url || `https://img.youtube.com/vi/${(it as MediaVideo).youtube_id}/mqdefault.jpg`)
+            return (
+              <View key={it.id} style={{
+                height: ITEM_H, flexDirection: 'row', alignItems: 'center',
+                backgroundColor: isDragging ? '#ede9fe' : '#fff',
+                marginHorizontal: 12, marginBottom: 2, borderRadius: 10,
+                paddingHorizontal: 12, gap: 12,
+              }}>
+                <Image source={{ uri: thumb }} style={{ width: 44, height: 44, borderRadius: 6 }} contentFit="cover" />
+                <Text style={{ flex: 1, fontSize: 14, color: '#1c1c1e' }} numberOfLines={1}>
+                  {(it as any).title || '(Untitled)'}
+                </Text>
+                <View {...(pr?.panHandlers ?? {})} style={{ paddingHorizontal: 10, paddingVertical: 12 }}>
+                  <Text style={{ fontSize: 22, color: isDragging ? '#2d1b69' : '#c7c7cc' }}>≡</Text>
+                </View>
+              </View>
+            )
+          })}
+        </ScrollView>
+
+        <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 8, paddingTop: 6 }}>
+          <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.45)', textAlign: 'center' }}>
+            Drag ≡ to reorder · tap Save to apply
+          </Text>
         </View>
       </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 15, fontWeight: '500', color: '#000', marginBottom: 2 }} numberOfLines={1}>{item.title || '(Untitled)'}</Text>
-        {item.description ? <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)' }} numberOfLines={1}>{item.description}</Text> : null}
-        <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.35)', marginTop: 1 }}>Order: {item.display_order}</Text>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
-        <ActiveBadge active={item.is_active} />
-        <Text style={{ fontSize: 20, color: '#c7c7cc' }}>›</Text>
-      </View>
-    </TouchableOpacity>
+    </Modal>
   )
 }
 
@@ -517,8 +611,10 @@ function VideoRow({ item, onAction }: { item: MediaVideo; onAction: () => void }
 
 export default function MediaAdminScreen() {
   const insets = useSafeAreaInsets()
+  const { width } = useWindowDimensions()
+  const TILE_SIZE = Math.floor((width - 24 - 9) / 4)  // 24 = 2×12 pad, 9 = 3×3 gap
 
-  // Media tab + filters
+  // Toolbar
   const [mediaTab, setMediaTab] = useState<MediaTab>('photos')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [search, setSearch] = useState('')
@@ -544,6 +640,14 @@ export default function MediaAdminScreen() {
   const [albumCoverData, setAlbumCoverData] = useState<Record<string, { covers: string[]; count: number }>>({})
   const [rootCoverData, setRootCoverData] = useState<{ photos: string[]; videos: string[]; photoCount: number; videoCount: number }>({ photos: [], videos: [], photoCount: 0, videoCount: 0 })
 
+  // Select mode
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkMovePicker, setBulkMovePicker] = useState(false)
+
+  // Reorder modal
+  const [showReorderModal, setShowReorderModal] = useState(false)
+
   // Form modal
   const [modalVisible, setModalVisible] = useState(false)
   const [modalForm, setModalForm] = useState<FormState>(EMPTY_FORM)
@@ -565,7 +669,12 @@ export default function MediaAdminScreen() {
   const selectedAlbumId = mediaTab === 'photos' ? selectedPhotoAlbumId : selectedVideoAlbumId
   const currentAlbumName = !selectedAlbumId ? 'Root' : (currentAlbums.find(a => a.id === selectedAlbumId)?.title ?? 'Root')
 
-  // ── Album filter helper ───────────────────────────────────────────────────
+  function cancelSelectMode() {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  // ── Album filter ──────────────────────────────────────────────────────────
 
   function buildAlbumQuery(q: any, tab: MediaTab, opts?: { // eslint-disable-line @typescript-eslint/no-explicit-any
     pAlbs?: MediaAlbum[], vAlbs?: MediaAlbum[], pId?: string | null, vId?: string | null
@@ -573,11 +682,9 @@ export default function MediaAdminScreen() {
     const curAlbs = opts?.pAlbs !== undefined && tab === 'photos' ? opts.pAlbs
       : opts?.vAlbs !== undefined && tab === 'videos' ? opts.vAlbs
       : tab === 'photos' ? photoAlbums : videoAlbums
-
     const albumId = tab === 'photos'
       ? (opts?.pId !== undefined ? opts.pId : selectedPhotoAlbumId)
       : (opts?.vId !== undefined ? opts.vId : selectedVideoAlbumId)
-
     if (curAlbs.length > 0) {
       if (albumId === null) q = q.is('album_id', null)
       else q = q.eq('album_id', albumId)
@@ -585,7 +692,7 @@ export default function MediaAdminScreen() {
     return q
   }
 
-  // ── Fetch functions ───────────────────────────────────────────────────────
+  // ── Fetch ─────────────────────────────────────────────────────────────────
 
   async function fetchPage(tab: MediaTab, sf: StatusFilter, s: string, offset: number, opts?: {
     pAlbs?: MediaAlbum[], vAlbs?: MediaAlbum[], pId?: string | null, vId?: string | null
@@ -627,7 +734,6 @@ export default function MediaAdminScreen() {
       photoCount: rootPCount ?? 0,
       videoCount: rootVCount ?? 0,
     })
-
     const results: Record<string, { covers: string[]; count: number }> = {}
     await Promise.all(allAlbums.map(async album => {
       if (album.album_type === 'photos') {
@@ -647,7 +753,7 @@ export default function MediaAdminScreen() {
     setAlbumCoverData(results)
   }
 
-  // ── Mount: load albums then initial data ──────────────────────────────────
+  // ── Mount ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     async function init() {
@@ -657,15 +763,11 @@ export default function MediaAdminScreen() {
       setAlbums(allAlbums)
       setPhotoAlbums(pAlbs)
       setVideoAlbums(vAlbs)
-
       await Promise.all([
         fetchPage('photos', 'all', '', 0, { pAlbs, vAlbs, pId: null, vId: null }).then(rows => {
-          setPhotos(rows)
-          setHasMore(rows.length === PAGE_SIZE)
+          setPhotos(rows); setHasMore(rows.length === PAGE_SIZE)
         }),
-        fetchPage('videos', 'all', '', 0, { pAlbs, vAlbs, pId: null, vId: null }).then(rows => {
-          setVideos(rows)
-        }),
+        fetchPage('videos', 'all', '', 0, { pAlbs, vAlbs, pId: null, vId: null }).then(rows => setVideos(rows)),
         fetchCounts(),
         fetchAlbumCoverData(allAlbums),
       ])
@@ -720,10 +822,7 @@ export default function MediaAdminScreen() {
   async function handleCreateAlbum(title: string) {
     const type = mediaTab
     const { data, error } = await supabase.from('media_albums').insert({
-      title,
-      album_type: type,
-      display_order: albums.length,
-      is_hidden: false,
+      title, album_type: type, display_order: albums.length, is_hidden: false,
     }).select().single()
     if (error) throw new Error(error.message)
     const newAlb = data as MediaAlbum
@@ -749,9 +848,7 @@ export default function MediaAdminScreen() {
               const { error } = await supabase.from('media_albums').update({ title: newTitle.trim() }).eq('id', album.id)
               if (error) { Alert.alert('Error', error.message); return }
               const updated = albums.map(a => a.id === album.id ? { ...a, title: newTitle.trim() } : a)
-              setAlbums(updated)
-              setPhotoAlbums(updated.filter(a => a.album_type === 'photos'))
-              setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
+              setAlbums(updated); setPhotoAlbums(updated.filter(a => a.album_type === 'photos')); setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
             },
           },
         ], 'plain-text', album.title)
@@ -760,9 +857,7 @@ export default function MediaAdminScreen() {
         supabase.from('media_albums').update({ is_hidden: next }).eq('id', album.id).then(({ error }) => {
           if (error) { Alert.alert('Error', error.message); return }
           const updated = albums.map(a => a.id === album.id ? { ...a, is_hidden: next } : a)
-          setAlbums(updated)
-          setPhotoAlbums(updated.filter(a => a.album_type === 'photos'))
-          setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
+          setAlbums(updated); setPhotoAlbums(updated.filter(a => a.album_type === 'photos')); setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
         })
       } else if (i === 2) {
         Alert.alert('Delete album?', `"${album.title}" will be deleted. Photos/videos inside will become unassigned.`, [
@@ -775,9 +870,7 @@ export default function MediaAdminScreen() {
               ])
               await supabase.from('media_albums').delete().eq('id', album.id)
               const updated = albums.filter(a => a.id !== album.id)
-              setAlbums(updated)
-              setPhotoAlbums(updated.filter(a => a.album_type === 'photos'))
-              setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
+              setAlbums(updated); setPhotoAlbums(updated.filter(a => a.album_type === 'photos')); setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
               if (selectedPhotoAlbumId === album.id) setSelectedPhotoAlbumId(null)
               if (selectedVideoAlbumId === album.id) setSelectedVideoAlbumId(null)
             },
@@ -789,9 +882,7 @@ export default function MediaAdminScreen() {
       ActionSheetIOS.showActionSheetWithOptions({ title: album.title, options, cancelButtonIndex: 3, destructiveButtonIndex: 2 }, handle)
     } else {
       Alert.alert(album.title, '', [
-        ...options.slice(0, -1).map((label, i) => ({
-          text: label, style: (label === 'Delete Album' ? 'destructive' : 'default') as 'destructive' | 'default', onPress: () => handle(i),
-        })),
+        ...options.slice(0, -1).map((label, i) => ({ text: label, style: (label === 'Delete Album' ? 'destructive' : 'default') as 'destructive' | 'default', onPress: () => handle(i) })),
         { text: 'Cancel', style: 'cancel' as const, onPress: () => {} },
       ])
     }
@@ -806,15 +897,88 @@ export default function MediaAdminScreen() {
     if (error) { Alert.alert('Error', error.message); return }
     if (mediaTab === 'photos') setPhotos(prev => prev.filter(x => x.id !== item.id))
     else setVideos(prev => prev.filter(x => x.id !== item.id))
+    fetchAlbumCoverData(albums)  // refresh rail counts after move
+  }
+
+  // ── Select mode actions ───────────────────────────────────────────────────
+
+  function handleTilePress(item: MediaPhoto | MediaVideo) {
+    if (selectMode) {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        if (next.has(item.id)) next.delete(item.id)
+        else next.add(item.id)
+        return next
+      })
+    } else {
+      showActions(item)
+    }
+  }
+
+  function handleTileLongPress(item: MediaPhoto | MediaVideo) {
+    setSelectMode(true)
+    setSelectedIds(new Set([item.id]))
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(currentData.map(x => x.id)))
+  }
+
+  async function handleBulkMoveToAlbum(albumId: string | null) {
+    setBulkMovePicker(false)
+    const ids = Array.from(selectedIds)
+    const table = mediaTab === 'photos' ? 'photos' : 'videos'
+    const { error } = await supabase.from(table).update({ album_id: albumId }).in('id', ids)
+    if (error) { Alert.alert('Error', error.message); return }
+    if (mediaTab === 'photos') setPhotos(prev => prev.filter(x => !selectedIds.has(x.id)))
+    else setVideos(prev => prev.filter(x => !selectedIds.has(x.id)))
+    cancelSelectMode()
+    fetchAlbumCoverData(albums)
+  }
+
+  async function handleBulkToggle() {
+    const ids = Array.from(selectedIds)
+    const table = mediaTab === 'photos' ? 'photos' : 'videos'
+    const allActive = ids.every(id => {
+      const item = currentData.find(x => x.id === id)
+      return item ? (item as MediaVideo).is_active !== false : false
+    })
+    const newActive = !allActive
+    const { error } = await supabase.from(table).update({ is_active: newActive }).in('id', ids)
+    if (error) { Alert.alert('Error', error.message); return }
+    if (mediaTab === 'photos') setPhotos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
+    else setVideos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
+    cancelSelectMode()
+  }
+
+  function handleBulkDelete() {
+    const ids = Array.from(selectedIds)
+    Alert.alert(`Delete ${ids.length} item${ids.length !== 1 ? 's' : ''}?`, 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          const table = mediaTab === 'photos' ? 'photos' : 'videos'
+          const { error } = await supabase.from(table).delete().in('id', ids)
+          if (error) { Alert.alert('Error', error.message); return }
+          if (mediaTab === 'photos') {
+            setPhotos(prev => prev.filter(x => !selectedIds.has(x.id)))
+            setCounts(c => ({ ...c, photos: Math.max(0, c.photos - ids.length) }))
+          } else {
+            setVideos(prev => prev.filter(x => !selectedIds.has(x.id)))
+            setCounts(c => ({ ...c, videos: Math.max(0, c.videos - ids.length) }))
+          }
+          cancelSelectMode()
+          fetchAlbumCoverData(albums)
+        },
+      },
+    ])
   }
 
   // ── Content actions ───────────────────────────────────────────────────────
 
   async function handleSave(form: FormState) {
     const order = parseInt(form.displayOrder) || 0
-    setSaving(true)
-    setUploadState(null)
-
+    setSaving(true); setUploadState(null)
     try {
       if (editingId) {
         const update: Record<string, unknown> = {
@@ -854,8 +1018,7 @@ export default function MediaAdminScreen() {
           const { uri, fileSize } = form.images[i]
           if (fileSize != null && fileSize > MAX_FILE_BYTES) throw new Error(`Photo ${i + 1} is ${formatBytes(fileSize)}, which exceeds the ${formatBytes(MAX_FILE_BYTES)} limit.`)
           const newPhoto = await webApiUpload(
-            'https://www.bazidpur.com/api/photos',
-            uri,
+            'https://www.bazidpur.com/api/photos', uri,
             { title: form.title.trim(), description: form.description.trim(), display_order: order + i },
             (pct, label) => setUploadState({ current: i + 1, total: form.images.length, pct, label })
           )
@@ -871,8 +1034,7 @@ export default function MediaAdminScreen() {
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Something went wrong. Please try again.')
     } finally {
-      setSaving(false)
-      setUploadState(null)
+      setSaving(false); setUploadState(null)
     }
   }
 
@@ -899,35 +1061,9 @@ export default function MediaAdminScreen() {
     else setVideos(prev => prev.map(x => x.id === id ? { ...x, is_active: !current } : x))
   }
 
-  async function moveItem(id: string, direction: 'up' | 'down') {
-    const list = currentData
-    const idx = list.findIndex(x => x.id === id)
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (swapIdx < 0 || swapIdx >= list.length) return
-    const a = list[idx], b = list[swapIdx]
-    const table = mediaTab === 'photos' ? 'photos' : 'videos'
-    const [ra, rb] = await Promise.all([
-      supabase.from(table).update({ display_order: b.display_order }).eq('id', a.id),
-      supabase.from(table).update({ display_order: a.display_order }).eq('id', b.id),
-    ])
-    if (ra.error || rb.error) { Alert.alert('Error', 'Could not reorder.'); return }
-    const newList = [...list]
-    newList[idx] = { ...a, display_order: b.display_order }
-    newList[swapIdx] = { ...b, display_order: a.display_order }
-    newList.sort((x, y) => x.display_order - y.display_order)
-    if (mediaTab === 'photos') setPhotos(newList as MediaPhoto[])
-    else setVideos(newList as MediaVideo[])
-  }
-
   function showActions(item: MediaPhoto | MediaVideo) {
-    const isFirst = currentData[0]?.id === item.id
-    const isLast = currentData[currentData.length - 1]?.id === item.id
-    const active = (item as MediaVideo).is_active
-    const options: string[] = ['✏️  Edit', '📁  Move to Album', active ? '🚫  Hide' : '✅  Make Active']
-    if (!isFirst) options.push('⬆️  Move Up')
-    if (!isLast) options.push('⬇️  Move Down')
-    options.push('🗑️  Delete', 'Cancel')
-
+    const active = (item as MediaVideo).is_active !== false
+    const options = ['✏️  Edit', '📁  Move to Album', active ? '🚫  Hide' : '✅  Make Active', '🗑️  Delete', 'Cancel']
     const handle = (i: number) => {
       const label = options[i]
       if (label.includes('Edit')) {
@@ -940,23 +1076,18 @@ export default function MediaAdminScreen() {
         setMovePicker({ item })
       } else if (label.includes('Hide') || label.includes('Active')) {
         toggleActive(item.id, active)
-      } else if (label.includes('Move Up')) {
-        moveItem(item.id, 'up')
-      } else if (label.includes('Move Down')) {
-        moveItem(item.id, 'down')
       } else if (label.includes('Delete')) {
         deleteItem(item.id)
       }
     }
-
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        { title: (item as any).title || (mediaTab === 'photos' ? 'Photo' : 'Video'), options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: options.findIndex(o => o.includes('Delete')) }, // eslint-disable-line @typescript-eslint/no-explicit-any
+        { title: (item as any).title || (mediaTab === 'photos' ? 'Photo' : 'Video'), options, cancelButtonIndex: 4, destructiveButtonIndex: 3 }, // eslint-disable-line @typescript-eslint/no-explicit-any
         handle
       )
     } else {
       Alert.alert('', '', [
-        ...options.slice(0, -1).map((label, i) => ({
+        ...options.slice(0, 4).map((label, i) => ({
           text: label.replace(/^[^\s]+\s+/, ''),
           style: (label.includes('Delete') ? 'destructive' : 'default') as 'destructive' | 'default',
           onPress: () => handle(i),
@@ -966,37 +1097,62 @@ export default function MediaAdminScreen() {
     }
   }
 
-  const MEDIA_TABS = [
-    { key: 'photos' as MediaTab, label: `Photos (${counts.photos})` },
-    { key: 'videos' as MediaTab, label: `Videos (${counts.videos})` },
-  ]
-  const STATUS_TABS = [
-    { key: 'all' as StatusFilter, label: 'All' },
-    { key: 'active' as StatusFilter, label: 'Active' },
-    { key: 'hidden' as StatusFilter, label: 'Hidden' },
-  ]
+  // ── Pill helpers ──────────────────────────────────────────────────────────
+
+  function Pill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.75}
+        style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: active ? '#2d1b69' : 'rgba(118,118,128,0.10)' }}>
+        <Text style={{ fontSize: 12, fontWeight: active ? '700' : '500', color: active ? '#fff' : 'rgba(60,60,67,0.65)' }}>{label}</Text>
+      </TouchableOpacity>
+    )
+  }
 
   if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f7' }}><ActivityIndicator color="#2d1b69" /></View>
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
 
-      {/* Search */}
-      <View style={{ backgroundColor: '#f2f2f7', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(118,118,128,0.12)', borderRadius: 10, paddingHorizontal: 10, gap: 6 }}>
-          <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)' }}>🔍</Text>
-          <TextInput
-            style={{ flex: 1, fontSize: 15, color: '#000', paddingVertical: 9 }}
-            placeholder="Search title…" placeholderTextColor="rgba(60,60,67,0.4)"
-            value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing"
-          />
-        </View>
+      {/* Combined toolbar: media type + status filter in one row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 8, gap: 5, borderBottomWidth: 0.5, borderBottomColor: '#e5e5ea' }}>
+        <Pill label={`📷 ${counts.photos}`} active={mediaTab === 'photos'} onPress={() => { setMediaTab('photos'); setStatusFilter('all'); cancelSelectMode() }} />
+        <Pill label={`🎬 ${counts.videos}`} active={mediaTab === 'videos'} onPress={() => { setMediaTab('videos'); setStatusFilter('all'); cancelSelectMode() }} />
+        <View style={{ width: 1, height: 18, backgroundColor: '#d1d1d6', marginHorizontal: 2 }} />
+        <Pill label="All" active={statusFilter === 'all'} onPress={() => setStatusFilter('all')} />
+        <Pill label="● Active" active={statusFilter === 'active'} onPress={() => setStatusFilter('active')} />
+        <Pill label="○ Hidden" active={statusFilter === 'hidden'} onPress={() => setStatusFilter('hidden')} />
       </View>
 
-      <Seg tabs={MEDIA_TABS} selected={mediaTab} onSelect={t => { setMediaTab(t); setStatusFilter('all') }} />
-      <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-        <Seg tabs={STATUS_TABS} selected={statusFilter} onSelect={setStatusFilter} />
-      </View>
+      {/* Search row with + button (or select mode header) */}
+      {selectMode ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: '#e5e5ea' }}>
+          <TouchableOpacity onPress={cancelSelectMode}>
+            <Text style={{ fontSize: 15, color: '#2d1b69' }}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: '600', color: '#1c1c1e' }}>
+            {selectedIds.size} selected
+          </Text>
+          <TouchableOpacity onPress={selectAll}>
+            <Text style={{ fontSize: 15, color: '#2d1b69' }}>Select All</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8, backgroundColor: '#f2f2f7' }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(118,118,128,0.12)', borderRadius: 10, paddingHorizontal: 10, gap: 6 }}>
+            <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)' }}>🔍</Text>
+            <TextInput
+              style={{ flex: 1, fontSize: 15, color: '#000', paddingVertical: 9 }}
+              placeholder="Search title…" placeholderTextColor="rgba(60,60,67,0.4)"
+              value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing"
+            />
+          </View>
+          <TouchableOpacity
+            onPress={() => { setEditingId(null); setModalForm(EMPTY_FORM); setModalTitle(`Add ${mediaTab === 'photos' ? 'Photo' : 'Video'}`); setModalVisible(true) }}
+            style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 26, lineHeight: 30, marginTop: -2 }}>+</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Album rail */}
       <AlbumRail
@@ -1005,6 +1161,7 @@ export default function MediaAdminScreen() {
         onSelect={id => {
           if (mediaTab === 'photos') setSelectedPhotoAlbumId(id)
           else setSelectedVideoAlbumId(id)
+          cancelSelectMode()
         }}
         onLongPress={handleAlbumLongPress}
         onAdd={() => setShowCreateAlbum(true)}
@@ -1015,34 +1172,49 @@ export default function MediaAdminScreen() {
         mediaType={mediaTab}
       />
 
-      {/* Selected album heading */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, backgroundColor: '#f2f2f7' }}>
+      {/* Album heading + Reorder button */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f2f2f7' }}>
         <Text style={{ fontSize: 16, fontWeight: '700', color: '#1c1c1e' }}>{currentAlbumName}</Text>
+        {currentData.length > 1 && !debouncedSearch && (
+          <TouchableOpacity onPress={() => setShowReorderModal(true)}
+            style={{ backgroundColor: '#ede9fe', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: '#2d1b69' }}>Reorder</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
+      {/* 4-per-row tile grid */}
       <FlatList
         data={currentData}
-        keyExtractor={item => `${mediaTab}-${item.id}`}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 160 }}
+        numColumns={4}
+        key={`grid-${mediaTab}`}
+        keyExtractor={item => item.id}
+        columnWrapperStyle={{ paddingHorizontal: 12, gap: 3 }}
+        ItemSeparatorComponent={() => <View style={{ height: 3 }} />}
+        contentContainerStyle={{ paddingTop: 3, paddingBottom: insets.bottom + (selectMode && selectedIds.size > 0 ? 170 : 140) }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
         onEndReached={onLoadMore}
         onEndReachedThreshold={0.3}
-        ItemSeparatorComponent={() => <View style={{ height: 0.5, backgroundColor: 'rgba(60,60,67,0.18)', marginLeft: 80 }} />}
-        ListHeaderComponent={<View style={{ height: 8 }} />}
-        renderItem={({ item }) =>
-          mediaTab === 'photos'
-            ? <PhotoRow item={item as MediaPhoto} onAction={() => showActions(item)} />
-            : <VideoRow item={item as MediaVideo} onAction={() => showActions(item)} />
-        }
+        renderItem={({ item }) => (
+          <MediaTile
+            item={item}
+            mediaType={mediaTab}
+            size={TILE_SIZE}
+            selected={selectedIds.has(item.id)}
+            selectMode={selectMode}
+            onPress={() => handleTilePress(item)}
+            onLongPress={() => handleTileLongPress(item)}
+          />
+        )}
         ListFooterComponent={
           loadingMore
             ? <ActivityIndicator color="#2d1b69" style={{ paddingVertical: 20 }} />
             : !hasMore && currentData.length > 0
-              ? <Text style={{ textAlign: 'center', color: 'rgba(60,60,67,0.4)', fontSize: 12, paddingVertical: 24 }}>{currentData.length} items</Text>
+              ? <Text style={{ textAlign: 'center', color: 'rgba(60,60,67,0.4)', fontSize: 12, paddingVertical: 20 }}>{currentData.length} items</Text>
               : null
         }
         ListEmptyComponent={
-          <View style={{ alignItems: 'center', paddingTop: 80, paddingHorizontal: 32 }}>
+          <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 }}>
             <Text style={{ fontSize: 40, marginBottom: 14 }}>{mediaTab === 'photos' ? '📸' : '🎬'}</Text>
             <Text style={{ fontSize: 16, fontWeight: '600', color: '#000', marginBottom: 6 }}>Nothing here</Text>
             <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)', textAlign: 'center' }}>No {mediaTab} in this album.</Text>
@@ -1050,13 +1222,27 @@ export default function MediaAdminScreen() {
         }
       />
 
-      {/* FAB */}
-      <TouchableOpacity
-        onPress={() => { setEditingId(null); setModalForm(EMPTY_FORM); setModalTitle(`Add ${mediaTab === 'photos' ? 'Photo' : 'Video'}`); setModalVisible(true) }}
-        style={{ position: 'absolute', bottom: insets.bottom + 86, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 }}
-      >
-        <Text style={{ color: '#fff', fontSize: 28, lineHeight: 32 }}>+</Text>
-      </TouchableOpacity>
+      {/* Bulk action bar (above tab bar when items selected) */}
+      {selectMode && selectedIds.size > 0 && (
+        <View style={{
+          position: 'absolute', bottom: insets.bottom + 49, left: 0, right: 0,
+          flexDirection: 'row', backgroundColor: '#fff',
+          borderTopWidth: 0.5, borderTopColor: '#e5e5ea',
+          paddingVertical: 13, paddingHorizontal: 20, alignItems: 'center',
+        }}>
+          <TouchableOpacity onPress={() => setBulkMovePicker(true)} style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#2d1b69' }}>Move</Text>
+          </TouchableOpacity>
+          <View style={{ width: 1, height: 18, backgroundColor: '#e5e5ea' }} />
+          <TouchableOpacity onPress={handleBulkToggle} style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#2d1b69' }}>Toggle</Text>
+          </TouchableOpacity>
+          <View style={{ width: 1, height: 18, backgroundColor: '#e5e5ea' }} />
+          <TouchableOpacity onPress={handleBulkDelete} style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#ef4444' }}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Modals */}
       <FormModal
@@ -1072,19 +1258,26 @@ export default function MediaAdminScreen() {
       />
 
       {showCreateAlbum && (
-        <CreateAlbumModal
-          mediaType={mediaTab}
-          onClose={() => setShowCreateAlbum(false)}
-          onCreate={handleCreateAlbum}
-        />
+        <CreateAlbumModal mediaType={mediaTab} onClose={() => setShowCreateAlbum(false)} onCreate={handleCreateAlbum} />
       )}
 
       {movePicker && (
-        <AlbumPickerModal
-          albums={albums}
+        <AlbumPickerModal albums={albums} mediaType={mediaTab} onPick={handleMoveToAlbum} onClose={() => setMovePicker(null)} />
+      )}
+
+      {bulkMovePicker && (
+        <AlbumPickerModal albums={albums} mediaType={mediaTab} onPick={handleBulkMoveToAlbum} onClose={() => setBulkMovePicker(false)} />
+      )}
+
+      {showReorderModal && currentData.length > 0 && (
+        <ReorderModal
+          items={currentData}
           mediaType={mediaTab}
-          onPick={handleMoveToAlbum}
-          onClose={() => setMovePicker(null)}
+          onClose={() => setShowReorderModal(false)}
+          onReorder={newOrder => {
+            if (mediaTab === 'photos') setPhotos(newOrder as MediaPhoto[])
+            else setVideos(newOrder as MediaVideo[])
+          }}
         />
       )}
 
