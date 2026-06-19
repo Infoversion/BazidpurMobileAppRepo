@@ -136,18 +136,60 @@ function ActiveBadge({ active }: { active: boolean | undefined }) {
   )
 }
 
+// ─── Cover grid (shared) ──────────────────────────────────────────────────────
+
+function CoverGrid({ covers, size }: { covers: string[]; size: number }) {
+  if (covers.length === 0) return null
+  if (covers.length === 1) return (
+    <Image source={{ uri: covers[0] }} style={{ width: size, height: '100%' }} contentFit="cover" />
+  )
+  const half = size / 2
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: size, height: '100%' }}>
+      {[0, 1, 2, 3].map(i => (
+        <View key={i} style={{ width: half, height: '50%', backgroundColor: '#d1d1d6' }}>
+          {covers[i] && (
+            <Image source={{ uri: covers[i] }} style={{ width: half, height: '100%' }} contentFit="cover" />
+          )}
+        </View>
+      ))}
+    </View>
+  )
+}
+
 // ─── Album rail ───────────────────────────────────────────────────────────────
 
 function AlbumRail({
   albums, selectedId, onSelect, onLongPress, onAdd,
+  coversForAlbum, countForAlbum, rootCovers, rootCount, mediaType,
 }: {
   albums: TmAlbum[]
   selectedId: string | null
   onSelect: (id: string | null) => void
   onLongPress: (album: TmAlbum) => void
   onAdd: () => void
+  coversForAlbum: (id: string) => string[]
+  countForAlbum: (id: string) => number
+  rootCovers: string[]
+  rootCount: number
+  mediaType: 'photos' | 'videos'
 }) {
-  const CARD_W = 80
+  const CARD_W = 90
+  const IMG_H = 68
+  const itemWord = mediaType === 'photos' ? 'photo' : 'video'
+
+  const nameOverlay = (label: string) => (
+    <>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.32)' }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 5, paddingVertical: 4 }}>
+        <Text
+          style={{ fontSize: 10, fontWeight: '800', color: '#fff', lineHeight: 13, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}
+          numberOfLines={2}
+        >{label}</Text>
+      </View>
+    </>
+  )
+
   return (
     <View style={{ backgroundColor: '#fff', borderBottomWidth: 0.5, borderBottomColor: '#e5e5ea', paddingTop: 8, paddingBottom: 10 }}>
       <Text style={{ fontSize: 10, fontWeight: '600', color: '#8e8e93', letterSpacing: 1, paddingHorizontal: 16, marginBottom: 6, textTransform: 'uppercase' }}>Albums</Text>
@@ -159,17 +201,23 @@ function AlbumRail({
           style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: selectedId === null ? '#2d1b69' : '#e5e5ea', overflow: 'hidden', backgroundColor: '#f9f9f9' }}
           activeOpacity={0.75}
         >
-          <View style={{ width: CARD_W, height: 52, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontSize: 18 }}>📂</Text>
+          <View style={{ width: CARD_W, height: IMG_H, backgroundColor: '#ede9fe', overflow: 'hidden' }}>
+            {rootCovers.length > 0
+              ? <CoverGrid covers={rootCovers} size={CARD_W} />
+              : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 20 }}>📂</Text></View>
+            }
+            {nameOverlay('Root')}
           </View>
-          <View style={{ paddingHorizontal: 4, paddingVertical: 3, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
-            <Text style={{ fontSize: 10, fontWeight: '700', color: selectedId === null ? '#2d1b69' : '#1c1c1e' }} numberOfLines={1}>Root</Text>
+          <View style={{ paddingHorizontal: 5, paddingVertical: 4, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
+            <Text style={{ fontSize: 10, color: '#8e8e93' }}>{rootCount} {itemWord}{rootCount !== 1 ? 's' : ''}</Text>
           </View>
         </TouchableOpacity>
 
         {/* Album cards */}
         {albums.map(album => {
           const active = selectedId === album.id
+          const covers = coversForAlbum(album.id)
+          const count = countForAlbum(album.id)
           return (
             <TouchableOpacity
               key={album.id}
@@ -178,16 +226,20 @@ function AlbumRail({
               style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: active ? '#2d1b69' : '#e5e5ea', overflow: 'hidden', backgroundColor: '#f9f9f9', opacity: album.is_hidden ? 0.55 : 1 }}
               activeOpacity={0.75}
             >
-              <View style={{ width: CARD_W, height: 52, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 18 }}>📁</Text>
+              <View style={{ width: CARD_W, height: IMG_H, backgroundColor: '#ede9fe', overflow: 'hidden' }}>
+                {covers.length > 0
+                  ? <CoverGrid covers={covers} size={CARD_W} />
+                  : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 20 }}>📁</Text></View>
+                }
                 {album.is_hidden && (
-                  <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#f59e0b', borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 }}>
+                  <View style={{ position: 'absolute', top: 2, right: 2, zIndex: 10, backgroundColor: '#f59e0b', borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 }}>
                     <Text style={{ fontSize: 8, fontWeight: '700', color: '#fff' }}>H</Text>
                   </View>
                 )}
+                {nameOverlay(album.title)}
               </View>
-              <View style={{ paddingHorizontal: 4, paddingVertical: 3, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: active ? '#2d1b69' : '#1c1c1e' }} numberOfLines={1}>{album.title}</Text>
+              <View style={{ paddingHorizontal: 5, paddingVertical: 4, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
+                <Text style={{ fontSize: 10, color: active ? '#2d1b69' : '#8e8e93' }}>{count} {itemWord}{count !== 1 ? 's' : ''}</Text>
               </View>
             </TouchableOpacity>
           )
@@ -196,7 +248,7 @@ function AlbumRail({
         {/* Add album button */}
         <TouchableOpacity
           onPress={onAdd}
-          style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: '#e5e5ea', borderStyle: 'dashed', overflow: 'hidden', backgroundColor: '#f9f9f9', alignItems: 'center', justifyContent: 'center', height: 80 }}
+          style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: '#e5e5ea', borderStyle: 'dashed', overflow: 'hidden', backgroundColor: '#f9f9f9', alignItems: 'center', justifyContent: 'center', height: IMG_H + 28 }}
           activeOpacity={0.75}
         >
           <Text style={{ fontSize: 22, color: '#8e8e93' }}>+</Text>
@@ -480,6 +532,8 @@ export default function MomentsAdminScreen() {
   const [selectedVideoAlbumId, setSelectedVideoAlbumId] = useState<string | null>(null)
   const [showCreateAlbum, setShowCreateAlbum] = useState(false)
   const [movePicker, setMovePicker] = useState<{ item: MomentPhoto | MomentVideo } | null>(null)
+  const [albumCoverData, setAlbumCoverData] = useState<Record<string, { covers: string[]; count: number }>>({})
+  const [rootCoverData, setRootCoverData] = useState<{ photos: string[]; videos: string[]; photoCount: number; videoCount: number }>({ photos: [], videos: [], photoCount: 0, videoCount: 0 })
 
   // Form modal
   const [modalVisible, setModalVisible] = useState(false)
@@ -550,6 +604,39 @@ export default function MomentsAdminScreen() {
     return (data ?? []) as TmAlbum[]
   }
 
+  async function fetchAlbumCoverData(allAlbums: TmAlbum[]) {
+    const [{ data: rootP }, { count: rootPCount }, { data: rootV }, { count: rootVCount }] = await Promise.all([
+      supabase.from('timeless_moments').select('thumbnail_url, r2_url').is('album_id', null).order('display_order').limit(4),
+      supabase.from('timeless_moments').select('*', { count: 'exact', head: true }).is('album_id', null),
+      supabase.from('timeless_moment_videos').select('youtube_id').is('album_id', null).eq('is_active', true).order('display_order').limit(4),
+      supabase.from('timeless_moment_videos').select('*', { count: 'exact', head: true }).is('album_id', null).eq('is_active', true),
+    ])
+    setRootCoverData({
+      photos: (rootP ?? []).map(p => p.thumbnail_url || p.r2_url).filter(Boolean) as string[],
+      videos: (rootV ?? []).map(v => `https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg`),
+      photoCount: rootPCount ?? 0,
+      videoCount: rootVCount ?? 0,
+    })
+
+    const results: Record<string, { covers: string[]; count: number }> = {}
+    await Promise.all(allAlbums.map(async album => {
+      if (album.album_type === 'photos') {
+        const [{ data: rows }, { count }] = await Promise.all([
+          supabase.from('timeless_moments').select('thumbnail_url, r2_url').eq('album_id', album.id).order('display_order').limit(4),
+          supabase.from('timeless_moments').select('*', { count: 'exact', head: true }).eq('album_id', album.id),
+        ])
+        results[album.id] = { covers: (rows ?? []).map(p => p.thumbnail_url || p.r2_url).filter(Boolean) as string[], count: count ?? 0 }
+      } else {
+        const [{ data: rows }, { count }] = await Promise.all([
+          supabase.from('timeless_moment_videos').select('youtube_id').eq('album_id', album.id).eq('is_active', true).order('display_order').limit(4),
+          supabase.from('timeless_moment_videos').select('*', { count: 'exact', head: true }).eq('album_id', album.id).eq('is_active', true),
+        ])
+        results[album.id] = { covers: (rows ?? []).map(v => `https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg`), count: count ?? 0 }
+      }
+    }))
+    setAlbumCoverData(results)
+  }
+
   // ── Mount: load albums then initial data ──────────────────────────────────
 
   useEffect(() => {
@@ -570,6 +657,7 @@ export default function MomentsAdminScreen() {
           setVideos(rows)
         }),
         fetchCounts(),
+        fetchAlbumCoverData(allAlbums),
       ])
     }
     init().finally(() => setLoading(false))
@@ -632,6 +720,7 @@ export default function MomentsAdminScreen() {
     setAlbums(updated)
     setPhotoAlbums(updated.filter(a => a.album_type === 'photos'))
     setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
+    setAlbumCoverData(prev => ({ ...prev, [newAlb.id]: { covers: [], count: 0 } }))
     setShowCreateAlbum(false)
     // Switch to new album
     if (type === 'photos') setSelectedPhotoAlbumId(newAlb.id)
@@ -913,6 +1002,11 @@ export default function MomentsAdminScreen() {
         }}
         onLongPress={handleAlbumLongPress}
         onAdd={() => setShowCreateAlbum(true)}
+        coversForAlbum={id => albumCoverData[id]?.covers ?? []}
+        countForAlbum={id => albumCoverData[id]?.count ?? 0}
+        rootCovers={mediaTab === 'photos' ? rootCoverData.photos : rootCoverData.videos}
+        rootCount={mediaTab === 'photos' ? rootCoverData.photoCount : rootCoverData.videoCount}
+        mediaType={mediaTab}
       />
 
       <FlatList

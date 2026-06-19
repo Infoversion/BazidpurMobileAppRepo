@@ -42,27 +42,66 @@ interface TMVideo {
 
 // ─── Album rail ───────────────────────────────────────────────────────────────
 
+function CoverGrid({ covers, placeholder, size }: { covers: string[]; placeholder?: 'photo' | 'video'; size: number }) {
+  if (covers.length === 0) return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 22 }}>{placeholder === 'video' ? '🎬' : '📷'}</Text>
+    </View>
+  )
+  if (covers.length === 1) return (
+    <Image source={{ uri: covers[0] }} style={{ width: size, height: '100%' }} contentFit="cover" />
+  )
+  const half = size / 2
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: size, height: '100%' }}>
+      {[0, 1, 2, 3].map(i => (
+        <View key={i} style={{ width: half, height: '50%', backgroundColor: '#d1d1d6' }}>
+          {covers[i] && (
+            <Image source={{ uri: covers[i] }} style={{ width: half, height: '100%' }} contentFit="cover" />
+          )}
+        </View>
+      ))}
+    </View>
+  )
+}
+
 function AlbumRail({
-  albums, selectedId, rootCount, rootLabel, rootCover, onSelect, countForAlbum, coverForAlbum,
+  albums, selectedId, rootCount, rootLabel, rootCovers, onSelect, countForAlbum, coversForAlbum, mediaType,
 }: {
   albums: TmAlbum[]
   selectedId: string | null
   rootCount: number
   rootLabel: string
-  rootCover: string | null
+  rootCovers: string[]
   onSelect: (id: string | null) => void
   countForAlbum: (id: string) => number
-  coverForAlbum: (id: string) => string | null
+  coversForAlbum: (id: string) => string[]
+  mediaType: 'photos' | 'videos'
 }) {
   if (rootCount === 0 && albums.length === 0) return null
-  const CARD_W = 96
+  const { width } = useWindowDimensions()
+  const CARD_W = Math.floor((width - 44) / 3)   // same width as photo tiles
+  const IMG_H = CARD_W                            // square
+  const itemWord = mediaType === 'photos' ? 'photo' : 'video'
+
+  const nameOverlay = (label: string) => (
+    <>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.32)' }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 7, paddingVertical: 5 }}>
+        <Text
+          style={{ fontSize: 11, fontWeight: '800', color: '#fff', lineHeight: 15, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}
+          numberOfLines={2}
+        >{label}</Text>
+      </View>
+    </>
+  )
 
   return (
     <View style={{ backgroundColor: '#fff', borderBottomWidth: 0.5, borderBottomColor: '#e5e5ea', paddingTop: 10, paddingBottom: 12 }}>
       <Text style={{ fontSize: 11, fontWeight: '600', color: '#8e8e93', letterSpacing: 1, paddingHorizontal: 16, marginBottom: 8, textTransform: 'uppercase' }}>
         Albums
       </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 6 }}>
 
         {rootCount > 0 && (
           <TouchableOpacity
@@ -70,22 +109,19 @@ function AlbumRail({
             activeOpacity={0.75}
             style={{ width: CARD_W, borderRadius: 10, borderWidth: 2, borderColor: selectedId === null ? '#2d1b69' : '#e5e5ea', overflow: 'hidden', backgroundColor: '#f9f9f9' }}
           >
-            <View style={{ width: CARD_W, height: 64, backgroundColor: '#f2f2f7', overflow: 'hidden' }}>
-              {rootCover
-                ? <Image source={{ uri: rootCover }} style={{ width: CARD_W, height: 64 }} contentFit="cover" />
-                : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 22 }}>📷</Text></View>
-              }
+            <View style={{ width: CARD_W, height: IMG_H, backgroundColor: '#f2f2f7', overflow: 'hidden' }}>
+              <CoverGrid covers={rootCovers} placeholder={mediaType === 'videos' ? 'video' : 'photo'} size={CARD_W} />
+              {nameOverlay(rootLabel)}
             </View>
-            <View style={{ paddingHorizontal: 5, paddingVertical: 4, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: selectedId === null ? '#2d1b69' : '#1c1c1e' }} numberOfLines={1}>{rootLabel}</Text>
-              <Text style={{ fontSize: 10, color: '#8e8e93' }}>{rootCount} item{rootCount !== 1 ? 's' : ''}</Text>
+            <View style={{ paddingHorizontal: 6, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
+              <Text style={{ fontSize: 11, color: '#8e8e93' }}>{rootCount} {itemWord}{rootCount !== 1 ? 's' : ''}</Text>
             </View>
           </TouchableOpacity>
         )}
 
         {albums.map(album => {
           const count = countForAlbum(album.id)
-          const cover = album.cover_photo_url || coverForAlbum(album.id)
+          const covers = coversForAlbum(album.id)
           const active = selectedId === album.id
           return (
             <TouchableOpacity
@@ -94,15 +130,12 @@ function AlbumRail({
               activeOpacity={0.75}
               style={{ width: CARD_W, borderRadius: 10, borderWidth: 2, borderColor: active ? '#2d1b69' : '#e5e5ea', overflow: 'hidden', backgroundColor: '#f9f9f9' }}
             >
-              <View style={{ width: CARD_W, height: 64, backgroundColor: '#f2f2f7', overflow: 'hidden' }}>
-                {cover
-                  ? <Image source={{ uri: cover }} style={{ width: CARD_W, height: 64 }} contentFit="cover" />
-                  : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 22 }}>📁</Text></View>
-                }
+              <View style={{ width: CARD_W, height: IMG_H, backgroundColor: '#f2f2f7', overflow: 'hidden' }}>
+                <CoverGrid covers={covers} placeholder={mediaType === 'videos' ? 'video' : 'photo'} size={CARD_W} />
+                {nameOverlay(album.title)}
               </View>
-              <View style={{ paddingHorizontal: 5, paddingVertical: 4, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: active ? '#2d1b69' : '#1c1c1e' }} numberOfLines={1}>{album.title}</Text>
-                <Text style={{ fontSize: 10, color: '#8e8e93' }}>{count} item{count !== 1 ? 's' : ''}</Text>
+              <View style={{ paddingHorizontal: 6, paddingVertical: 5, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
+                <Text style={{ fontSize: 11, color: '#8e8e93' }}>{count} {itemWord}{count !== 1 ? 's' : ''}</Text>
               </View>
             </TouchableOpacity>
           )
@@ -279,13 +312,11 @@ export default function TimelessMomentsScreen() {
             selectedId={selectedPhotoAlbumId}
             rootCount={rootPhotos.length}
             rootLabel="All Photos"
-            rootCover={rootPhotos[0]?.thumbnail_url || rootPhotos[0]?.r2_url || null}
+            rootCovers={rootPhotos.slice(0, 4).map(p => p.thumbnail_url || p.r2_url)}
             onSelect={id => { setSelectedPhotoAlbumId(id) }}
             countForAlbum={id => photos.filter(p => p.album_id === id).length}
-            coverForAlbum={id => {
-              const p = photos.find(ph => ph.album_id === id)
-              return p ? (p.thumbnail_url || p.r2_url) : null
-            }}
+            coversForAlbum={id => photos.filter(p => p.album_id === id).slice(0, 4).map(p => p.thumbnail_url || p.r2_url)}
+            mediaType="photos"
           />
           {albumPhotos.length === 0 ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
@@ -326,13 +357,11 @@ export default function TimelessMomentsScreen() {
             selectedId={selectedVideoAlbumId}
             rootCount={rootVideos.length}
             rootLabel="All Videos"
-            rootCover={rootVideos[0] ? `https://img.youtube.com/vi/${rootVideos[0].youtube_id}/mqdefault.jpg` : null}
+            rootCovers={rootVideos.slice(0, 4).map(v => `https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg`)}
             onSelect={id => { setSelectedVideoAlbumId(id) }}
             countForAlbum={id => videos.filter(v => v.album_id === id).length}
-            coverForAlbum={id => {
-              const v = videos.find(vi => vi.album_id === id)
-              return v ? `https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg` : null
-            }}
+            coversForAlbum={id => videos.filter(v => v.album_id === id).slice(0, 4).map(v => `https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg`)}
+            mediaType="videos"
           />
           {albumVideos.length === 0 ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
