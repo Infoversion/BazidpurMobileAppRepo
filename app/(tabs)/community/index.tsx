@@ -20,6 +20,7 @@ const TILES: Tile[] = [
   { emoji: '📖', label: 'Memoirs',         sub: 'Personal stories',   route: '/(tabs)/community/memoirs', bg: '#bbf7d0', depth: '#065f46' },
   { emoji: '📚', label: 'Reading Room',     sub: 'Books & journals',   route: '/(tabs)/community/reading-room', bg: '#e0e7ff', depth: '#3730a3' },
   { emoji: '💬', label: 'The Forum',       sub: 'Community threads',  route: '/(tabs)/community/forum',   bg: '#bae6fd', depth: '#0369a1' },
+  { emoji: '🌍', label: 'Scattered Roots', sub: 'Where we are',      route: '/(tabs)/community/scattered-roots', bg: '#cffafe', depth: '#0e7490' },
   { emoji: '🌳', label: 'Family Tree',     sub: 'Trace lineage',      route: '/(tabs)/tree',              bg: '#99f6e4', depth: '#0f766e' },
   { emoji: '📜', label: 'Lineage',         sub: 'Ten generations',    route: '/(tabs)/lineage',           bg: '#fef08a', depth: '#854d0e' },
 { emoji: '⚙️', label: 'Admin',           sub: 'Manage content',     route: '/(tabs)/admin', adminOnly: true, bg: '#fca5a5', depth: '#991b1b' },
