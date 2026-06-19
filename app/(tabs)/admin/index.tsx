@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Alert,
+  ActivityIndicator, RefreshControl, useWindowDimensions,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -55,55 +55,78 @@ interface Stats {
   reportCount: number
 }
 
-
-
-function ActionCard({
-  emoji, title, sub, badge, badgeColor, onPress,
+function AdminTile({
+  emoji, label, stat, badge, tileSize, onPress,
 }: {
   emoji: string
-  title: string
-  sub: string
-  badge?: string | null
-  badgeColor?: string
-  onPress: () => void
+  label: string
+  stat?: number | null
+  badge?: number | null
+  tileSize: number
+  onPress?: (() => void) | null
 }) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.75}
-      style={{
-        backgroundColor: '#fff',
-        borderRadius: 14, padding: 14,
-        flexDirection: 'row', alignItems: 'center', gap: 12,
-        borderWidth: 1, borderColor: '#f3f4f6',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
-      }}
-    >
-      <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Text style={{ fontSize: 20 }}>{emoji}</Text>
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827' }}>{title}</Text>
-        <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>{sub}</Text>
-      </View>
-      {badge ? (
-        <View style={{ backgroundColor: badgeColor ?? '#fef3c7', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: badgeColor === '#fee2e2' ? '#991b1b' : '#92400e' }}>{badge}</Text>
+  const inner = (
+    <>
+      {!!badge && (
+        <View style={{
+          position: 'absolute', top: 9, right: 9, zIndex: 1,
+          backgroundColor: '#ef4444', borderRadius: 10,
+          minWidth: 20, height: 20,
+          alignItems: 'center', justifyContent: 'center',
+          paddingHorizontal: 5,
+        }}>
+          <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff' }}>{badge > 99 ? '99+' : badge}</Text>
         </View>
-      ) : null}
-      <Text style={{ fontSize: 18, color: '#d1d5db', flexShrink: 0 }}>›</Text>
-    </TouchableOpacity>
+      )}
+      <Text style={{ fontSize: 32, marginBottom: 6 }}>{emoji}</Text>
+      <Text
+        style={{ fontSize: 11, fontWeight: '700', color: '#1c1c1e', textAlign: 'center', lineHeight: 14 }}
+        numberOfLines={2}
+      >
+        {label}
+      </Text>
+      {stat != null && (
+        <Text style={{ fontSize: 11, color: '#8e8e93', marginTop: 4, fontWeight: '500' }}>
+          {stat.toLocaleString()}
+        </Text>
+      )}
+    </>
   )
+
+  const style = {
+    width: tileSize, height: tileSize,
+    backgroundColor: '#fff',
+    borderRadius: 22,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+  }
+
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.72} style={style}>
+        {inner}
+      </TouchableOpacity>
+    )
+  }
+  return <View style={[style, { opacity: 0.55 }]}>{inner}</View>
 }
 
 export default function AdminScreen() {
   const insets = useSafeAreaInsets()
+  const { width } = useWindowDimensions()
   const { user } = useAuth()
   const isSuperadmin = user?.role === 'superadmin'
   const initials = user
     ? [user.first_name?.[0], user.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
     : '?'
+
+  const tileSize = Math.floor((width - 32 - 20) / 3)
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -190,9 +213,9 @@ export default function AdminScreen() {
     setRefreshing(false)
   }, [])
 
-if (loading) {
+  if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f7' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f7' }}>
         <ActivityIndicator color="#2d1b69" />
       </View>
     )
@@ -200,8 +223,23 @@ if (loading) {
 
   const s = stats!
 
+  const tiles = [
+    { emoji: '👥', label: 'Members',          stat: s.totalUsers,                         badge: null,                              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'all' } }) },
+    { emoji: '⏳', label: 'Pending',           stat: s.pendingCount,                       badge: s.pendingCount > 0 ? s.pendingCount : null, onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'pending' } }) },
+    { emoji: '🛡️', label: 'Admins',            stat: s.adminCount,                         badge: null,                              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'admin' } }) },
+    { emoji: '🌳', label: 'Family Tree',       stat: s.familyTreeNodes,                    badge: null,                              onPress: () => router.push('/(tabs)/admin/family-tree' as any) },
+    { emoji: '📸', label: 'Media',             stat: s.totalPhotos + s.totalVideos,        badge: null,                              onPress: () => router.push('/(tabs)/admin/media') },
+    { emoji: '✨', label: 'Timeless\nMoments', stat: s.totalMoments + s.totalMomentVideos, badge: null,                              onPress: () => router.push('/(tabs)/admin/moments') },
+    { emoji: '🗂️', label: 'Albums',            stat: s.totalPhotoAlbums + s.totalVideoAlbums, badge: null,                          onPress: null },
+    { emoji: '📚', label: 'Reading Room',      stat: s.totalBooks,                         badge: null,                              onPress: () => router.push('/(tabs)/admin/library' as any) },
+    { emoji: '✉️', label: 'Contacts',          stat: s.totalContacts,                      badge: s.unreadContacts > 0 ? s.unreadContacts : null, onPress: () => router.push('/(tabs)/admin/contacts') },
+    { emoji: '💬', label: 'WhatsApp',          stat: s.totalChats,                         badge: null,                              onPress: () => router.push('/(tabs)/admin/whatsapp') },
+    { emoji: '📨', label: 'Invitations',       stat: null,                                 badge: null,                              onPress: () => router.push('/(tabs)/admin/invite') },
+    { emoji: '⚑',  label: 'Flagged',           stat: s.reportCount,                        badge: s.reportCount > 0 ? s.reportCount : null, onPress: () => router.push('/(tabs)/admin/reports' as any) },
+  ]
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+    <View style={{ flex: 1, backgroundColor: '#f5f5f7' }}>
 
       {/* Header */}
       <View style={{
@@ -213,13 +251,12 @@ if (loading) {
         alignItems: 'flex-end',
       }}>
         <View style={{ flex: 1 }}>
-<Text style={{ fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>Admin</Text>
+          <Text style={{ fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>Admin</Text>
           <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>
             {isSuperadmin ? 'Superadmin' : 'Admin'}
           </Text>
         </View>
 
-        {/* Right icons */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 2 }}>
           <TouchableOpacity
             onPress={() => router.push('/(public)/help')}
@@ -260,101 +297,44 @@ if (loading) {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 90, gap: 20 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 90, gap: 24 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
         showsVerticalScrollIndicator={false}
       >
 
-        {/* ── Overview card ────────────────────────────────────────────── */}
+        {/* Tile grid */}
         <View>
-          <Text style={{ fontSize: 11, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
             Overview
           </Text>
-          <View style={{
-            backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden',
-            shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
-          }}>
-          <View style={{ height: 3, backgroundColor: '#2d1b69' }} />
-          {[
-            { icon: '👥', label: 'Approved Members', value: s.totalUsers,                              sub: 'members + admins',                                                            highlight: false,              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'all' } }) },
-            { icon: '⏳', label: 'Pending Review',   value: s.pendingCount,                            sub: 'awaiting approval',                                                           highlight: s.pendingCount > 0, onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'pending' } }) },
-            { icon: '🛡️', label: 'Admins & Staff',   value: s.adminCount,                              sub: 'admins + superadmins',                                                        highlight: false,              onPress: () => router.push({ pathname: '/(tabs)/admin/members' as any, params: { tab: 'admin' } }) },
-            { icon: '🌳', label: 'Family Tree',      value: s.familyTreeNodes,                         sub: 'documented members',                                                          highlight: false,              onPress: () => router.push('/(tabs)/admin/family-tree' as any) },
-            { icon: '📸', label: 'Media',            value: s.totalPhotos + s.totalVideos,             sub: `${s.totalPhotos} photos · ${s.totalVideos} videos`,                          highlight: false,              onPress: () => router.push('/(tabs)/admin/media') },
-            { icon: '✨', label: 'Timeless Moments', value: s.totalMoments + s.totalMomentVideos,      sub: `${s.totalMoments} photos · ${s.totalMomentVideos} videos`,                   highlight: false,              onPress: () => router.push('/(tabs)/admin/moments') },
-            { icon: '🗂️', label: 'Gallery Albums',   value: s.totalPhotoAlbums + s.totalVideoAlbums,   sub: `${s.totalPhotoAlbums} photo · ${s.totalVideoAlbums} video`,                  highlight: false,              onPress: null },
-            { icon: '📚', label: 'Reading Room',     value: s.totalBooks,                              sub: 'active books',                                                                highlight: false,              onPress: () => router.push('/(tabs)/admin/library' as any) },
-            { icon: '✉️', label: 'Contact Submissions', value: s.totalContacts,                        sub: s.unreadContacts > 0 ? `${s.unreadContacts} unread` : 'all read',             highlight: s.unreadContacts > 0, onPress: () => router.push('/(tabs)/admin/contacts') },
-            { icon: '💬', label: 'WhatsApp Archive',    value: s.totalChats,                           sub: 'chats imported',                                                              highlight: false,              onPress: () => router.push('/(tabs)/admin/whatsapp') },
-            { icon: '📨', label: 'Send Invitations',    value: null,                                   sub: 'invite family to join',                                                       highlight: false,              onPress: () => router.push('/(tabs)/admin/invite') },
-            { icon: '⚑',  label: 'Flagged Content',    value: s.reportCount,                          sub: s.reportCount > 0 ? 'requires review' : 'nothing flagged',                     highlight: s.reportCount > 0,  onPress: () => router.push('/(tabs)/admin/reports' as any) },
-          ].map((row, i, arr) => {
-            const isPending = row.label === 'Pending Review'
-            const bgColor = row.highlight ? (isPending ? '#fffbeb' : '#fff1f2') : 'transparent'
-            const textColor = row.highlight ? (isPending ? '#92400e' : '#9f1239') : '#374151'
-            const numColor = row.highlight ? (isPending ? '#d97706' : '#e11d48') : '#111827'
-            const inner = (
-              <>
-                <Text style={{ fontSize: 15, marginRight: 8 }}>{row.icon}</Text>
-                <Text style={{ flex: 1, fontSize: 13, color: textColor }}>
-                  {row.label}{' '}
-                  <Text style={{ color: '#9ca3af' }}>({row.sub})</Text>
-                </Text>
-                {row.value !== null && (
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: numColor }}>
-                    {row.value.toLocaleString()}
-                  </Text>
-                )}
-                {row.onPress ? <Text style={{ fontSize: 18, fontWeight: '700', color: '#9ca3af', marginLeft: 6 }}>›</Text> : null}
-              </>
-            )
-            return row.onPress ? (
-              <TouchableOpacity
-                key={row.label}
-                onPress={row.onPress}
-                activeOpacity={0.6}
-                style={{
-                  flexDirection: 'row', alignItems: 'center',
-                  paddingVertical: 9, paddingHorizontal: 16,
-                  borderBottomWidth: i < arr.length - 1 ? 1 : 0,
-                  borderBottomColor: '#f3f4f6',
-                  backgroundColor: bgColor,
-                }}
-              >
-                {inner}
-              </TouchableOpacity>
-            ) : (
-              <View
-                key={row.label}
-                style={{
-                  flexDirection: 'row', alignItems: 'center',
-                  paddingVertical: 9, paddingHorizontal: 16,
-                  borderBottomWidth: i < arr.length - 1 ? 1 : 0,
-                  borderBottomColor: '#f3f4f6',
-                  backgroundColor: bgColor,
-                }}
-              >
-                {inner}
-              </View>
-            )
-          })}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            {tiles.map(tile => (
+              <AdminTile
+                key={tile.label}
+                emoji={tile.emoji}
+                label={tile.label}
+                stat={tile.stat}
+                badge={tile.badge}
+                tileSize={tileSize}
+                onPress={tile.onPress}
+              />
+            ))}
           </View>
         </View>
 
-        {/* ── Fun admin scenes ─────────────────────────────────────────── */}
-        <View style={{ marginTop: 8 }}>
-          <Text style={{ fontSize: 11, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+        {/* Life of an Admin */}
+        <View>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
             Life of an Admin
           </Text>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#f3f4f6' }}>
+            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 18, padding: 14, alignItems: 'center', gap: 6 }}>
               <Text style={{ fontSize: 36, lineHeight: 44 }}>🧑‍💼</Text>
               <Text style={{ fontSize: 22, lineHeight: 28 }}>📋✅</Text>
               <Text style={{ fontSize: 11, fontWeight: '700', color: '#2d1b69', textAlign: 'center' }}>Stamp of Approval</Text>
               <Text style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', lineHeight: 14 }}>Carefully vetting every soul seeking entry to the Bazidpur family</Text>
             </View>
-            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#f3f4f6' }}>
+            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 18, padding: 14, alignItems: 'center', gap: 6 }}>
               <Text style={{ fontSize: 36, lineHeight: 44 }}>👩‍🌾</Text>
               <Text style={{ fontSize: 22, lineHeight: 28 }}>🌳✨</Text>
               <Text style={{ fontSize: 11, fontWeight: '700', color: '#2d1b69', textAlign: 'center' }}>Tree Whisperer</Text>
@@ -362,13 +342,13 @@ if (loading) {
             </View>
           </View>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#f3f4f6' }}>
+            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 18, padding: 14, alignItems: 'center', gap: 6 }}>
               <Text style={{ fontSize: 36, lineHeight: 44 }}>🛡️</Text>
               <Text style={{ fontSize: 22, lineHeight: 28 }}>⚔️🏰</Text>
               <Text style={{ fontSize: 11, fontWeight: '700', color: '#2d1b69', textAlign: 'center' }}>Guardian of the Village</Text>
               <Text style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center', lineHeight: 14 }}>Standing watch so the community stays safe and wholesome</Text>
             </View>
-            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#f3f4f6' }}>
+            <View style={{ flex: 1, backgroundColor: '#fff', borderRadius: 18, padding: 14, alignItems: 'center', gap: 6 }}>
               <Text style={{ fontSize: 36, lineHeight: 44 }}>🌙</Text>
               <Text style={{ fontSize: 22, lineHeight: 28 }}>💻☕</Text>
               <Text style={{ fontSize: 11, fontWeight: '700', color: '#2d1b69', textAlign: 'center' }}>Late-Night Hero</Text>
