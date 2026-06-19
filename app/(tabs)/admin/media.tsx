@@ -1146,17 +1146,25 @@ export default function MediaAdminScreen() {
   async function saveAlbumReorder() {
     setAlbumReorderSaving(true)
     try {
-      await Promise.all(reorderAlbumsRef.current.map((a, i) =>
-        supabase.from('media_albums').update({ display_order: i }).eq('id', a.id)
-      ))
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not signed in.')
+      const orders = reorderAlbumsRef.current.map((a, i) => ({ id: a.id, display_order: i }))
+      const res = await fetch(
+        `https://www.bazidpur.com/api/media-albums?_t=${encodeURIComponent(session.access_token)}`,
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orders }) }
+      )
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error || 'Failed to save order.')
+      }
       const newOrder = reorderAlbumsRef.current
       const updatedAll = [...albums.filter(a => a.album_type !== mediaTab), ...newOrder]
       setAlbums(updatedAll)
       if (mediaTab === 'photos') setPhotoAlbums(newOrder)
       else setVideoAlbums(newOrder)
       setAlbumReorderMode(false)
-    } catch {
-      Alert.alert('Error', 'Could not save album order.', [{ text: 'OK' }])
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not save album order.', [{ text: 'OK' }])
     } finally {
       setAlbumReorderSaving(false)
     }
