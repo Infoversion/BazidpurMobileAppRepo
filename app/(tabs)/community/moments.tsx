@@ -86,12 +86,14 @@ function AlbumRail({
 
   const nameOverlay = (label: string) => (
     <>
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.38)' }} />
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
-        <Text
-          style={{ fontSize: 11, fontWeight: '800', color: '#fff', lineHeight: 15, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
-          numberOfLines={2}
-        >{label}</Text>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.52)' }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center' }}>
+        <View style={{ backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 7, paddingVertical: 5 }}>
+          <Text
+            style={{ fontSize: 11, fontWeight: '800', color: '#fff', lineHeight: 15, textAlign: 'left', textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
+            numberOfLines={2}
+          >{label}</Text>
+        </View>
       </View>
     </>
   )
