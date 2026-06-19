@@ -522,240 +522,6 @@ function MediaTile({ item, mediaType, size, selected, selectMode, onPress, onLon
   )
 }
 
-// ─── Reorder modal (overlay PanResponder — no ScrollView conflict) ────────────
-
-function ReorderModal({ items, mediaType, onClose, onReorder }: {
-  items: (MediaPhoto | MediaVideo)[]
-  mediaType: MediaTab
-  onClose: () => void
-  onReorder: (newOrder: (MediaPhoto | MediaVideo)[]) => void
-}) {
-  const SLOT_H = 66  // item 64 + gap 2
-  const LIST_TOP = 10
-  const insets = useSafeAreaInsets()
-  const [displayOrder, setDisplayOrder] = useState(() => [...items])
-  const [saving, setSaving] = useState(false)
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-
-  const orderRef = useRef([...items])
-  const draggingIdxRef = useRef(-1)
-  const anchorIdxRef = useRef(-1)
-
-  // Single overlay PanResponder — never touches a ScrollView, no gesture conflict.
-  // Uses evt.nativeEvent.locationY (relative to the overlay View) — no measureInWindow needed.
-  const overlayPR = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (evt) => {
-        const listY = evt.nativeEvent.locationY - LIST_TOP
-        const idx = Math.max(0, Math.min(orderRef.current.length - 1, Math.floor(listY / SLOT_H)))
-        draggingIdxRef.current = idx
-        anchorIdxRef.current = idx
-        setDraggingId(orderRef.current[idx]?.id ?? null)
-      },
-      onPanResponderMove: (_, gs) => {
-        const from = draggingIdxRef.current
-        if (from < 0) return
-        const toIdx = Math.max(0, Math.min(orderRef.current.length - 1,
-          Math.round(anchorIdxRef.current + gs.dy / SLOT_H)))
-        if (toIdx !== from) {
-          const next = [...orderRef.current]
-          const [moved] = next.splice(from, 1)
-          next.splice(toIdx, 0, moved)
-          orderRef.current = next
-          draggingIdxRef.current = toIdx
-          setDisplayOrder([...next])
-        }
-      },
-      onPanResponderRelease: () => { draggingIdxRef.current = -1; anchorIdxRef.current = -1; setDraggingId(null) },
-      onPanResponderTerminate: () => { draggingIdxRef.current = -1; anchorIdxRef.current = -1; setDraggingId(null) },
-    })
-  ).current
-
-  async function handleSave() {
-    setSaving(true)
-    try {
-      const table = mediaType === 'photos' ? 'photos' : 'videos'
-      await Promise.all(orderRef.current.map((it, i) =>
-        supabase.from(table).update({ display_order: i }).eq('id', it.id)
-      ))
-      onReorder(orderRef.current.map((it, i) => ({ ...it, display_order: i })))
-      onClose()
-    } catch {
-      Alert.alert('Error', 'Could not save order. Please try again.', [{ text: 'OK' }])
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
-        <View style={{ backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, paddingTop: insets.top + 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.18)' }}>
-          <TouchableOpacity onPress={onClose} disabled={saving}>
-            <Text style={{ fontSize: 16, color: saving ? 'rgba(60,60,67,0.3)' : '#2d1b69' }}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={{ fontSize: 16, fontWeight: '600' }}>Reorder {mediaType === 'photos' ? 'Photos' : 'Videos'}</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#2d1b69" /> : <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Save</Text>}
-          </TouchableOpacity>
-        </View>
-
-        {/* List area — plain View (no ScrollView), overlay captures all touches */}
-        <View style={{ flex: 1, position: 'relative' }}>
-          <View style={{ paddingTop: LIST_TOP }}>
-            {displayOrder.map(it => {
-              const isDragging = draggingId === it.id
-              const thumb = mediaType === 'photos'
-                ? ((it as MediaPhoto).thumbnail_url || (it as MediaPhoto).r2_url)
-                : (`https://img.youtube.com/vi/${(it as MediaVideo).youtube_id}/mqdefault.jpg`)
-              return (
-                <View key={it.id} style={{
-                  height: SLOT_H - 2, flexDirection: 'row', alignItems: 'center',
-                  backgroundColor: isDragging ? '#ede9fe' : '#fff',
-                  marginHorizontal: 12, marginBottom: 2, borderRadius: 10,
-                  paddingHorizontal: 12, gap: 12,
-                }}>
-                  <Image source={{ uri: thumb }} style={{ width: 44, height: 44, borderRadius: 6 }} contentFit="cover" />
-                  <Text style={{ flex: 1, fontSize: 14, color: '#1c1c1e' }} numberOfLines={1}>
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {(it as any).title || '(Untitled)'}
-                  </Text>
-                  <Text style={{ fontSize: 22, color: isDragging ? '#2d1b69' : '#c7c7cc' }}>≡</Text>
-                </View>
-              )
-            })}
-          </View>
-          {/* collapsable=false forces a real native view so touches are received */}
-          <View
-            collapsable={false}
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-            {...overlayPR.panHandlers}
-          />
-        </View>
-
-        <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 8, paddingTop: 6 }}>
-          <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.45)', textAlign: 'center' }}>
-            Drag a row to reorder · tap Save to apply
-          </Text>
-        </View>
-      </View>
-    </Modal>
-  )
-}
-
-// ─── Album reorder modal (overlay PanResponder) ───────────────────────────────
-
-function AlbumReorderModal({ albums, onClose, onReorder }: {
-  albums: MediaAlbum[]
-  onClose: () => void
-  onReorder: (newOrder: MediaAlbum[]) => void
-}) {
-  const SLOT_H = 58  // item 56 + gap 2
-  const LIST_TOP = 10
-  const insets = useSafeAreaInsets()
-  const [displayOrder, setDisplayOrder] = useState(() => [...albums])
-  const [saving, setSaving] = useState(false)
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-
-  const orderRef = useRef([...albums])
-  const draggingIdxRef = useRef(-1)
-  const anchorIdxRef = useRef(-1)
-
-  const overlayPR = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (evt) => {
-        const listY = evt.nativeEvent.locationY - LIST_TOP
-        const idx = Math.max(0, Math.min(orderRef.current.length - 1, Math.floor(listY / SLOT_H)))
-        draggingIdxRef.current = idx
-        anchorIdxRef.current = idx
-        setDraggingId(orderRef.current[idx]?.id ?? null)
-      },
-      onPanResponderMove: (_, gs) => {
-        const from = draggingIdxRef.current
-        if (from < 0) return
-        const toIdx = Math.max(0, Math.min(orderRef.current.length - 1,
-          Math.round(anchorIdxRef.current + gs.dy / SLOT_H)))
-        if (toIdx !== from) {
-          const next = [...orderRef.current]
-          const [moved] = next.splice(from, 1)
-          next.splice(toIdx, 0, moved)
-          orderRef.current = next
-          draggingIdxRef.current = toIdx
-          setDisplayOrder([...next])
-        }
-      },
-      onPanResponderRelease: () => { draggingIdxRef.current = -1; anchorIdxRef.current = -1; setDraggingId(null) },
-      onPanResponderTerminate: () => { draggingIdxRef.current = -1; anchorIdxRef.current = -1; setDraggingId(null) },
-    })
-  ).current
-
-  async function handleSave() {
-    setSaving(true)
-    try {
-      await Promise.all(orderRef.current.map((a, i) =>
-        supabase.from('media_albums').update({ display_order: i }).eq('id', a.id)
-      ))
-      onReorder(orderRef.current)
-      onClose()
-    } catch {
-      Alert.alert('Error', 'Could not save album order.', [{ text: 'OK' }])
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
-        <View style={{ backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, paddingTop: insets.top + 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.18)' }}>
-          <TouchableOpacity onPress={onClose} disabled={saving}>
-            <Text style={{ fontSize: 16, color: saving ? 'rgba(60,60,67,0.3)' : '#f97316' }}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={{ fontSize: 16, fontWeight: '600' }}>Reorder Albums</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#f97316" /> : <Text style={{ fontSize: 16, fontWeight: '600', color: '#f97316' }}>Save</Text>}
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ flex: 1, position: 'relative' }}>
-          <View style={{ paddingTop: LIST_TOP }}>
-            {displayOrder.map(a => {
-              const isDragging = draggingId === a.id
-              return (
-                <View key={a.id} style={{
-                  height: SLOT_H - 2, flexDirection: 'row', alignItems: 'center',
-                  backgroundColor: isDragging ? '#fff7ed' : '#fff',
-                  marginHorizontal: 12, marginBottom: 2, borderRadius: 10,
-                  paddingHorizontal: 12, gap: 12,
-                }}>
-                  <Text style={{ fontSize: 20 }}>{a.is_hidden ? '🙈' : '📁'}</Text>
-                  <Text style={{ flex: 1, fontSize: 14, color: '#1c1c1e' }} numberOfLines={1}>{a.title}</Text>
-                  <Text style={{ fontSize: 22, color: isDragging ? '#f97316' : '#c7c7cc' }}>≡</Text>
-                </View>
-              )
-            })}
-          </View>
-          <View
-            collapsable={false}
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-            {...overlayPR.panHandlers}
-          />
-        </View>
-
-        <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 8, paddingTop: 6 }}>
-          <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.45)', textAlign: 'center' }}>
-            Drag a row to reorder · tap Save to apply
-          </Text>
-        </View>
-      </View>
-    </Modal>
-  )
-}
-
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function MediaAdminScreen() {
@@ -794,9 +560,14 @@ export default function MediaAdminScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkMovePicker, setBulkMovePicker] = useState(false)
 
-  // Reorder modals
-  const [showReorderModal, setShowReorderModal] = useState(false)
-  const [showAlbumReorderModal, setShowAlbumReorderModal] = useState(false)
+  // Inline reorder
+  const [photoReorderMode, setPhotoReorderMode] = useState(false)
+  const [albumReorderMode, setAlbumReorderMode] = useState(false)
+  const [reorderItems, setReorderItems] = useState<(MediaPhoto | MediaVideo)[]>([])
+  const [reorderAlbumsList, setReorderAlbumsList] = useState<MediaAlbum[]>([])
+  const [reorderDraggingId, setReorderDraggingId] = useState<string | null>(null)
+  const [photoReorderSaving, setPhotoReorderSaving] = useState(false)
+  const [albumReorderSaving, setAlbumReorderSaving] = useState(false)
 
   // Form modal
   const [modalVisible, setModalVisible] = useState(false)
@@ -808,6 +579,79 @@ export default function MediaAdminScreen() {
 
   const loadingMoreRef = useRef(false)
   const skipFirst = useRef(true)
+
+  // ── Inline reorder refs ───────────────────────────────────────────────────
+
+  const reorderItemsRef = useRef<(MediaPhoto | MediaVideo)[]>([])
+  const reorderAlbumsRef = useRef<MediaAlbum[]>([])
+  const rdDraggingIdxRef = useRef(-1)
+  const rdAnchorIdxRef = useRef(-1)
+
+  const SLOT_H_ITEM = 66   // row 64 + gap 2
+  const SLOT_H_ALBUM = 58  // row 56 + gap 2
+  const LIST_TOP_REORDER = 10
+
+  // Single overlay PanResponder for photo/video reorder (plain View, no Modal)
+  const itemOverlayPR = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: (evt) => {
+      const listY = evt.nativeEvent.locationY - LIST_TOP_REORDER
+      const n = reorderItemsRef.current.length
+      const idx = Math.max(0, Math.min(n - 1, Math.floor(listY / SLOT_H_ITEM)))
+      rdDraggingIdxRef.current = idx
+      rdAnchorIdxRef.current = idx
+      setReorderDraggingId(reorderItemsRef.current[idx]?.id ?? null)
+    },
+    onPanResponderMove: (_, gs) => {
+      const from = rdDraggingIdxRef.current
+      if (from < 0) return
+      const n = reorderItemsRef.current.length
+      const toIdx = Math.max(0, Math.min(n - 1, Math.round(rdAnchorIdxRef.current + gs.dy / SLOT_H_ITEM)))
+      if (toIdx !== from) {
+        const next = [...reorderItemsRef.current]
+        const [moved] = next.splice(from, 1)
+        next.splice(toIdx, 0, moved)
+        reorderItemsRef.current = next
+        rdDraggingIdxRef.current = toIdx
+        setReorderItems([...next])
+      }
+    },
+    onPanResponderRelease: () => { rdDraggingIdxRef.current = -1; rdAnchorIdxRef.current = -1; setReorderDraggingId(null) },
+    onPanResponderTerminate: () => { rdDraggingIdxRef.current = -1; rdAnchorIdxRef.current = -1; setReorderDraggingId(null) },
+  })).current
+
+  // Single overlay PanResponder for album reorder
+  const albumOverlayPR = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: (evt) => {
+      const listY = evt.nativeEvent.locationY - LIST_TOP_REORDER
+      const n = reorderAlbumsRef.current.length
+      const idx = Math.max(0, Math.min(n - 1, Math.floor(listY / SLOT_H_ALBUM)))
+      rdDraggingIdxRef.current = idx
+      rdAnchorIdxRef.current = idx
+      setReorderDraggingId(reorderAlbumsRef.current[idx]?.id ?? null)
+    },
+    onPanResponderMove: (_, gs) => {
+      const from = rdDraggingIdxRef.current
+      if (from < 0) return
+      const n = reorderAlbumsRef.current.length
+      const toIdx = Math.max(0, Math.min(n - 1, Math.round(rdAnchorIdxRef.current + gs.dy / SLOT_H_ALBUM)))
+      if (toIdx !== from) {
+        const next = [...reorderAlbumsRef.current]
+        const [moved] = next.splice(from, 1)
+        next.splice(toIdx, 0, moved)
+        reorderAlbumsRef.current = next
+        rdDraggingIdxRef.current = toIdx
+        setReorderAlbumsList([...next])
+      }
+    },
+    onPanResponderRelease: () => { rdDraggingIdxRef.current = -1; rdAnchorIdxRef.current = -1; setReorderDraggingId(null) },
+    onPanResponderTerminate: () => { rdDraggingIdxRef.current = -1; rdAnchorIdxRef.current = -1; setReorderDraggingId(null) },
+  })).current
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 400)
@@ -1259,6 +1103,65 @@ export default function MediaAdminScreen() {
     }
   }
 
+  // ── Inline reorder ────────────────────────────────────────────────────────
+
+  function enterPhotoReorderMode() {
+    const items = [...currentData]
+    reorderItemsRef.current = items
+    rdDraggingIdxRef.current = -1
+    rdAnchorIdxRef.current = -1
+    setReorderItems(items)
+    setReorderDraggingId(null)
+    setPhotoReorderMode(true)
+  }
+
+  function enterAlbumReorderMode() {
+    const albs = [...currentAlbums]
+    reorderAlbumsRef.current = albs
+    rdDraggingIdxRef.current = -1
+    rdAnchorIdxRef.current = -1
+    setReorderAlbumsList(albs)
+    setReorderDraggingId(null)
+    setAlbumReorderMode(true)
+  }
+
+  async function savePhotoReorder() {
+    setPhotoReorderSaving(true)
+    try {
+      const table = mediaTab === 'photos' ? 'photos' : 'videos'
+      await Promise.all(reorderItemsRef.current.map((it, i) =>
+        supabase.from(table).update({ display_order: i }).eq('id', it.id)
+      ))
+      const updated = reorderItemsRef.current.map((it, i) => ({ ...it, display_order: i }))
+      if (mediaTab === 'photos') setPhotos(updated as MediaPhoto[])
+      else setVideos(updated as MediaVideo[])
+      setPhotoReorderMode(false)
+    } catch {
+      Alert.alert('Error', 'Could not save order. Please try again.', [{ text: 'OK' }])
+    } finally {
+      setPhotoReorderSaving(false)
+    }
+  }
+
+  async function saveAlbumReorder() {
+    setAlbumReorderSaving(true)
+    try {
+      await Promise.all(reorderAlbumsRef.current.map((a, i) =>
+        supabase.from('media_albums').update({ display_order: i }).eq('id', a.id)
+      ))
+      const newOrder = reorderAlbumsRef.current
+      const updatedAll = [...albums.filter(a => a.album_type !== mediaTab), ...newOrder]
+      setAlbums(updatedAll)
+      if (mediaTab === 'photos') setPhotoAlbums(newOrder)
+      else setVideoAlbums(newOrder)
+      setAlbumReorderMode(false)
+    } catch {
+      Alert.alert('Error', 'Could not save album order.', [{ text: 'OK' }])
+    } finally {
+      setAlbumReorderSaving(false)
+    }
+  }
+
   // ── Pill helpers ──────────────────────────────────────────────────────────
 
   function Pill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
@@ -1309,7 +1212,7 @@ export default function MediaAdminScreen() {
             />
           </View>
           <TouchableOpacity
-            onPress={() => setShowAlbumReorderModal(true)}
+            onPress={enterAlbumReorderMode}
             style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#fff3e0', alignItems: 'center', justifyContent: 'center' }}>
             <AlbumSortIcon size={16} color="#f97316" />
           </TouchableOpacity>
@@ -1359,7 +1262,7 @@ export default function MediaAdminScreen() {
               </TouchableOpacity>
             </>
           ) : currentData.length > 1 && !debouncedSearch ? (
-            <TouchableOpacity onPress={() => setShowReorderModal(true)}
+            <TouchableOpacity onPress={enterPhotoReorderMode}
               style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
               <SortIcon size={16} color="#2d1b69" />
             </TouchableOpacity>
@@ -1426,29 +1329,99 @@ export default function MediaAdminScreen() {
         <AlbumPickerModal albums={albums} mediaType={mediaTab} onPick={handleBulkMoveToAlbum} onClose={() => setBulkMovePicker(false)} />
       )}
 
-      {showAlbumReorderModal && (
-        <AlbumReorderModal
-          albums={currentAlbums}
-          onClose={() => setShowAlbumReorderModal(false)}
-          onReorder={newOrder => {
-            const updatedAll = [...albums.filter(a => a.album_type !== mediaTab), ...newOrder]
-            setAlbums(updatedAll)
-            if (mediaTab === 'photos') setPhotoAlbums(newOrder)
-            else setVideoAlbums(newOrder)
-          }}
-        />
+      {/* Photo/video reorder — full-screen overlay, plain View (no Modal, no gesture conflict) */}
+      {photoReorderMode && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: '#f2f2f7' }}>
+          <View style={{ backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, paddingTop: insets.top + 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.18)' }}>
+            <TouchableOpacity onPress={() => setPhotoReorderMode(false)} disabled={photoReorderSaving}>
+              <Text style={{ fontSize: 16, color: photoReorderSaving ? 'rgba(60,60,67,0.3)' : '#2d1b69' }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 16, fontWeight: '600' }}>Reorder {mediaTab === 'photos' ? 'Photos' : 'Videos'}</Text>
+            <TouchableOpacity onPress={savePhotoReorder} disabled={photoReorderSaving}>
+              {photoReorderSaving ? <ActivityIndicator color="#2d1b69" /> : <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+          <View style={{ flex: 1, position: 'relative' }}>
+            <View style={{ paddingTop: LIST_TOP_REORDER }}>
+              {reorderItems.map(it => {
+                const isDragging = reorderDraggingId === it.id
+                const thumb = mediaTab === 'photos'
+                  ? ((it as MediaPhoto).thumbnail_url || (it as MediaPhoto).r2_url)
+                  : `https://img.youtube.com/vi/${(it as MediaVideo).youtube_id}/mqdefault.jpg`
+                return (
+                  <View key={it.id} style={{
+                    height: SLOT_H_ITEM - 2, flexDirection: 'row', alignItems: 'center',
+                    backgroundColor: isDragging ? '#ede9fe' : '#fff',
+                    marginHorizontal: 12, marginBottom: 2, borderRadius: 10,
+                    paddingHorizontal: 12, gap: 12,
+                  }}>
+                    <Image source={{ uri: thumb }} style={{ width: 44, height: 44, borderRadius: 6 }} contentFit="cover" />
+                    <Text style={{ flex: 1, fontSize: 14, color: '#1c1c1e' }} numberOfLines={1}>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {(it as any).title || '(Untitled)'}
+                    </Text>
+                    <Text style={{ fontSize: 22, color: isDragging ? '#2d1b69' : '#c7c7cc' }}>≡</Text>
+                  </View>
+                )
+              })}
+            </View>
+            {/* collapsable=false forces a real native UIView — overlay captures all touches */}
+            <View
+              collapsable={false}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              {...itemOverlayPR.panHandlers}
+            />
+          </View>
+          <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 8, paddingTop: 6 }}>
+            <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.45)', textAlign: 'center' }}>
+              Drag a row to reorder · tap Save to apply
+            </Text>
+          </View>
+        </View>
       )}
 
-      {showReorderModal && currentData.length > 0 && (
-        <ReorderModal
-          items={currentData}
-          mediaType={mediaTab}
-          onClose={() => setShowReorderModal(false)}
-          onReorder={newOrder => {
-            if (mediaTab === 'photos') setPhotos(newOrder as MediaPhoto[])
-            else setVideos(newOrder as MediaVideo[])
-          }}
-        />
+      {/* Album reorder — full-screen overlay, plain View (no Modal) */}
+      {albumReorderMode && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: '#f2f2f7' }}>
+          <View style={{ backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, paddingTop: insets.top + 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.18)' }}>
+            <TouchableOpacity onPress={() => setAlbumReorderMode(false)} disabled={albumReorderSaving}>
+              <Text style={{ fontSize: 16, color: albumReorderSaving ? 'rgba(60,60,67,0.3)' : '#f97316' }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 16, fontWeight: '600' }}>Reorder Albums</Text>
+            <TouchableOpacity onPress={saveAlbumReorder} disabled={albumReorderSaving}>
+              {albumReorderSaving ? <ActivityIndicator color="#f97316" /> : <Text style={{ fontSize: 16, fontWeight: '600', color: '#f97316' }}>Save</Text>}
+            </TouchableOpacity>
+          </View>
+          <View style={{ flex: 1, position: 'relative' }}>
+            <View style={{ paddingTop: LIST_TOP_REORDER }}>
+              {reorderAlbumsList.map(a => {
+                const isDragging = reorderDraggingId === a.id
+                return (
+                  <View key={a.id} style={{
+                    height: SLOT_H_ALBUM - 2, flexDirection: 'row', alignItems: 'center',
+                    backgroundColor: isDragging ? '#fff7ed' : '#fff',
+                    marginHorizontal: 12, marginBottom: 2, borderRadius: 10,
+                    paddingHorizontal: 12, gap: 12,
+                  }}>
+                    <Text style={{ fontSize: 20 }}>{a.is_hidden ? '🙈' : '📁'}</Text>
+                    <Text style={{ flex: 1, fontSize: 14, color: '#1c1c1e' }} numberOfLines={1}>{a.title}</Text>
+                    <Text style={{ fontSize: 22, color: isDragging ? '#f97316' : '#c7c7cc' }}>≡</Text>
+                  </View>
+                )
+              })}
+            </View>
+            <View
+              collapsable={false}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              {...albumOverlayPR.panHandlers}
+            />
+          </View>
+          <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 8, paddingTop: 6 }}>
+            <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.45)', textAlign: 'center' }}>
+              Drag a row to reorder · tap Save to apply
+            </Text>
+          </View>
+        </View>
       )}
 
     </View>
