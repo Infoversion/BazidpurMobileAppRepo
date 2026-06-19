@@ -152,7 +152,7 @@ function CoverGrid({ covers, size }: { covers: string[]; size: number }) {
 // ─── Album rail ───────────────────────────────────────────────────────────────
 
 function AlbumRail({
-  albums, selectedId, onSelect, onLongPress, onAdd,
+  albums, selectedId, onSelect, onLongPress, onAdd, onLongPressRoot,
   coversForAlbum, countForAlbum, rootCovers, rootCount, mediaType,
 }: {
   albums: MediaAlbum[]
@@ -160,6 +160,7 @@ function AlbumRail({
   onSelect: (id: string | null) => void
   onLongPress: (album: MediaAlbum) => void
   onAdd: () => void
+  onLongPressRoot: () => void
   coversForAlbum: (id: string) => string[]
   countForAlbum: (id: string) => number
   rootCovers: string[]
@@ -185,7 +186,7 @@ function AlbumRail({
         Albums ({albums.length})
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-        <TouchableOpacity onPress={() => onSelect(null)}
+        <TouchableOpacity onPress={() => onSelect(null)} onLongPress={onLongPressRoot}
           style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: selectedId === null ? '#2d1b69' : '#e5e5ea', overflow: 'hidden', backgroundColor: '#f9f9f9' }}
           activeOpacity={0.75}>
           <View style={{ width: CARD_W, height: IMG_H, backgroundColor: '#ede9fe', overflow: 'hidden' }}>
@@ -527,20 +528,14 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
   const draggingIdxRef = useRef(-1)
   const anchorIdxRef = useRef(-1)
   const positionMapRef = useRef(new Map(items.map((it, i) => [it.id, i])))
-  // Direct ref to ScrollView for synchronous scroll-disable (avoids re-render race)
-  const scrollRef = useRef<any>(null) // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const panResponders = useRef(
     items.map(it =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
-        // Claim moves immediately — no threshold — so ScrollView can't intercept
         onMoveShouldSetPanResponder: () => true,
-        // Never yield the gesture back to a parent (ScrollView) once we have it
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
-          // Disable scroll synchronously (no re-render lag)
-          scrollRef.current?.setNativeProps({ scrollEnabled: false })
           const idx = positionMapRef.current.get(it.id) ?? 0
           draggingIdxRef.current = idx
           anchorIdxRef.current = idx
@@ -562,13 +557,11 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
           }
         },
         onPanResponderRelease: () => {
-          scrollRef.current?.setNativeProps({ scrollEnabled: true })
           draggingIdxRef.current = -1
           anchorIdxRef.current = -1
           setDraggingId(null)
         },
         onPanResponderTerminate: () => {
-          scrollRef.current?.setNativeProps({ scrollEnabled: true })
           draggingIdxRef.current = -1
           anchorIdxRef.current = -1
           setDraggingId(null)
@@ -611,9 +604,8 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
         </View>
 
         <ScrollView
-          ref={scrollRef}
           style={{ flex: 1 }}
-          scrollEnabled={draggingId === null}
+          scrollEnabled={false}
           contentContainerStyle={{ paddingVertical: 10 }}
         >
           {displayOrder.map(it => {
@@ -643,6 +635,126 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
           })}
         </ScrollView>
 
+        <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 8, paddingTop: 6 }}>
+          <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.45)', textAlign: 'center' }}>
+            Hold and drag ≡ to reorder · tap Save to apply
+          </Text>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+// ─── Album reorder modal ──────────────────────────────────────────────────────
+
+function AlbumReorderModal({ albums, onClose, onReorder }: {
+  albums: MediaAlbum[]
+  onClose: () => void
+  onReorder: (newOrder: MediaAlbum[]) => void
+}) {
+  const ITEM_H = 56
+  const insets = useSafeAreaInsets()
+  const [displayOrder, setDisplayOrder] = useState(() => [...albums])
+  const [saving, setSaving] = useState(false)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+
+  const orderRef = useRef([...albums])
+  const draggingIdxRef = useRef(-1)
+  const anchorIdxRef = useRef(-1)
+  const positionMapRef = useRef(new Map(albums.map((a, i) => [a.id, i])))
+
+  const panResponders = useRef(
+    albums.map(a =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: () => {
+          const idx = positionMapRef.current.get(a.id) ?? 0
+          draggingIdxRef.current = idx
+          anchorIdxRef.current = idx
+          setDraggingId(a.id)
+        },
+        onPanResponderMove: (_, gs) => {
+          const from = draggingIdxRef.current
+          if (from < 0) return
+          const n = orderRef.current.length
+          const toIdx = Math.max(0, Math.min(n - 1, Math.round(anchorIdxRef.current + gs.dy / ITEM_H)))
+          if (toIdx !== from) {
+            const next = [...orderRef.current]
+            const [moved] = next.splice(from, 1)
+            next.splice(toIdx, 0, moved)
+            orderRef.current = next
+            next.forEach((x, i) => positionMapRef.current.set(x.id, i))
+            draggingIdxRef.current = toIdx
+            setDisplayOrder([...next])
+          }
+        },
+        onPanResponderRelease: () => {
+          draggingIdxRef.current = -1
+          anchorIdxRef.current = -1
+          setDraggingId(null)
+        },
+        onPanResponderTerminate: () => {
+          draggingIdxRef.current = -1
+          anchorIdxRef.current = -1
+          setDraggingId(null)
+        },
+      })
+    )
+  ).current
+
+  const idToOrigIdx = new Map(albums.map((a, i) => [a.id, i]))
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await Promise.all(
+        orderRef.current.map((a, i) =>
+          supabase.from('media_albums').update({ display_order: i }).eq('id', a.id)
+        )
+      )
+      onReorder(orderRef.current)
+      onClose()
+    } catch {
+      Alert.alert('Error', 'Could not save album order.', [{ text: 'OK' }])
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <View style={{ backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, paddingTop: insets.top + 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.18)' }}>
+          <TouchableOpacity onPress={onClose} disabled={saving}>
+            <Text style={{ fontSize: 16, color: saving ? 'rgba(60,60,67,0.3)' : '#2d1b69' }}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 16, fontWeight: '600' }}>Reorder Albums</Text>
+          <TouchableOpacity onPress={handleSave} disabled={saving}>
+            {saving ? <ActivityIndicator color="#2d1b69" /> : <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Save</Text>}
+          </TouchableOpacity>
+        </View>
+        <ScrollView scrollEnabled={false} style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 10 }}>
+          {displayOrder.map(a => {
+            const prIdx = idToOrigIdx.get(a.id) ?? 0
+            const pr = panResponders[prIdx]
+            const isDragging = draggingId === a.id
+            return (
+              <View key={a.id} style={{
+                height: ITEM_H, flexDirection: 'row', alignItems: 'center',
+                backgroundColor: isDragging ? '#ede9fe' : '#fff',
+                marginHorizontal: 12, marginBottom: 2, borderRadius: 10,
+                paddingHorizontal: 12, gap: 12,
+              }}>
+                <Text style={{ fontSize: 20 }}>{a.is_hidden ? '🙈' : '📁'}</Text>
+                <Text style={{ flex: 1, fontSize: 14, color: '#1c1c1e' }} numberOfLines={1}>{a.title}</Text>
+                <View {...(pr?.panHandlers ?? {})} style={{ paddingHorizontal: 14, paddingVertical: 14 }}>
+                  <Text style={{ fontSize: 22, color: isDragging ? '#2d1b69' : '#c7c7cc' }}>≡</Text>
+                </View>
+              </View>
+            )
+          })}
+        </ScrollView>
         <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 8, paddingTop: 6 }}>
           <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.45)', textAlign: 'center' }}>
             Hold and drag ≡ to reorder · tap Save to apply
@@ -691,8 +803,9 @@ export default function MediaAdminScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkMovePicker, setBulkMovePicker] = useState(false)
 
-  // Reorder modal
+  // Reorder modals
   const [showReorderModal, setShowReorderModal] = useState(false)
+  const [showAlbumReorderModal, setShowAlbumReorderModal] = useState(false)
 
   // Form modal
   const [modalVisible, setModalVisible] = useState(false)
@@ -877,9 +990,17 @@ export default function MediaAdminScreen() {
   }
 
   function handleAlbumLongPress(album: MediaAlbum) {
-    const options = ['Rename', album.is_hidden ? 'Show (unhide)' : 'Hide from members', 'Delete Album', 'Cancel']
+    const addLabel = `Add ${album.album_type === 'photos' ? 'Photos' : 'Videos'} to This Album`
+    const options = [addLabel, 'Rename', album.is_hidden ? 'Show (unhide)' : 'Hide from members', 'Delete Album', 'Cancel']
     const handle = (i: number) => {
       if (i === 0) {
+        if (album.album_type === 'photos') { setMediaTab('photos'); setSelectedPhotoAlbumId(album.id) }
+        else { setMediaTab('videos'); setSelectedVideoAlbumId(album.id) }
+        cancelSelectMode()
+        setEditingId(null); setModalForm(EMPTY_FORM)
+        setModalTitle(`Add ${album.album_type === 'photos' ? 'Photo' : 'Video'}`)
+        setModalVisible(true)
+      } else if (i === 1) {
         Alert.prompt('Rename Album', 'Enter new name:', [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -892,14 +1013,14 @@ export default function MediaAdminScreen() {
             },
           },
         ], 'plain-text', album.title)
-      } else if (i === 1) {
+      } else if (i === 2) {
         const next = !album.is_hidden
         supabase.from('media_albums').update({ is_hidden: next }).eq('id', album.id).then(({ error }) => {
           if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
           const updated = albums.map(a => a.id === album.id ? { ...a, is_hidden: next } : a)
           setAlbums(updated); setPhotoAlbums(updated.filter(a => a.album_type === 'photos')); setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
         })
-      } else if (i === 2) {
+      } else if (i === 3) {
         Alert.alert('Delete album?', `"${album.title}" will be deleted. Photos/videos inside will become unassigned.`, [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -919,10 +1040,10 @@ export default function MediaAdminScreen() {
       }
     }
     if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions({ title: album.title, options, cancelButtonIndex: 3, destructiveButtonIndex: 2 }, handle)
+      ActionSheetIOS.showActionSheetWithOptions({ title: album.title, options, cancelButtonIndex: 4, destructiveButtonIndex: 3 }, handle)
     } else {
       Alert.alert(album.title, '', [
-        ...options.slice(0, -1).map((label, i) => ({ text: label, style: (label === 'Delete Album' ? 'destructive' : 'default') as 'destructive' | 'default', onPress: () => handle(i) })),
+        ...options.slice(0, 4).map((label, i) => ({ text: label, style: (label === 'Delete Album' ? 'destructive' : 'default') as 'destructive' | 'default', onPress: () => handle(i) })),
         { text: 'Cancel', style: 'cancel' as const, onPress: () => {} },
       ])
     }
@@ -978,14 +1099,23 @@ export default function MediaAdminScreen() {
 
   async function handleBulkToggle() {
     const ids = Array.from(selectedIds)
-    const table = mediaTab === 'photos' ? 'photos' : 'videos'
     const allActive = ids.every(id => {
       const item = currentData.find(x => x.id === id)
       return item ? (item as MediaVideo).is_active !== false : false
     })
     const newActive = !allActive
-    const { error } = await supabase.from(table).update({ is_active: newActive }).in('id', ids)
-    if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { Alert.alert('Error', 'Not signed in.', [{ text: 'OK' }]); return }
+    const table = mediaTab === 'photos' ? 'photos' : 'videos'
+    const res = await fetch(
+      `https://www.bazidpur.com/api/${table}?_t=${encodeURIComponent(session.access_token)}`,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, is_active: newActive }) }
+    )
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      Alert.alert('Error', j.error || 'Failed to update.', [{ text: 'OK' }])
+      return
+    }
     if (mediaTab === 'photos') setPhotos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
     else setVideos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
     cancelSelectMode()
@@ -1085,14 +1215,21 @@ export default function MediaAdminScreen() {
   }
 
   async function toggleActive(id: string, current: boolean) {
+    const newActive = !current
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { Alert.alert('Error', 'Not signed in.', [{ text: 'OK' }]); return }
     const table = mediaTab === 'photos' ? 'photos' : 'videos'
-    const { error } = await supabase.from(table).update({ is_active: !current }).eq('id', id)
-    if (error) {
-      Alert.alert('Cannot Update', friendlyError(error.message), [{ text: 'OK' }])
+    const res = await fetch(
+      `https://www.bazidpur.com/api/${table}?_t=${encodeURIComponent(session.access_token)}`,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, is_active: newActive }) }
+    )
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      Alert.alert('Cannot Update', j.error || 'Failed to update. Please try again.', [{ text: 'OK' }])
       return
     }
-    if (mediaTab === 'photos') setPhotos(prev => prev.map(x => x.id === id ? { ...x, is_active: !current } : x))
-    else setVideos(prev => prev.map(x => x.id === id ? { ...x, is_active: !current } : x))
+    if (mediaTab === 'photos') setPhotos(prev => prev.map(x => x.id === id ? { ...x, is_active: newActive } : x))
+    else setVideos(prev => prev.map(x => x.id === id ? { ...x, is_active: newActive } : x))
   }
 
   function showActions(item: MediaPhoto | MediaVideo) {
@@ -1181,9 +1318,9 @@ export default function MediaAdminScreen() {
             />
           </View>
           <TouchableOpacity
-            onPress={() => { setEditingId(null); setModalForm(EMPTY_FORM); setModalTitle(`Add ${mediaTab === 'photos' ? 'Photo' : 'Video'}`); setModalVisible(true) }}
-            style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: '#fff', fontSize: 26, lineHeight: 30, marginTop: -2 }}>+</Text>
+            onPress={() => setShowAlbumReorderModal(true)}
+            style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
+            <SortIcon size={16} color="#2d1b69" />
           </TouchableOpacity>
         </View>
       )}
@@ -1199,6 +1336,14 @@ export default function MediaAdminScreen() {
         }}
         onLongPress={handleAlbumLongPress}
         onAdd={() => setShowCreateAlbum(true)}
+        onLongPressRoot={() => {
+          if (mediaTab === 'photos') setSelectedPhotoAlbumId(null)
+          else setSelectedVideoAlbumId(null)
+          cancelSelectMode()
+          setEditingId(null); setModalForm(EMPTY_FORM)
+          setModalTitle(`Add ${mediaTab === 'photos' ? 'Photo' : 'Video'}`)
+          setModalVisible(true)
+        }}
         coversForAlbum={id => albumCoverData[id]?.covers ?? []}
         countForAlbum={id => albumCoverData[id]?.count ?? 0}
         rootCovers={mediaTab === 'photos' ? rootCoverData.photos : rootCoverData.videos}
@@ -1206,15 +1351,29 @@ export default function MediaAdminScreen() {
         mediaType={mediaTab}
       />
 
-      {/* Album heading + sort icon button */}
+      {/* Album heading + action icons (select mode) or sort icon */}
       <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f2f2f7' }}>
         <Text style={{ fontSize: 16, fontWeight: '700', color: '#1c1c1e' }}>{currentAlbumName}</Text>
-        {currentData.length > 1 && !debouncedSearch && (
-          <TouchableOpacity onPress={() => setShowReorderModal(true)}
-            style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
-            <SortIcon size={16} color="#2d1b69" />
-          </TouchableOpacity>
-        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {selectMode && selectedIds.size > 0 ? (
+            <>
+              <TouchableOpacity onPress={() => setBulkMovePicker(true)} style={{ padding: 6 }}>
+                <Text style={{ fontSize: 22 }}>📁</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleBulkToggle} style={{ padding: 6 }}>
+                <Text style={{ fontSize: 22 }}>👁</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleBulkDelete} style={{ padding: 6 }}>
+                <Text style={{ fontSize: 22 }}>🗑️</Text>
+              </TouchableOpacity>
+            </>
+          ) : currentData.length > 1 && !debouncedSearch ? (
+            <TouchableOpacity onPress={() => setShowReorderModal(true)}
+              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
+              <SortIcon size={16} color="#2d1b69" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
 
       {/* 4-per-row tile grid */}
@@ -1225,7 +1384,7 @@ export default function MediaAdminScreen() {
         keyExtractor={item => item.id}
         columnWrapperStyle={{ paddingHorizontal: 12, gap: 3 }}
         ItemSeparatorComponent={() => <View style={{ height: 3 }} />}
-        contentContainerStyle={{ paddingTop: 3, paddingBottom: insets.bottom + (selectMode && selectedIds.size > 0 ? 170 : 140) }}
+        contentContainerStyle={{ paddingTop: 3, paddingBottom: insets.bottom + 140 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#2d1b69" />}
         onEndReached={onLoadMore}
         onEndReachedThreshold={0.3}
@@ -1256,32 +1415,6 @@ export default function MediaAdminScreen() {
         }
       />
 
-      {/* Bulk action bar — shown above tab bar when items are selected */}
-      {selectMode && selectedIds.size > 0 && (
-        <View style={{
-          position: 'absolute', bottom: insets.bottom + 86, left: 0, right: 0,
-          flexDirection: 'row', backgroundColor: '#fff',
-          borderTopWidth: 0.5, borderBottomWidth: 0.5, borderColor: '#e5e5ea',
-          paddingVertical: 13, paddingHorizontal: 20, alignItems: 'center',
-          shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 4,
-        }}>
-          <TouchableOpacity onPress={() => setBulkMovePicker(true)} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-            <Text style={{ fontSize: 18 }}>📁</Text>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: '#2d1b69' }}>Move</Text>
-          </TouchableOpacity>
-          <View style={{ width: 1, height: 36, backgroundColor: '#e5e5ea' }} />
-          <TouchableOpacity onPress={handleBulkToggle} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-            <Text style={{ fontSize: 18 }}>👁</Text>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: '#2d1b69' }}>Toggle</Text>
-          </TouchableOpacity>
-          <View style={{ width: 1, height: 36, backgroundColor: '#e5e5ea' }} />
-          <TouchableOpacity onPress={handleBulkDelete} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-            <Text style={{ fontSize: 18 }}>🗑️</Text>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: '#ef4444' }}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* Modals */}
       <FormModal
         visible={modalVisible} title={modalTitle} mediaType={mediaTab}
@@ -1300,6 +1433,19 @@ export default function MediaAdminScreen() {
 
       {bulkMovePicker && (
         <AlbumPickerModal albums={albums} mediaType={mediaTab} onPick={handleBulkMoveToAlbum} onClose={() => setBulkMovePicker(false)} />
+      )}
+
+      {showAlbumReorderModal && (
+        <AlbumReorderModal
+          albums={currentAlbums}
+          onClose={() => setShowAlbumReorderModal(false)}
+          onReorder={newOrder => {
+            const updatedAll = [...albums.filter(a => a.album_type !== mediaTab), ...newOrder]
+            setAlbums(updatedAll)
+            if (mediaTab === 'photos') setPhotoAlbums(newOrder)
+            else setVideoAlbums(newOrder)
+          }}
+        />
       )}
 
       {showReorderModal && currentData.length > 0 && (
