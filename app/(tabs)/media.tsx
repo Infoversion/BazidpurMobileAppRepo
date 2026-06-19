@@ -414,7 +414,7 @@ export default function TimelessMomentsScreen() {
                 albums={visiblePhotoAlbums}
                 selectedId={selectedPhotoAlbumId}
                 rootCount={rootPhotos.length}
-                rootLabel="All Photos"
+                rootLabel="Unorganized Photos"
                 rootCovers={rootPhotos.slice(0, 4).map((p: any) => p.thumbnail_url || p.r2_url)}
                 onSelect={id => setSelectedPhotoAlbumId(id)}
                 countForAlbum={id => (photos as any[]).filter(p => p.album_id === id).length}
@@ -424,7 +424,7 @@ export default function TimelessMomentsScreen() {
               {(visiblePhotoAlbums.length > 0 || rootPhotos.length > 0) && (
                 <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 2 }}>
                   <Text style={{ fontSize: 16, fontWeight: '700', color: '#1c1c1e' }}>
-                    {selectedPhotoAlbumId === null ? 'All Photos' : (photoAlbums.find(a => a.id === selectedPhotoAlbumId)?.title ?? '')}
+                    {selectedPhotoAlbumId === null ? 'Unorganized Photos' : (photoAlbums.find(a => a.id === selectedPhotoAlbumId)?.title ?? '')}
                   </Text>
                 </View>
               )}
