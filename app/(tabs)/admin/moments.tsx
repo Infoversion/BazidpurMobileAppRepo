@@ -21,6 +21,13 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024
 interface PickedImage { uri: string; fileSize?: number }
 interface UploadState { current: number; total: number; pct: number; label: string }
 
+interface TmAlbum {
+  id: string
+  title: string
+  album_type: 'photos' | 'videos'
+  is_hidden: boolean
+}
+
 interface MomentPhoto {
   id: string
   title?: string
@@ -29,6 +36,7 @@ interface MomentPhoto {
   thumbnail_url?: string
   display_order: number
   is_active?: boolean
+  album_id?: string | null
   created_at: string
 }
 
@@ -41,6 +49,7 @@ interface MomentVideo {
   thumbnail_url?: string
   display_order: number
   is_active: boolean
+  album_id?: string | null
   created_at: string
 }
 
@@ -67,76 +76,49 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-// Upload a photo to the web API (R2 storage) using expo-file-system.
-// createUploadTask streams the file natively — no JS blob/XHR issues.
 async function webApiUpload(
-  apiUrl: string,
-  uri: string,
+  apiUrl: string, uri: string,
   fields: { title: string; description: string; display_order: number },
   onProgress: (pct: number, label: string) => void
 ): Promise<Record<string, unknown>> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not signed in.')
-
   const ext = uri.split('.').pop()?.split('?')[0]?.toLowerCase() || 'jpg'
   const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg'
-
   onProgress(0, 'Uploading…')
-
   const url = `${apiUrl}?_t=${encodeURIComponent(session.access_token)}`
-
-  const task = FileSystem.createUploadTask(
-    url,
-    uri,
-    {
-      httpMethod: 'POST',
-      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-      fieldName: 'file',
-      mimeType,
-      parameters: {
-        title: fields.title || '',
-        description: fields.description || '',
-        display_order: String(fields.display_order),
-      },
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    },
-    ({ totalBytesSent, totalBytesExpectedToSend }) => {
-      if (totalBytesExpectedToSend > 0) {
-        onProgress(Math.round((totalBytesSent / totalBytesExpectedToSend) * 95), 'Uploading…')
-      }
-    }
-  )
-
+  const task = FileSystem.createUploadTask(url, uri, {
+    httpMethod: 'POST',
+    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    fieldName: 'file',
+    mimeType,
+    parameters: { title: fields.title || '', description: fields.description || '', display_order: String(fields.display_order) },
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  }, ({ totalBytesSent, totalBytesExpectedToSend }) => {
+    if (totalBytesExpectedToSend > 0) onProgress(Math.round((totalBytesSent / totalBytesExpectedToSend) * 95), 'Uploading…')
+  })
   const result = await task.uploadAsync()
-  if (!result) throw new Error('Upload failed — no response from server.')
-
+  if (!result) throw new Error('Upload failed — no response.')
   onProgress(98, 'Saving…')
-
   if (result.status < 200 || result.status >= 300) {
     let errMsg = `Server returned ${result.status}`
     try { const j = JSON.parse(result.body); errMsg = (j.error ?? j.message ?? errMsg) as string } catch {}
     throw new Error(errMsg)
   }
-
   const parsed = JSON.parse(result.body)
   return (parsed.photo as Record<string, unknown>) ?? parsed
 }
 
 // ─── Segmented control ────────────────────────────────────────────────────────
 
-function Seg<T extends string>({ tabs, selected, onSelect }: {
-  tabs: { key: T; label: string }[]
-  selected: T
-  onSelect: (k: T) => void
-}) {
+function Seg<T extends string>({ tabs, selected, onSelect }: { tabs: { key: T; label: string }[]; selected: T; onSelect: (k: T) => void }) {
   return (
     <View style={{ flexDirection: 'row', backgroundColor: 'rgba(118,118,128,0.12)', borderRadius: 9, padding: 2, marginHorizontal: 16, marginTop: 10, marginBottom: 8 }}>
       {tabs.map(tab => {
         const active = tab.key === selected
         return (
           <TouchableOpacity key={tab.key} onPress={() => onSelect(tab.key)} activeOpacity={0.8}
-            style={[{ flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 7 }, active && { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }]}
-          >
+            style={[{ flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: 7 }, active && { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 }]}>
             <Text style={{ fontSize: 12, fontWeight: active ? '600' : '400', color: active ? '#000' : 'rgba(60,60,67,0.6)' }}>{tab.label}</Text>
           </TouchableOpacity>
         )
@@ -154,17 +136,169 @@ function ActiveBadge({ active }: { active: boolean | undefined }) {
   )
 }
 
-// ─── Form modal ───────────────────────────────────────────────────────────────
+// ─── Album rail ───────────────────────────────────────────────────────────────
+
+function AlbumRail({
+  albums, selectedId, onSelect, onLongPress, onAdd,
+}: {
+  albums: TmAlbum[]
+  selectedId: string | null
+  onSelect: (id: string | null) => void
+  onLongPress: (album: TmAlbum) => void
+  onAdd: () => void
+}) {
+  const CARD_W = 80
+  return (
+    <View style={{ backgroundColor: '#fff', borderBottomWidth: 0.5, borderBottomColor: '#e5e5ea', paddingTop: 8, paddingBottom: 10 }}>
+      <Text style={{ fontSize: 10, fontWeight: '600', color: '#8e8e93', letterSpacing: 1, paddingHorizontal: 16, marginBottom: 6, textTransform: 'uppercase' }}>Albums</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+
+        {/* Root card */}
+        <TouchableOpacity
+          onPress={() => onSelect(null)}
+          style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: selectedId === null ? '#2d1b69' : '#e5e5ea', overflow: 'hidden', backgroundColor: '#f9f9f9' }}
+          activeOpacity={0.75}
+        >
+          <View style={{ width: CARD_W, height: 52, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 18 }}>📂</Text>
+          </View>
+          <View style={{ paddingHorizontal: 4, paddingVertical: 3, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: selectedId === null ? '#2d1b69' : '#1c1c1e' }} numberOfLines={1}>Root</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Album cards */}
+        {albums.map(album => {
+          const active = selectedId === album.id
+          return (
+            <TouchableOpacity
+              key={album.id}
+              onPress={() => onSelect(album.id)}
+              onLongPress={() => onLongPress(album)}
+              style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: active ? '#2d1b69' : '#e5e5ea', overflow: 'hidden', backgroundColor: '#f9f9f9', opacity: album.is_hidden ? 0.55 : 1 }}
+              activeOpacity={0.75}
+            >
+              <View style={{ width: CARD_W, height: 52, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 18 }}>📁</Text>
+                {album.is_hidden && (
+                  <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#f59e0b', borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1 }}>
+                    <Text style={{ fontSize: 8, fontWeight: '700', color: '#fff' }}>H</Text>
+                  </View>
+                )}
+              </View>
+              <View style={{ paddingHorizontal: 4, paddingVertical: 3, borderTopWidth: 0.5, borderTopColor: '#e5e5ea' }}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: active ? '#2d1b69' : '#1c1c1e' }} numberOfLines={1}>{album.title}</Text>
+              </View>
+            </TouchableOpacity>
+          )
+        })}
+
+        {/* Add album button */}
+        <TouchableOpacity
+          onPress={onAdd}
+          style={{ width: CARD_W, borderRadius: 8, borderWidth: 2, borderColor: '#e5e5ea', borderStyle: 'dashed', overflow: 'hidden', backgroundColor: '#f9f9f9', alignItems: 'center', justifyContent: 'center', height: 80 }}
+          activeOpacity={0.75}
+        >
+          <Text style={{ fontSize: 22, color: '#8e8e93' }}>+</Text>
+          <Text style={{ fontSize: 9, color: '#8e8e93', marginTop: 2 }}>Album</Text>
+        </TouchableOpacity>
+
+      </ScrollView>
+    </View>
+  )
+}
+
+// ─── Album picker modal (move-to-album) ──────────────────────────────────────
+
+function AlbumPickerModal({
+  albums, mediaType, onPick, onClose,
+}: {
+  albums: TmAlbum[]
+  mediaType: MediaTab
+  onPick: (albumId: string | null) => void
+  onClose: () => void
+}) {
+  const insets = useSafeAreaInsets()
+  const relevant = albums.filter(a => a.album_type === mediaType)
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+        <View style={{ backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, paddingTop: insets.top + 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.18)' }}>
+          <TouchableOpacity onPress={onClose}><Text style={{ fontSize: 16, color: '#2d1b69' }}>Cancel</Text></TouchableOpacity>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: '#000' }}>Move to Album</Text>
+          <View style={{ width: 60 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
+          <TouchableOpacity onPress={() => onPick(null)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 12, padding: 14 }}>
+            <Text style={{ fontSize: 22 }}>📂</Text>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: '#1c1c1e' }}>Root (unassigned)</Text>
+          </TouchableOpacity>
+          {relevant.map(album => (
+            <TouchableOpacity key={album.id} onPress={() => onPick(album.id)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 12, padding: 14 }}>
+              <Text style={{ fontSize: 22 }}>📁</Text>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: '#1c1c1e' }}>{album.title}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </Modal>
+  )
+}
+
+// ─── Create album modal ───────────────────────────────────────────────────────
+
+function CreateAlbumModal({
+  mediaType, onClose, onCreate,
+}: {
+  mediaType: MediaTab
+  onClose: () => void
+  onCreate: (title: string) => Promise<void>
+}) {
+  const insets = useSafeAreaInsets()
+  const [title, setTitle] = useState('')
+  const [saving, setSaving] = useState(false)
+  async function save() {
+    if (!title.trim()) return
+    setSaving(true)
+    try { await onCreate(title.trim()) } finally { setSaving(false) }
+  }
+  return (
+    <Modal visible animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#f2f2f7' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={{ backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, paddingTop: insets.top + 14, borderBottomWidth: 0.5, borderBottomColor: 'rgba(60,60,67,0.18)' }}>
+          <TouchableOpacity onPress={onClose} disabled={saving}><Text style={{ fontSize: 16, color: saving ? 'rgba(60,60,67,0.3)' : '#2d1b69' }}>Cancel</Text></TouchableOpacity>
+          <Text style={{ fontSize: 16, fontWeight: '600' }}>New {mediaType === 'photos' ? 'Photo' : 'Video'} Album</Text>
+          <TouchableOpacity onPress={save} disabled={saving || !title.trim()}>
+            {saving ? <ActivityIndicator color="#2d1b69" /> : <Text style={{ fontSize: 16, fontWeight: '600', color: title.trim() ? '#2d1b69' : 'rgba(60,60,67,0.3)' }}>Create</Text>}
+          </TouchableOpacity>
+        </View>
+        <View style={{ padding: 16 }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 16 }}>
+            <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)', marginBottom: 4 }}>Album title</Text>
+            <TextInput
+              autoFocus
+              style={{ fontSize: 16, color: '#000', paddingVertical: 4 }}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Enter album name…"
+              returnKeyType="done"
+              onSubmitEditing={save}
+            />
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  )
+}
+
+// ─── Form modal (add / edit photo or video) ───────────────────────────────────
 
 function FormModal({ visible, title: modalTitle, mediaType, initial, saving, uploadState, onSave, onClose }: {
-  visible: boolean
-  title: string
-  mediaType: MediaTab
-  initial: FormState
-  saving: boolean
-  uploadState: UploadState | null
-  onSave: (f: FormState) => void
-  onClose: () => void
+  visible: boolean; title: string; mediaType: MediaTab
+  initial: FormState; saving: boolean; uploadState: UploadState | null
+  onSave: (f: FormState) => void; onClose: () => void
 }) {
   const [form, setForm] = useState<FormState>(initial)
   const isNew = !initial.title && !initial.youtubeUrl
@@ -175,26 +309,13 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!perm.granted) { Alert.alert('Permission needed', 'Please allow photo library access in Settings.'); return }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.7,
-      allowsMultipleSelection: true,
-      allowsEditing: false,
-      exif: false,
+      mediaTypes: ['images'], quality: 0.7, allowsMultipleSelection: true, allowsEditing: false, exif: false,
     })
     if (result.canceled) return
-
     const oversized = result.assets.filter(a => a.fileSize != null && a.fileSize > MAX_FILE_BYTES)
     const valid = result.assets.filter(a => a.fileSize == null || a.fileSize <= MAX_FILE_BYTES)
-
-    if (oversized.length > 0) {
-      Alert.alert(
-        `${oversized.length} photo${oversized.length > 1 ? 's' : ''} skipped`,
-        `${oversized.length > 1 ? 'They were' : 'It was'} over the ${formatBytes(MAX_FILE_BYTES)} limit.`
-      )
-    }
-    if (valid.length > 0) {
-      setForm(f => ({ ...f, images: [...f.images, ...valid.map(a => ({ uri: a.uri, fileSize: a.fileSize ?? undefined }))] }))
-    }
+    if (oversized.length > 0) Alert.alert(`${oversized.length} photo${oversized.length > 1 ? 's' : ''} skipped`, `Over the ${formatBytes(MAX_FILE_BYTES)} limit.`)
+    if (valid.length > 0) setForm(f => ({ ...f, images: [...f.images, ...valid.map(a => ({ uri: a.uri, fileSize: a.fileSize ?? undefined }))] }))
   }
 
   return (
@@ -209,14 +330,10 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
-
-          {/* Upload progress */}
           {uploadState && (
             <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 10 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: '#2d1b69' }}>
-                  Photo {uploadState.current} of {uploadState.total}
-                </Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#2d1b69' }}>Photo {uploadState.current} of {uploadState.total}</Text>
                 <Text style={{ fontSize: 13, color: 'rgba(60,60,67,0.5)' }}>{uploadState.label}</Text>
               </View>
               <View style={{ height: 8, backgroundColor: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
@@ -226,38 +343,28 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
             </View>
           )}
 
-          {/* Photo picker */}
           {mediaType === 'photos' && isNew && !uploadState && (
             <View style={{ gap: 8 }}>
-              <TouchableOpacity
-                onPress={pickImages}
-                style={{ backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#2d1b69', borderStyle: 'dashed', paddingVertical: 28 }}
-              >
+              <TouchableOpacity onPress={pickImages}
+                style={{ backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#2d1b69', borderStyle: 'dashed', paddingVertical: 28 }}>
                 <Text style={{ fontSize: 36 }}>📷</Text>
                 <Text style={{ fontSize: 15, fontWeight: '500', color: '#2d1b69', marginTop: 6 }}>
                   {form.images.length > 0 ? '+ Add More Photos' : 'Tap to choose photo(s)'}
                 </Text>
-                <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.4)', marginTop: 4 }}>
-                  Max {formatBytes(MAX_FILE_BYTES)} per photo
-                </Text>
+                <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.4)', marginTop: 4 }}>Max {formatBytes(MAX_FILE_BYTES)} per photo</Text>
               </TouchableOpacity>
-
               {form.images.length > 0 && (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {form.images.map((img, i) => (
                     <View key={i} style={{ alignItems: 'center', gap: 2 }}>
                       <View style={{ position: 'relative' }}>
                         <Image source={{ uri: img.uri }} style={{ width: 80, height: 80, borderRadius: 8 }} contentFit="cover" />
-                        <TouchableOpacity
-                          onPress={() => setForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
-                          style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center' }}
-                        >
+                        <TouchableOpacity onPress={() => setForm(f => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
+                          style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✕</Text>
                         </TouchableOpacity>
                       </View>
-                      {img.fileSize != null && (
-                        <Text style={{ fontSize: 9, color: 'rgba(60,60,67,0.45)' }}>{formatBytes(img.fileSize)}</Text>
-                      )}
+                      {img.fileSize != null && <Text style={{ fontSize: 9, color: 'rgba(60,60,67,0.45)' }}>{formatBytes(img.fileSize)}</Text>}
                     </View>
                   ))}
                 </View>
@@ -271,8 +378,7 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
                 <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)', marginBottom: 4 }}>YouTube URL or Video ID</Text>
                 <TextInput style={{ fontSize: 16, color: '#000', paddingVertical: 4 }} value={form.youtubeUrl}
                   onChangeText={v => setForm(f => ({ ...f, youtubeUrl: v }))}
-                  placeholder="https://youtube.com/watch?v=... or video ID"
-                  autoCapitalize="none" />
+                  placeholder="https://youtube.com/watch?v=…" autoCapitalize="none" />
                 <View style={{ height: 0.5, backgroundColor: 'rgba(60,60,67,0.1)' }} />
               </>
             )}
@@ -300,13 +406,12 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
   )
 }
 
-// ─── Rows ─────────────────────────────────────────────────────────────────────
+// ─── Row components ───────────────────────────────────────────────────────────
 
 function PhotoRow({ item, onAction }: { item: MomentPhoto; onAction: () => void }) {
   return (
     <TouchableOpacity onPress={onAction} activeOpacity={0.6}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10 }}
-    >
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10 }}>
       <View style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', backgroundColor: '#f2f2f7', flexShrink: 0 }}>
         <Image source={{ uri: item.thumbnail_url || item.r2_url }} style={{ width: 52, height: 52 }} contentFit="cover" />
       </View>
@@ -327,8 +432,7 @@ function VideoRow({ item, onAction }: { item: MomentVideo; onAction: () => void 
   const thumb = item.thumbnail_url || `https://img.youtube.com/vi/${item.youtube_id}/mqdefault.jpg`
   return (
     <TouchableOpacity onPress={onAction} activeOpacity={0.6}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10 }}
-    >
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10 }}>
       <View style={{ width: 72, height: 52, borderRadius: 8, overflow: 'hidden', backgroundColor: '#000', flexShrink: 0, alignItems: 'center', justifyContent: 'center' }}>
         <Image source={{ uri: thumb }} style={{ width: 72, height: 52 }} contentFit="cover" />
         <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
@@ -352,17 +456,32 @@ function VideoRow({ item, onAction }: { item: MomentVideo; onAction: () => void 
 
 export default function MomentsAdminScreen() {
   const insets = useSafeAreaInsets()
+
+  // Media tab + filters
   const [mediaTab, setMediaTab] = useState<MediaTab>('photos')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  // Content
   const [photos, setPhotos] = useState<MomentPhoto[]>([])
   const [videos, setVideos] = useState<MomentVideo[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [counts, setCounts] = useState({ photos: 0, videos: 0 })
+
+  // Albums
+  const [albums, setAlbums] = useState<TmAlbum[]>([])
+  const [photoAlbums, setPhotoAlbums] = useState<TmAlbum[]>([])
+  const [videoAlbums, setVideoAlbums] = useState<TmAlbum[]>([])
+  const [selectedPhotoAlbumId, setSelectedPhotoAlbumId] = useState<string | null>(null)
+  const [selectedVideoAlbumId, setSelectedVideoAlbumId] = useState<string | null>(null)
+  const [showCreateAlbum, setShowCreateAlbum] = useState(false)
+  const [movePicker, setMovePicker] = useState<{ item: MomentPhoto | MomentVideo } | null>(null)
+
+  // Form modal
   const [modalVisible, setModalVisible] = useState(false)
   const [modalForm, setModalForm] = useState<FormState>(EMPTY_FORM)
   const [modalTitle, setModalTitle] = useState('')
@@ -370,17 +489,47 @@ export default function MomentsAdminScreen() {
   const [saving, setSaving] = useState(false)
   const [uploadState, setUploadState] = useState<UploadState | null>(null)
 
+  const loadingMoreRef = useRef(false)
+  const skipFirst = useRef(true)
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 400)
     return () => clearTimeout(t)
   }, [search])
 
   const currentData: (MomentPhoto | MomentVideo)[] = mediaTab === 'photos' ? photos : videos
+  const currentAlbums = mediaTab === 'photos' ? photoAlbums : videoAlbums
+  const selectedAlbumId = mediaTab === 'photos' ? selectedPhotoAlbumId : selectedVideoAlbumId
 
-  async function fetchPage(tab: MediaTab, sf: StatusFilter, s: string, offset: number) {
+  // ── Album filter helper ───────────────────────────────────────────────────
+
+  function buildAlbumQuery(q: any, tab: MediaTab, opts?: {
+    pAlbs?: TmAlbum[], vAlbs?: TmAlbum[], pId?: string | null, vId?: string | null
+  }) {
+    const curAlbs = opts?.pAlbs !== undefined && tab === 'photos' ? opts.pAlbs
+      : opts?.vAlbs !== undefined && tab === 'videos' ? opts.vAlbs
+      : tab === 'photos' ? photoAlbums : videoAlbums
+
+    const albumId = tab === 'photos'
+      ? (opts?.pId !== undefined ? opts.pId : selectedPhotoAlbumId)
+      : (opts?.vId !== undefined ? opts.vId : selectedVideoAlbumId)
+
+    if (curAlbs.length > 0) {
+      if (albumId === null) q = q.is('album_id', null)
+      else q = q.eq('album_id', albumId)
+    }
+    return q
+  }
+
+  // ── Fetch functions ───────────────────────────────────────────────────────
+
+  async function fetchPage(tab: MediaTab, sf: StatusFilter, s: string, offset: number, opts?: {
+    pAlbs?: TmAlbum[], vAlbs?: TmAlbum[], pId?: string | null, vId?: string | null
+  }) {
     const table = tab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let q: any = supabase.from(table).select('*').order('display_order')
+    q = buildAlbumQuery(q, tab, opts)
     if (sf === 'active') q = q.eq('is_active', true)
     else if (sf === 'hidden') q = q.eq('is_active', false)
     if (s) q = q.or(`title.ilike.%${s}%,description.ilike.%${s}%`)
@@ -396,16 +545,38 @@ export default function MomentsAdminScreen() {
     setCounts({ photos: p ?? 0, videos: v ?? 0 })
   }
 
+  async function fetchAlbums() {
+    const { data } = await supabase.from('tm_albums').select('id, title, album_type, is_hidden').order('display_order')
+    return (data ?? []) as TmAlbum[]
+  }
+
+  // ── Mount: load albums then initial data ──────────────────────────────────
+
   useEffect(() => {
-    Promise.all([
-      fetchPage('photos', 'all', '', 0).then(rows => { setPhotos(rows); if (mediaTab === 'photos') setHasMore(rows.length === PAGE_SIZE) }),
-      fetchPage('videos', 'all', '', 0).then(rows => { setVideos(rows); if (mediaTab === 'videos') setHasMore(rows.length === PAGE_SIZE) }),
-      fetchCounts(),
-    ]).finally(() => setLoading(false))
+    async function init() {
+      const allAlbums = await fetchAlbums()
+      const pAlbs = allAlbums.filter(a => a.album_type === 'photos')
+      const vAlbs = allAlbums.filter(a => a.album_type === 'videos')
+      setAlbums(allAlbums)
+      setPhotoAlbums(pAlbs)
+      setVideoAlbums(vAlbs)
+
+      await Promise.all([
+        fetchPage('photos', 'all', '', 0, { pAlbs, vAlbs, pId: null, vId: null }).then(rows => {
+          setPhotos(rows)
+          setHasMore(rows.length === PAGE_SIZE)
+        }),
+        fetchPage('videos', 'all', '', 0, { pAlbs, vAlbs, pId: null, vId: null }).then(rows => {
+          setVideos(rows)
+        }),
+        fetchCounts(),
+      ])
+    }
+    init().finally(() => setLoading(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadingMoreRef = useRef(false)
-  const skipFirst = useRef(true)
+  // ── Re-fetch on filter / album change ────────────────────────────────────
+
   useEffect(() => {
     if (skipFirst.current) { skipFirst.current = false; return }
     loadingMoreRef.current = true
@@ -417,7 +588,7 @@ export default function MomentsAdminScreen() {
       else setVideos(rows)
       setHasMore(rows.length === PAGE_SIZE)
     }).finally(() => { loadingMoreRef.current = false })
-  }, [mediaTab, statusFilter, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mediaTab, statusFilter, debouncedSearch, selectedPhotoAlbumId, selectedVideoAlbumId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -426,7 +597,7 @@ export default function MomentsAdminScreen() {
     else setVideos(rows)
     setHasMore(rows.length === PAGE_SIZE)
     setRefreshing(false)
-  }, [mediaTab, statusFilter, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mediaTab, statusFilter, debouncedSearch, selectedPhotoAlbumId, selectedVideoAlbumId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function onLoadMore() {
     if (loadingMoreRef.current || !hasMore) return
@@ -446,6 +617,103 @@ export default function MomentsAdminScreen() {
     }
   }
 
+  // ── Album actions ─────────────────────────────────────────────────────────
+
+  async function handleCreateAlbum(title: string) {
+    const type = mediaTab
+    const { data, error } = await supabase.from('tm_albums').insert({
+      title,
+      album_type: type,
+      display_order: albums.length,
+    }).select().single()
+    if (error) throw new Error(error.message)
+    const newAlb = data as TmAlbum
+    const updated = [...albums, newAlb]
+    setAlbums(updated)
+    setPhotoAlbums(updated.filter(a => a.album_type === 'photos'))
+    setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
+    setShowCreateAlbum(false)
+    // Switch to new album
+    if (type === 'photos') setSelectedPhotoAlbumId(newAlb.id)
+    else setSelectedVideoAlbumId(newAlb.id)
+  }
+
+  function handleAlbumLongPress(album: TmAlbum) {
+    const options = ['Rename', album.is_hidden ? 'Show (unhide)' : 'Hide from members', 'Delete Album', 'Cancel']
+    const handle = (i: number) => {
+      if (i === 0) {
+        Alert.prompt('Rename Album', 'Enter new name:', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Rename', onPress: async (newTitle?: string) => {
+              if (!newTitle?.trim()) return
+              const { error } = await supabase.from('tm_albums').update({ title: newTitle.trim() }).eq('id', album.id)
+              if (error) { Alert.alert('Error', error.message); return }
+              const updated = albums.map(a => a.id === album.id ? { ...a, title: newTitle.trim() } : a)
+              setAlbums(updated)
+              setPhotoAlbums(updated.filter(a => a.album_type === 'photos'))
+              setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
+            },
+          },
+        ], 'plain-text', album.title)
+      } else if (i === 1) {
+        const next = !album.is_hidden
+        supabase.from('tm_albums').update({ is_hidden: next }).eq('id', album.id).then(({ error }) => {
+          if (error) { Alert.alert('Error', error.message); return }
+          const updated = albums.map(a => a.id === album.id ? { ...a, is_hidden: next } : a)
+          setAlbums(updated)
+          setPhotoAlbums(updated.filter(a => a.album_type === 'photos'))
+          setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
+        })
+      } else if (i === 2) {
+        Alert.alert('Delete album?', `"${album.title}" will be deleted. Photos/videos inside will become unassigned.`, [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete', style: 'destructive', onPress: async () => {
+              // Unassign items
+              await Promise.all([
+                supabase.from('timeless_moments').update({ album_id: null }).eq('album_id', album.id),
+                supabase.from('timeless_moment_videos').update({ album_id: null }).eq('album_id', album.id),
+              ])
+              await supabase.from('tm_albums').delete().eq('id', album.id)
+              const updated = albums.filter(a => a.id !== album.id)
+              setAlbums(updated)
+              setPhotoAlbums(updated.filter(a => a.album_type === 'photos'))
+              setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
+              // Switch to root if deleted album was selected
+              if (selectedPhotoAlbumId === album.id) setSelectedPhotoAlbumId(null)
+              if (selectedVideoAlbumId === album.id) setSelectedVideoAlbumId(null)
+            },
+          },
+        ])
+      }
+    }
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions({ title: album.title, options, cancelButtonIndex: 3, destructiveButtonIndex: 2 }, handle)
+    } else {
+      Alert.alert(album.title, '', [
+        ...options.slice(0, -1).map((label, i) => ({
+          text: label, style: (label === 'Delete Album' ? 'destructive' : 'default') as 'destructive' | 'default', onPress: () => handle(i),
+        })),
+        { text: 'Cancel', style: 'cancel' as const, onPress: () => {} },
+      ])
+    }
+  }
+
+  async function handleMoveToAlbum(albumId: string | null) {
+    if (!movePicker) return
+    const item = movePicker.item
+    setMovePicker(null)
+    const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
+    const { error } = await supabase.from(table).update({ album_id: albumId }).eq('id', item.id)
+    if (error) { Alert.alert('Error', error.message); return }
+    // Remove from current view (it moved to a different album)
+    if (mediaTab === 'photos') setPhotos(prev => prev.filter(x => x.id !== item.id))
+    else setVideos(prev => prev.filter(x => x.id !== item.id))
+  }
+
+  // ── Content actions ───────────────────────────────────────────────────────
+
   async function handleSave(form: FormState) {
     const order = parseInt(form.displayOrder) || 0
     setSaving(true)
@@ -453,7 +721,6 @@ export default function MomentsAdminScreen() {
 
     try {
       if (editingId) {
-        const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
         const update: Record<string, unknown> = {
           title: form.title.trim() || null,
           description: form.description.trim() || null,
@@ -478,6 +745,7 @@ export default function MomentsAdminScreen() {
           description: form.description.trim() || null,
           display_order: order,
           is_active: true,
+          album_id: selectedVideoAlbumId ?? null,
         }).select().single()
         if (error) throw new Error(error.message)
         setVideos(prev => [data as MomentVideo, ...prev])
@@ -485,32 +753,28 @@ export default function MomentsAdminScreen() {
 
       } else {
         if (form.images.length === 0) throw new Error('Please choose at least one photo.')
-
         const inserted: MomentPhoto[] = []
         for (let i = 0; i < form.images.length; i++) {
           const { uri, fileSize } = form.images[i]
-
-          if (fileSize != null && fileSize > MAX_FILE_BYTES) {
-            throw new Error(`Photo ${i + 1} is ${formatBytes(fileSize)}, which exceeds the ${formatBytes(MAX_FILE_BYTES)} limit.`)
-          }
-
+          if (fileSize != null && fileSize > MAX_FILE_BYTES) throw new Error(`Photo ${i + 1} is ${formatBytes(fileSize)}, which exceeds the ${formatBytes(MAX_FILE_BYTES)} limit.`)
           const newPhoto = await webApiUpload(
             'https://www.bazidpur.com/api/timeless-moments',
             uri,
             { title: form.title.trim(), description: form.description.trim(), display_order: order + i },
             (pct, label) => setUploadState({ current: i + 1, total: form.images.length, pct, label })
           )
-          inserted.push(newPhoto as unknown as MomentPhoto)
+          // Assign to current album if one is selected
+          if (selectedPhotoAlbumId && (newPhoto as any).id) {
+            await supabase.from('timeless_moments').update({ album_id: selectedPhotoAlbumId }).eq('id', (newPhoto as any).id)
+          }
+          inserted.push({ ...(newPhoto as unknown as MomentPhoto), album_id: selectedPhotoAlbumId ?? null })
         }
-
         setPhotos(prev => [...inserted, ...prev])
         setCounts(c => ({ ...c, photos: c.photos + inserted.length }))
       }
-
       setModalVisible(false)
-
     } catch (e) {
-      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+      Alert.alert('Error', e instanceof Error ? e.message : 'Something went wrong. Please try again.')
     } finally {
       setSaving(false)
       setUploadState(null)
@@ -563,8 +827,7 @@ export default function MomentsAdminScreen() {
     const isFirst = currentData[0]?.id === item.id
     const isLast = currentData[currentData.length - 1]?.id === item.id
     const active = (item as MomentVideo).is_active
-
-    const options: string[] = ['✏️  Edit']
+    const options: string[] = ['✏️  Edit', '📁  Move to Album']
     if (mediaTab === 'videos') options.push(active ? '🚫  Hide' : '✅  Make Active')
     if (!isFirst) options.push('⬆️  Move Up')
     if (!isLast) options.push('⬇️  Move Down')
@@ -578,6 +841,8 @@ export default function MomentsAdminScreen() {
         setModalForm({ title: v.title ?? '', description: v.description ?? '', displayOrder: String(item.display_order), youtubeUrl: v.youtube_url ?? '', images: [] })
         setModalTitle('Edit')
         setModalVisible(true)
+      } else if (label.includes('Move to Album')) {
+        setMovePicker({ item })
       } else if (label.includes('Hide') || label.includes('Active')) {
         toggleActive(item.id, active)
       } else if (label.includes('Move Up')) {
@@ -595,11 +860,14 @@ export default function MomentsAdminScreen() {
         handle
       )
     } else {
-      Alert.alert('', '', options.slice(0, -1).map((label, i) => ({
-        text: label.replace(/^[^\s]+\s+/, ''),
-        style: label.includes('Delete') ? 'destructive' : 'default',
-        onPress: () => handle(i),
-      })).concat([{ text: 'Cancel', style: 'cancel', onPress: () => {} }]))
+      Alert.alert('', '', [
+        ...options.slice(0, -1).map((label, i) => ({
+          text: label.replace(/^[^\s]+\s+/, ''),
+          style: (label.includes('Delete') ? 'destructive' : 'default') as 'destructive' | 'default',
+          onPress: () => handle(i),
+        })),
+        { text: 'Cancel', style: 'cancel' as const, onPress: () => {} },
+      ])
     }
   }
 
@@ -617,6 +885,8 @@ export default function MomentsAdminScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+
+      {/* Search */}
       <View style={{ backgroundColor: '#f2f2f7', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(118,118,128,0.12)', borderRadius: 10, paddingHorizontal: 10, gap: 6 }}>
           <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)' }}>🔍</Text>
@@ -633,6 +903,18 @@ export default function MomentsAdminScreen() {
         <Seg tabs={STATUS_TABS} selected={statusFilter} onSelect={setStatusFilter} />
       </View>
 
+      {/* Album rail */}
+      <AlbumRail
+        albums={currentAlbums}
+        selectedId={selectedAlbumId}
+        onSelect={id => {
+          if (mediaTab === 'photos') setSelectedPhotoAlbumId(id)
+          else setSelectedVideoAlbumId(id)
+        }}
+        onLongPress={handleAlbumLongPress}
+        onAdd={() => setShowCreateAlbum(true)}
+      />
+
       <FlatList
         data={currentData}
         keyExtractor={item => `${mediaTab}-${item.id}`}
@@ -648,20 +930,22 @@ export default function MomentsAdminScreen() {
             : <VideoRow item={item as MomentVideo} onAction={() => showActions(item)} />
         }
         ListFooterComponent={
-          loadingMore ? <ActivityIndicator color="#2d1b69" style={{ paddingVertical: 20 }} />
+          loadingMore
+            ? <ActivityIndicator color="#2d1b69" style={{ paddingVertical: 20 }} />
             : !hasMore && currentData.length > 0
-              ? <Text style={{ textAlign: 'center', color: 'rgba(60,60,67,0.4)', fontSize: 12, paddingVertical: 24 }}>{currentData.length} items total</Text>
+              ? <Text style={{ textAlign: 'center', color: 'rgba(60,60,67,0.4)', fontSize: 12, paddingVertical: 24 }}>{currentData.length} items</Text>
               : null
         }
         ListEmptyComponent={
           <View style={{ alignItems: 'center', paddingTop: 80, paddingHorizontal: 32 }}>
             <Text style={{ fontSize: 40, marginBottom: 14 }}>{mediaTab === 'photos' ? '✨' : '🎬'}</Text>
             <Text style={{ fontSize: 16, fontWeight: '600', color: '#000', marginBottom: 6 }}>Nothing here</Text>
-            <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)', textAlign: 'center' }}>No {mediaTab} match the current filter.</Text>
+            <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)', textAlign: 'center' }}>No {mediaTab} in this album.</Text>
           </View>
         }
       />
 
+      {/* FAB */}
       <TouchableOpacity
         onPress={() => { setEditingId(null); setModalForm(EMPTY_FORM); setModalTitle(`Add ${mediaTab === 'photos' ? 'Photo' : 'Video'}`); setModalVisible(true) }}
         style={{ position: 'absolute', bottom: insets.bottom + 86, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 }}
@@ -669,6 +953,7 @@ export default function MomentsAdminScreen() {
         <Text style={{ color: '#fff', fontSize: 28, lineHeight: 32 }}>+</Text>
       </TouchableOpacity>
 
+      {/* Modals */}
       <FormModal
         visible={modalVisible}
         title={modalTitle}
@@ -679,6 +964,24 @@ export default function MomentsAdminScreen() {
         onSave={handleSave}
         onClose={() => { if (!saving) setModalVisible(false) }}
       />
+
+      {showCreateAlbum && (
+        <CreateAlbumModal
+          mediaType={mediaTab}
+          onClose={() => setShowCreateAlbum(false)}
+          onCreate={handleCreateAlbum}
+        />
+      )}
+
+      {movePicker && (
+        <AlbumPickerModal
+          albums={albums}
+          mediaType={mediaTab}
+          onPick={handleMoveToAlbum}
+          onClose={() => setMovePicker(null)}
+        />
+      )}
+
     </View>
   )
 }
