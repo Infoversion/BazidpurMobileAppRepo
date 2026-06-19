@@ -33,13 +33,7 @@ export default function ScatteredRootsScreen() {
       })
   }, [])
 
-  const countryCounts = members.reduce<Record<string, number>>((acc, m) => {
-    if (m.location_country) acc[m.location_country] = (acc[m.location_country] || 0) + 1
-    return acc
-  }, {})
-
-  const countries = Object.entries(countryCounts)
-    .sort(([, a], [, b]) => b - a)
+  const countries = [...new Set(members.map(m => m.location_country).filter(Boolean) as string[])].sort()
 
   const mapHeight = Math.round(width * 0.65)
 
@@ -56,17 +50,15 @@ export default function ScatteredRootsScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Stat bar */}
-          <View style={{ flexDirection: 'row', backgroundColor: '#fff', marginTop: 16, marginHorizontal: 16, borderRadius: 14, overflow: 'hidden', borderWidth: 0.5, borderColor: '#e5e5ea' }}>
-            <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderRightWidth: 0.5, borderRightColor: '#e5e5ea' }}>
-              <Text style={{ fontSize: 26, fontWeight: '800', color: '#2d1b69' }}>{members.length}</Text>
-              <Text style={{ fontSize: 11, color: '#8e8e93', marginTop: 2 }}>Members located</Text>
+          {/* Country count */}
+          {countries.length > 0 && (
+            <View style={{ marginTop: 16, marginHorizontal: 16 }}>
+              <Text style={{ fontSize: 15, color: '#6b7280', textAlign: 'center' }}>
+                Scattered across{' '}
+                <Text style={{ fontWeight: '800', color: '#1c1c1e' }}>{countries.length} {countries.length === 1 ? 'country' : 'countries'}</Text>
+              </Text>
             </View>
-            <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}>
-              <Text style={{ fontSize: 26, fontWeight: '800', color: '#2d1b69' }}>{countries.length}</Text>
-              <Text style={{ fontSize: 11, color: '#8e8e93', marginTop: 2 }}>{countries.length === 1 ? 'Country' : 'Countries'}</Text>
-            </View>
-          </View>
+          )}
 
           {/* Map */}
           <View style={{ marginTop: 12, marginHorizontal: 16, borderRadius: 16, overflow: 'hidden', borderWidth: 0.5, borderColor: '#e5e5ea' }}>
@@ -74,10 +66,10 @@ export default function ScatteredRootsScreen() {
               provider={PROVIDER_DEFAULT}
               style={{ width: '100%', height: mapHeight }}
               initialRegion={{
-                latitude: 25,
-                longitude: 20,
-                latitudeDelta: 130,
-                longitudeDelta: 200,
+                latitude: 28,
+                longitude: 72,
+                latitudeDelta: 45,
+                longitudeDelta: 55,
               }}
               mapType="standard"
               scrollEnabled
@@ -115,17 +107,13 @@ export default function ScatteredRootsScreen() {
                 Countries
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {countries.map(([country, count]) => (
+                {countries.map(country => (
                   <View key={country} style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 5,
                     paddingHorizontal: 12, paddingVertical: 7,
                     backgroundColor: '#f4f0ff', borderRadius: 20,
                     borderWidth: 0.5, borderColor: '#ddd6fe',
                   }}>
                     <Text style={{ fontSize: 13, color: '#2d1b69', fontWeight: '600' }}>{country}</Text>
-                    <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 9, color: '#fff', fontWeight: '700' }}>{count}</Text>
-                    </View>
                   </View>
                 ))}
               </View>
