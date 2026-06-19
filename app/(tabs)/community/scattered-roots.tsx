@@ -56,17 +56,8 @@ export default function ScatteredRootsScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Hero */}
-          <View style={{ backgroundColor: '#fff', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14, borderBottomWidth: 0.5, borderBottomColor: '#e5e5ea' }}>
-            <Text style={{ fontSize: 13, color: '#8e8e93', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Our Community</Text>
-            <Text style={{ fontSize: 28, fontWeight: '800', color: '#1c1c1e', marginBottom: 4 }}>Scattered Roots</Text>
-            <Text style={{ fontSize: 14, color: '#6b7280', lineHeight: 20 }}>
-              Members of the Bazidpur family are spread across the globe — connected by shared roots and a common heritage.
-            </Text>
-          </View>
-
           {/* Stat bar */}
-          <View style={{ flexDirection: 'row', backgroundColor: '#fff', marginTop: 12, marginHorizontal: 16, borderRadius: 14, overflow: 'hidden', borderWidth: 0.5, borderColor: '#e5e5ea' }}>
+          <View style={{ flexDirection: 'row', backgroundColor: '#fff', marginTop: 16, marginHorizontal: 16, borderRadius: 14, overflow: 'hidden', borderWidth: 0.5, borderColor: '#e5e5ea' }}>
             <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14, borderRightWidth: 0.5, borderRightColor: '#e5e5ea' }}>
               <Text style={{ fontSize: 26, fontWeight: '800', color: '#2d1b69' }}>{members.length}</Text>
               <Text style={{ fontSize: 11, color: '#8e8e93', marginTop: 2 }}>Members located</Text>
