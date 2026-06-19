@@ -347,10 +347,10 @@ function CreateAlbumModal({
 
 // ─── Form modal (add / edit) ──────────────────────────────────────────────────
 
-function FormModal({ visible, title: modalTitle, mediaType, initial, saving, uploadState, onSave, onClose }: {
+function FormModal({ visible, title: modalTitle, mediaType, initial, saving, uploadState, onSave, onClose, albumName }: {
   visible: boolean; title: string; mediaType: MediaTab
   initial: FormState; saving: boolean; uploadState: UploadState | null
-  onSave: (f: FormState) => void; onClose: () => void
+  onSave: (f: FormState) => void; onClose: () => void; albumName?: string
 }) {
   const [form, setForm] = useState<FormState>(initial)
   const isNew = !initial.title && !initial.youtubeUrl
@@ -380,6 +380,15 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
             {saving ? <ActivityIndicator color="#2d1b69" /> : <Text style={{ fontSize: 16, fontWeight: '600', color: '#2d1b69' }}>Save</Text>}
           </TouchableOpacity>
         </View>
+
+        {albumName !== undefined && (
+          <View style={{ backgroundColor: '#ede9fe', paddingHorizontal: 16, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 13, color: '#5b21b6' }}>
+              📁 {mediaType === 'photos' ? 'Photos' : 'Videos'} will be added to{' '}
+              <Text style={{ fontWeight: '700' }}>"{albumName}"</Text>
+            </Text>
+          </View>
+        )}
 
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
           {uploadState && (
@@ -554,6 +563,7 @@ export default function MediaAdminScreen() {
   const currentData: (MediaPhoto | MediaVideo)[] = mediaTab === 'photos' ? photos : videos
   const currentAlbums = mediaTab === 'photos' ? photoAlbums : videoAlbums
   const selectedAlbumId = mediaTab === 'photos' ? selectedPhotoAlbumId : selectedVideoAlbumId
+  const currentAlbumName = !selectedAlbumId ? 'Root' : (currentAlbums.find(a => a.id === selectedAlbumId)?.title ?? 'Root')
 
   // ── Album filter helper ───────────────────────────────────────────────────
 
@@ -1005,6 +1015,11 @@ export default function MediaAdminScreen() {
         mediaType={mediaTab}
       />
 
+      {/* Selected album heading */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, backgroundColor: '#f2f2f7' }}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: '#1c1c1e' }}>{currentAlbumName}</Text>
+      </View>
+
       <FlatList
         data={currentData}
         keyExtractor={item => `${mediaTab}-${item.id}`}
@@ -1053,6 +1068,7 @@ export default function MediaAdminScreen() {
         uploadState={uploadState}
         onSave={handleSave}
         onClose={() => { if (!saving) setModalVisible(false) }}
+        albumName={editingId ? undefined : currentAlbumName}
       />
 
       {showCreateAlbum && (
