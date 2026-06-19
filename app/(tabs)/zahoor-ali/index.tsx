@@ -1,11 +1,13 @@
-import { View, Text, ScrollView } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native'
 import { Image } from 'expo-image'
+import { router } from 'expo-router'
 import { PurpleHeader } from '@/components/PurpleHeader'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
 const PORTRAIT       = `${R2}/about/fazihat-shah-warsi.jpg`
 const GROUP_PHOTO    = `${R2}/about/fazihatshahwarsigroup.jpg`
 const SUFI_GATHERING = `${R2}/about/fazihat-sufi-gathering.jpg`
+const SHRINE_NIGHT   = `${R2}/urs/urs-shrine-night2.png`
 
 const PURSUITS = [
   { icon: '🐎', title: 'Horsemanship', desc: 'Mastered riding at full speed — including the skill of picking up a peg from the ground on horseback.' },
@@ -158,6 +160,26 @@ export default function ZahoorAliScreen() {
               {' '}— the date of his passing — Warsi brothers gather at his resting place. The Holy Quran is recited and prayers are offered.
             </Text>
           </View>
+
+          {/* Urs banner — prominent link */}
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/zahoor-ali/urs')}
+            activeOpacity={0.88}
+            style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 14, height: 140 }}
+          >
+            <Image source={{ uri: SHRINE_NIGHT }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} contentFit="cover" />
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.52)' }} />
+            <View style={{ flex: 1, padding: 18, justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: '600' }}>Annual Gathering · 28th Zul-Hijjah</Text>
+              <View>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 8 }}>Urs of Fazihat Shah Warsi</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '500' }}>About the Urs</Text>
+                  <Text style={{ fontSize: 15, color: 'rgba(255,255,255,0.85)' }}>›</Text>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
 
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
             <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, flex: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 }}>
