@@ -326,8 +326,8 @@ export default function TimelessMomentsScreen() {
 
   async function fetchData() {
     const [{ data: p }, { data: v }, { data: albs }] = await Promise.all([
-      supabase.from('photos').select('*').eq('is_active', true).order('display_order').limit(PAGE_SIZE),
-      supabase.from('videos').select('*').eq('is_active', true).order('display_order').limit(PAGE_SIZE),
+      supabase.from('photos').select('*').eq('is_active', true).order('display_order'),
+      supabase.from('videos').select('*').eq('is_active', true).order('display_order'),
       supabase.from('media_albums').select('id, title, description, cover_photo_url, album_type').eq('is_hidden', false).order('display_order'),
     ])
     const newPhotos = (p ?? []) as Photo[]

@@ -19,6 +19,7 @@ type StatusFilter = 'all' | 'active' | 'hidden'
 const PAGE_SIZE = 25
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 
+interface MediaAlbum { id: string; title: string; album_type: 'photos' | 'videos' }
 interface PickedImage { uri: string; fileSize?: number }
 interface UploadState { current: number; total: number; pct: number; label: string }
 
@@ -39,7 +40,7 @@ function formatBytes(bytes: number): string {
 async function webApiUpload(
   apiUrl: string,
   uri: string,
-  fields: { title: string; description: string; display_order: number },
+  fields: { title: string; description: string; display_order: number; album_id?: string | null },
   onProgress: (pct: number, label: string) => void
 ): Promise<Record<string, unknown>> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -54,6 +55,13 @@ async function webApiUpload(
   // custom headers from multipart uploads; query param is the safe fallback.
   const url = `${apiUrl}?_t=${encodeURIComponent(session.access_token)}`
 
+  const parameters: Record<string, string> = {
+    title: fields.title || '',
+    description: fields.description || '',
+    display_order: String(fields.display_order),
+  }
+  if (fields.album_id) parameters.album_id = fields.album_id
+
   const task = FileSystem.createUploadTask(
     url,
     uri,
@@ -62,11 +70,7 @@ async function webApiUpload(
       uploadType: FileSystem.FileSystemUploadType.MULTIPART,
       fieldName: 'file',
       mimeType,
-      parameters: {
-        title: fields.title || '',
-        description: fields.description || '',
-        display_order: String(fields.display_order),
-      },
+      parameters,
       headers: { Authorization: `Bearer ${session.access_token}` },
     },
     ({ totalBytesSent, totalBytesExpectedToSend }) => {
@@ -138,9 +142,10 @@ interface FormState {
   displayOrder: string
   youtubeUrl: string    // video only
   images: PickedImage[] // photo only (new photos)
+  albumId: string | null
 }
 
-function FormModal({ visible, title: modalTitle, mediaType, initial, saving, uploadState, onSave, onClose }: {
+function FormModal({ visible, title: modalTitle, mediaType, initial, saving, uploadState, onSave, onClose, albums }: {
   visible: boolean
   title: string
   mediaType: MediaTab
@@ -149,6 +154,7 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
   uploadState: UploadState | null
   onSave: (f: FormState) => void
   onClose: () => void
+  albums: MediaAlbum[]
 }) {
   const [form, setForm] = useState<FormState>(initial)
   const isNew = !initial.title && !initial.youtubeUrl
@@ -181,6 +187,26 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
     }
   }
 
+  function showAlbumPicker() {
+    const filtered = albums.filter(a => a.album_type === mediaType)
+    const options = ['No Album', ...filtered.map(a => a.title), 'Cancel']
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: options.length - 1 },
+        (i) => {
+          if (i === 0) setForm(f => ({ ...f, albumId: null }))
+          else if (i < filtered.length + 1) setForm(f => ({ ...f, albumId: filtered[i - 1].id }))
+        }
+      )
+    } else {
+      Alert.alert('Select Album', '', [
+        { text: 'No Album', onPress: () => setForm(f => ({ ...f, albumId: null })) },
+        ...filtered.map(a => ({ text: a.title, onPress: () => setForm(f => ({ ...f, albumId: a.id })) })),
+        { text: 'Cancel', style: 'cancel' as const },
+      ])
+    }
+  }
+
   function field(label: string, key: keyof FormState, opts: Partial<React.ComponentProps<typeof TextInput>> = {}) {
     return (
       <View key={key}>
@@ -194,6 +220,10 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
       </View>
     )
   }
+
+  const albumLabel = form.albumId
+    ? (albums.find(a => a.id === form.albumId)?.title ?? 'Unknown album')
+    : 'No Album'
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -281,6 +311,19 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
             {field('Title', 'title', { placeholder: 'Optional title', autoCapitalize: 'sentences' })}
             {field('Description', 'description', { placeholder: 'Optional description', autoCapitalize: 'sentences', multiline: true })}
             {field('Display Order', 'displayOrder', { keyboardType: 'numeric', placeholder: '0' })}
+
+            {/* Album picker */}
+            <View>
+              <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)', marginBottom: 4 }}>Album</Text>
+              <TouchableOpacity onPress={showAlbumPicker} activeOpacity={0.7}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 16, color: form.albumId ? '#1c1c1e' : 'rgba(60,60,67,0.4)' }}>
+                    {albumLabel}
+                  </Text>
+                  <Text style={{ fontSize: 16, color: '#2d1b69' }}>›</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
 
         </ScrollView>
@@ -291,7 +334,7 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
 
 // ─── Photo row ────────────────────────────────────────────────────────────────
 
-function PhotoRow({ item, onAction }: { item: Photo; onAction: () => void }) {
+function PhotoRow({ item, albumName, onAction }: { item: Photo; albumName?: string; onAction: () => void }) {
   return (
     <TouchableOpacity onPress={onAction} activeOpacity={0.6}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10 }}
@@ -302,7 +345,11 @@ function PhotoRow({ item, onAction }: { item: Photo; onAction: () => void }) {
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontSize: 15, fontWeight: '500', color: '#000', marginBottom: 2 }} numberOfLines={1}>{item.title || '(Untitled)'}</Text>
         {item.description ? <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)' }} numberOfLines={1}>{item.description}</Text> : null}
-        <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.35)', marginTop: 1 }}>Order: {item.display_order}</Text>
+        {albumName ? (
+          <Text style={{ fontSize: 11, color: '#2d1b69', marginTop: 1 }}>📁 {albumName}</Text>
+        ) : (
+          <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.35)', marginTop: 1 }}>Order: {item.display_order}</Text>
+        )}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
         <ActiveBadge active={item.is_active} />
@@ -314,7 +361,7 @@ function PhotoRow({ item, onAction }: { item: Photo; onAction: () => void }) {
 
 // ─── Video row ────────────────────────────────────────────────────────────────
 
-function VideoRow({ item, onAction }: { item: Video; onAction: () => void }) {
+function VideoRow({ item, albumName, onAction }: { item: Video; albumName?: string; onAction: () => void }) {
   const thumb = item.thumbnail_url || `https://img.youtube.com/vi/${item.youtube_id}/mqdefault.jpg`
   return (
     <TouchableOpacity onPress={onAction} activeOpacity={0.6}
@@ -329,7 +376,11 @@ function VideoRow({ item, onAction }: { item: Video; onAction: () => void }) {
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontSize: 15, fontWeight: '500', color: '#000', marginBottom: 2 }} numberOfLines={1}>{item.title || '(Untitled)'}</Text>
         {item.description ? <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)' }} numberOfLines={1}>{item.description}</Text> : null}
-        <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.35)', marginTop: 1 }}>Order: {item.display_order}</Text>
+        {albumName ? (
+          <Text style={{ fontSize: 11, color: '#2d1b69', marginTop: 1 }}>📁 {albumName}</Text>
+        ) : (
+          <Text style={{ fontSize: 11, color: 'rgba(60,60,67,0.35)', marginTop: 1 }}>Order: {item.display_order}</Text>
+        )}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
         <ActiveBadge active={item.is_active} />
@@ -341,14 +392,16 @@ function VideoRow({ item, onAction }: { item: Video; onAction: () => void }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-const EMPTY_FORM: FormState = { title: '', description: '', displayOrder: '', youtubeUrl: '', images: [] }
+const EMPTY_FORM: FormState = { title: '', description: '', displayOrder: '', youtubeUrl: '', images: [], albumId: null }
 
 export default function MediaAdminScreen() {
   const insets = useSafeAreaInsets()
   const [mediaTab, setMediaTab] = useState<MediaTab>('photos')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [albumFilter, setAlbumFilter] = useState<string>('__all__')
   const [photos, setPhotos] = useState<Photo[]>([])
   const [videos, setVideos] = useState<Video[]>([])
+  const [mediaAlbums, setMediaAlbums] = useState<MediaAlbum[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -373,13 +426,15 @@ export default function MediaAdminScreen() {
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
-  async function fetchPage(tab: MediaTab, sf: StatusFilter, s: string, offset: number) {
+  async function fetchPage(tab: MediaTab, sf: StatusFilter, s: string, offset: number, af: string = '__all__') {
     const table = tab === 'photos' ? 'photos' : 'videos'
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let q: any = supabase.from(table).select('*').order('display_order')
     if (sf === 'active') q = q.eq('is_active', true)
     else if (sf === 'hidden') q = q.eq('is_active', false)
     if (s) q = q.or(`title.ilike.%${s}%,description.ilike.%${s}%`)
+    if (af === '__root__') q = q.is('album_id', null)
+    else if (af !== '__all__') q = q.eq('album_id', af)
     const { data } = await q.range(offset, offset + PAGE_SIZE - 1)
     return (data ?? []) as any[] // eslint-disable-line @typescript-eslint/no-explicit-any
   }
@@ -392,11 +447,20 @@ export default function MediaAdminScreen() {
     setCounts({ photos: p ?? 0, videos: v ?? 0 })
   }
 
+  async function fetchAlbums() {
+    const { data } = await supabase
+      .from('media_albums')
+      .select('id, title, album_type')
+      .order('display_order')
+    setMediaAlbums((data ?? []) as MediaAlbum[])
+  }
+
   useEffect(() => {
     Promise.all([
       fetchPage('photos', 'all', '', 0).then(rows => { setPhotos(rows); if (mediaTab === 'photos') setHasMore(rows.length === PAGE_SIZE) }),
       fetchPage('videos', 'all', '', 0).then(rows => { setVideos(rows); if (mediaTab === 'videos') setHasMore(rows.length === PAGE_SIZE) }),
       fetchCounts(),
+      fetchAlbums(),
     ]).finally(() => setLoading(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -408,28 +472,28 @@ export default function MediaAdminScreen() {
     if (mediaTab === 'photos') setPhotos([])
     else setVideos([])
     setHasMore(true)
-    fetchPage(mediaTab, statusFilter, debouncedSearch, 0).then(rows => {
+    fetchPage(mediaTab, statusFilter, debouncedSearch, 0, albumFilter).then(rows => {
       if (mediaTab === 'photos') setPhotos(rows)
       else setVideos(rows)
       setHasMore(rows.length === PAGE_SIZE)
     }).finally(() => { loadingMoreRef.current = false })
-  }, [mediaTab, statusFilter, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mediaTab, statusFilter, debouncedSearch, albumFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    const [rows] = await Promise.all([fetchPage(mediaTab, statusFilter, debouncedSearch, 0), fetchCounts()])
+    const [rows] = await Promise.all([fetchPage(mediaTab, statusFilter, debouncedSearch, 0, albumFilter), fetchCounts()])
     if (mediaTab === 'photos') setPhotos(rows)
     else setVideos(rows)
     setHasMore(rows.length === PAGE_SIZE)
     setRefreshing(false)
-  }, [mediaTab, statusFilter, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mediaTab, statusFilter, debouncedSearch, albumFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function onLoadMore() {
     if (loadingMoreRef.current || !hasMore) return
     loadingMoreRef.current = true
     setLoadingMore(true)
     try {
-      const rows = await fetchPage(mediaTab, statusFilter, debouncedSearch, currentData.length)
+      const rows = await fetchPage(mediaTab, statusFilter, debouncedSearch, currentData.length, albumFilter)
       if (mediaTab === 'photos') {
         setPhotos(prev => { const ids = new Set(prev.map(x => x.id)); return [...prev, ...(rows as Photo[]).filter(r => !ids.has(r.id))] })
       } else {
@@ -457,6 +521,7 @@ export default function MediaAdminScreen() {
           title: form.title.trim() || null,
           description: form.description.trim() || null,
           display_order: order,
+          album_id: form.albumId || null,
         }
         if (mediaTab === 'videos' && form.youtubeUrl.trim()) {
           const yid = extractYouTubeId(form.youtubeUrl.trim())
@@ -481,6 +546,7 @@ export default function MediaAdminScreen() {
           description: form.description.trim() || null,
           display_order: order,
           is_active: true,
+          album_id: form.albumId || null,
         }).select().single()
         if (error) throw new Error(error.message)
         setVideos(prev => [data as Video, ...prev])
@@ -501,9 +567,15 @@ export default function MediaAdminScreen() {
           const newPhoto = await webApiUpload(
             'https://www.bazidpur.com/api/photos',
             uri,
-            { title: form.title.trim(), description: form.description.trim(), display_order: order + i },
+            { title: form.title.trim(), description: form.description.trim(), display_order: order + i, album_id: form.albumId },
             (pct, label) => setUploadState({ current: i + 1, total: form.images.length, pct, label })
           )
+          // If the web API doesn't persist album_id, update the row directly.
+          const photoId = newPhoto.id as string | undefined
+          if (photoId && form.albumId && !(newPhoto as any).album_id) {
+            await supabase.from('photos').update({ album_id: form.albumId }).eq('id', photoId)
+            ;(newPhoto as any).album_id = form.albumId
+          }
           inserted.push(newPhoto as unknown as Photo)
         }
 
@@ -586,7 +658,14 @@ export default function MediaAdminScreen() {
       if (label.includes('Edit')) {
         const v = item as any // eslint-disable-line @typescript-eslint/no-explicit-any
         setEditingId(item.id)
-        setModalForm({ title: item.title ?? '', description: v.description ?? '', displayOrder: String(item.display_order), youtubeUrl: v.youtube_url ?? '', images: [] })
+        setModalForm({
+          title: item.title ?? '',
+          description: v.description ?? '',
+          displayOrder: String(item.display_order),
+          youtubeUrl: v.youtube_url ?? '',
+          images: [],
+          albumId: v.album_id ?? null,
+        })
         setModalTitle('Edit')
         setModalVisible(true)
       } else if (label.includes('Hide') || label.includes('Active')) {
@@ -613,6 +692,10 @@ export default function MediaAdminScreen() {
       })).concat([{ text: 'Cancel', style: 'cancel', onPress: () => {} }]))
     }
   }
+
+  // ── Derived ───────────────────────────────────────────────────────────────
+
+  const tabAlbums = mediaAlbums.filter(a => a.album_type === mediaTab)
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -644,10 +727,46 @@ export default function MediaAdminScreen() {
         </View>
       </View>
 
-      <Seg tabs={MEDIA_TABS} selected={mediaTab} onSelect={t => { setMediaTab(t); setStatusFilter('all') }} />
+      <Seg
+        tabs={MEDIA_TABS}
+        selected={mediaTab}
+        onSelect={t => { setMediaTab(t); setStatusFilter('all'); setAlbumFilter('__all__') }}
+      />
       <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
         <Seg tabs={STATUS_TABS} selected={statusFilter} onSelect={setStatusFilter} />
       </View>
+
+      {/* Album filter chips */}
+      {tabAlbums.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ backgroundColor: '#f2f2f7', maxHeight: 38 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8, gap: 6, alignItems: 'center' }}
+        >
+          {[
+            { key: '__all__', label: 'All' },
+            ...tabAlbums.map(a => ({ key: a.id, label: a.title })),
+            { key: '__root__', label: 'No Album' },
+          ].map(chip => {
+            const active = albumFilter === chip.key
+            return (
+              <TouchableOpacity
+                key={chip.key}
+                onPress={() => setAlbumFilter(chip.key)}
+                style={{
+                  paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14,
+                  backgroundColor: active ? '#2d1b69' : '#e5e5ea',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#fff' : '#3c3c43' }}>
+                  {chip.label}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+      )}
 
       <FlatList
         data={currentData}
@@ -658,11 +777,12 @@ export default function MediaAdminScreen() {
         onEndReachedThreshold={0.3}
         ItemSeparatorComponent={() => <View style={{ height: 0.5, backgroundColor: 'rgba(60,60,67,0.18)', marginLeft: 80 }} />}
         ListHeaderComponent={<View style={{ height: 8 }} />}
-        renderItem={({ item }) =>
-          mediaTab === 'photos'
-            ? <PhotoRow item={item as Photo} onAction={() => showActions(item)} />
-            : <VideoRow item={item as Video} onAction={() => showActions(item)} />
-        }
+        renderItem={({ item }) => {
+          const albumName = mediaAlbums.find(a => a.id === (item as any).album_id)?.title
+          return mediaTab === 'photos'
+            ? <PhotoRow item={item as Photo} albumName={albumName} onAction={() => showActions(item)} />
+            : <VideoRow item={item as Video} albumName={albumName} onAction={() => showActions(item)} />
+        }}
         ListFooterComponent={
           loadingMore
             ? <ActivityIndicator color="#2d1b69" style={{ paddingVertical: 20 }} />
@@ -709,6 +829,7 @@ export default function MediaAdminScreen() {
         uploadState={uploadState}
         onSave={handleSave}
         onClose={() => { if (!saving) setModalVisible(false) }}
+        albums={mediaAlbums}
       />
     </View>
   )
