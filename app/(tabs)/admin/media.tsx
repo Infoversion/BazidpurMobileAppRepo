@@ -540,18 +540,16 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
   const orderRef = useRef([...items])
   const draggingIdxRef = useRef(-1)
   const anchorIdxRef = useRef(-1)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const containerRef = useRef<any>(null)
-  const containerTopRef = useRef(0)
 
-  // Single overlay PanResponder — never touches a ScrollView, no gesture conflict
+  // Single overlay PanResponder — never touches a ScrollView, no gesture conflict.
+  // Uses evt.nativeEvent.locationY (relative to the overlay View) — no measureInWindow needed.
   const overlayPR = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (_, gs) => {
-        const listY = gs.y0 - containerTopRef.current - LIST_TOP
+      onPanResponderGrant: (evt) => {
+        const listY = evt.nativeEvent.locationY - LIST_TOP
         const idx = Math.max(0, Math.min(orderRef.current.length - 1, Math.floor(listY / SLOT_H)))
         draggingIdxRef.current = idx
         anchorIdxRef.current = idx
@@ -605,11 +603,7 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
         </View>
 
         {/* List area — plain View (no ScrollView), overlay captures all touches */}
-        <View
-          ref={containerRef}
-          style={{ flex: 1, position: 'relative' }}
-          onLayout={() => containerRef.current?.measureInWindow((_: number, y: number) => { containerTopRef.current = y })}
-        >
+        <View style={{ flex: 1, position: 'relative' }}>
           <View style={{ paddingTop: LIST_TOP }}>
             {displayOrder.map(it => {
               const isDragging = draggingId === it.id
@@ -633,8 +627,12 @@ function ReorderModal({ items, mediaType, onClose, onReorder }: {
               )
             })}
           </View>
-          {/* Transparent overlay — single PanResponder, no ScrollView to fight */}
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} {...overlayPR.panHandlers} />
+          {/* collapsable=false forces a real native view so touches are received */}
+          <View
+            collapsable={false}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            {...overlayPR.panHandlers}
+          />
         </View>
 
         <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 8, paddingTop: 6 }}>
@@ -664,17 +662,14 @@ function AlbumReorderModal({ albums, onClose, onReorder }: {
   const orderRef = useRef([...albums])
   const draggingIdxRef = useRef(-1)
   const anchorIdxRef = useRef(-1)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const containerRef = useRef<any>(null)
-  const containerTopRef = useRef(0)
 
   const overlayPR = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (_, gs) => {
-        const listY = gs.y0 - containerTopRef.current - LIST_TOP
+      onPanResponderGrant: (evt) => {
+        const listY = evt.nativeEvent.locationY - LIST_TOP
         const idx = Math.max(0, Math.min(orderRef.current.length - 1, Math.floor(listY / SLOT_H)))
         draggingIdxRef.current = idx
         anchorIdxRef.current = idx
@@ -726,11 +721,7 @@ function AlbumReorderModal({ albums, onClose, onReorder }: {
           </TouchableOpacity>
         </View>
 
-        <View
-          ref={containerRef}
-          style={{ flex: 1, position: 'relative' }}
-          onLayout={() => containerRef.current?.measureInWindow((_: number, y: number) => { containerTopRef.current = y })}
-        >
+        <View style={{ flex: 1, position: 'relative' }}>
           <View style={{ paddingTop: LIST_TOP }}>
             {displayOrder.map(a => {
               const isDragging = draggingId === a.id
@@ -748,7 +739,11 @@ function AlbumReorderModal({ albums, onClose, onReorder }: {
               )
             })}
           </View>
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} {...overlayPR.panHandlers} />
+          <View
+            collapsable={false}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            {...overlayPR.panHandlers}
+          />
         </View>
 
         <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 8, paddingTop: 6 }}>
