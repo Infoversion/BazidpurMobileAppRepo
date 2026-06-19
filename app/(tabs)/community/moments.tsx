@@ -86,10 +86,10 @@ function AlbumRail({
 
   const nameOverlay = (label: string) => (
     <>
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.32)' }} />
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.72)', paddingHorizontal: 7, paddingVertical: 5 }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.38)' }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
         <Text
-          style={{ fontSize: 11, fontWeight: '800', color: '#fff', lineHeight: 15, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}
+          style={{ fontSize: 11, fontWeight: '800', color: '#fff', lineHeight: 15, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.7)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }}
           numberOfLines={2}
         >{label}</Text>
       </View>
@@ -318,6 +318,13 @@ export default function TimelessMomentsScreen() {
             coversForAlbum={id => photos.filter(p => p.album_id === id).slice(0, 4).map(p => p.thumbnail_url || p.r2_url)}
             mediaType="photos"
           />
+          {(visiblePhotoAlbums.length > 0 || rootPhotos.length > 0) && (
+            <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 2 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#1c1c1e' }}>
+                {selectedPhotoAlbumId === null ? 'All Photos' : (photoAlbums.find(a => a.id === selectedPhotoAlbumId)?.title ?? '')}
+              </Text>
+            </View>
+          )}
           {albumPhotos.length === 0 ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
               <Text style={{ fontSize: 44, marginBottom: 12 }}>✨</Text>
@@ -363,6 +370,13 @@ export default function TimelessMomentsScreen() {
             coversForAlbum={id => videos.filter(v => v.album_id === id).slice(0, 4).map(v => `https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg`)}
             mediaType="videos"
           />
+          {(visibleVideoAlbums.length > 0 || rootVideos.length > 0) && (
+            <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 2 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#1c1c1e' }}>
+                {selectedVideoAlbumId === null ? 'All Videos' : (videoAlbums.find(a => a.id === selectedVideoAlbumId)?.title ?? '')}
+              </Text>
+            </View>
+          )}
           {albumVideos.length === 0 ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
               <Text style={{ fontSize: 44, marginBottom: 12 }}>🎬</Text>
