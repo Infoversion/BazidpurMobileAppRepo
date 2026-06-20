@@ -94,6 +94,10 @@ const withJSC = (config) => {
         contents = `ENV['USE_THIRD_PARTY_JSC'] = '1'\nENV['USE_HERMES'] = '0'\n${contents}`
       }
 
+      if (!contents.includes("require 'fileutils'")) {
+        contents = contents.replace("require 'json'", "require 'json'\nrequire 'fileutils'")
+      }
+
       if (!contents.includes('# withJSC: force JSC defines')) {
         const hook = `
     # withJSC: force USE_HERMES=0 and USE_THIRD_PARTY_JSC=1 preprocessor defines so every pod's
@@ -108,6 +112,32 @@ const withJSC = (config) => {
         defs << 'USE_THIRD_PARTY_JSC=1' unless defs.include?('USE_THIRD_PARTY_JSC=1')
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
       end
+    end
+
+    # expo-av@16.0.8 compatibility shim: EXEventEmitter and EXEventEmitterService protocols
+    # were removed from expo-modules-core SDK 56 but expo-av still imports them.
+    shim_dir = File.join(__dir__, 'Pods/Headers/Public/ExpoModulesCore/ExpoModulesCore')
+    FileUtils.mkdir_p(shim_dir)
+    {
+      'EXEventEmitter.h' => <<~OBJC,
+        #pragma once
+        #import <Foundation/Foundation.h>
+        @protocol EXEventEmitter <NSObject>
+        - (NSArray<NSString *> *)supportedEvents;
+        - (void)startObserving;
+        - (void)stopObserving;
+        @end
+      OBJC
+      'EXEventEmitterService.h' => <<~OBJC
+        #pragma once
+        #import <Foundation/Foundation.h>
+        @protocol EXEventEmitterService <NSObject>
+        - (void)sendEventWithName:(NSString *)eventName body:(id)body;
+        @end
+      OBJC
+    }.each do |filename, content|
+      filepath = File.join(shim_dir, filename)
+      File.write(filepath, content) unless File.exist?(filepath)
     end
 `
         contents = contents.replace(
