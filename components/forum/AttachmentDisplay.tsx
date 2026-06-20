@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Modal, ActivityIndicator, Alert, Animated, Easing } from 'react-native'
 import { Image } from 'expo-image'
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
+import { Audio } from 'expo-av'
+import type { AVPlaybackStatus } from 'expo-av'
 import { WebView } from 'react-native-webview'
 import YoutubePlayer from 'react-native-youtube-iframe'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -26,31 +27,29 @@ function fmtSec(s: number) {
 }
 
 const VIZ_COLORS = ['#f97316', '#ec4899', '#8b5cf6', '#06b6d4', '#22c55e']
-const VIZ_DURATIONS = [260, 190, 340, 210, 290]
+const VIZ_MULTIPLIERS = [1.0, 1.15, 0.85, 1.05, 0.9]
 
-function AudioVisualizer({ playing }: { playing: boolean }) {
+function AudioVisualizer({ playing, metering }: { playing: boolean; metering: number }) {
   const MAX_H = 22
   const MIN_H = 3
-  const anims = useRef(VIZ_DURATIONS.map(() => new Animated.Value(MIN_H))).current
+  const anims = useRef(VIZ_COLORS.map(() => new Animated.Value(MIN_H))).current
 
   useEffect(() => {
-    if (playing) {
-      const loops = anims.map((anim, i) =>
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(anim, { toValue: MAX_H, duration: VIZ_DURATIONS[i], useNativeDriver: false, easing: Easing.inOut(Easing.sin) }),
-            Animated.timing(anim, { toValue: MIN_H, duration: VIZ_DURATIONS[i], useNativeDriver: false, easing: Easing.inOut(Easing.sin) }),
-          ])
-        )
-      )
-      loops.forEach(l => l.start())
-      return () => loops.forEach(l => l.stop())
-    } else {
-      anims.forEach(anim =>
-        Animated.timing(anim, { toValue: MIN_H, duration: 200, useNativeDriver: false }).start()
-      )
+    if (!playing) {
+      anims.forEach(anim => {
+        anim.stopAnimation()
+        Animated.timing(anim, { toValue: MIN_H, duration: 250, useNativeDriver: false, easing: Easing.out(Easing.quad) }).start()
+      })
+      return
     }
-  }, [playing])
+    // metering is dB, typically -160 (silence) to 0 (max). Clamp to -60..0 range.
+    const norm = Math.max(0, Math.min(1, (metering + 60) / 60))
+    anims.forEach((anim, i) => {
+      const target = MIN_H + norm * VIZ_MULTIPLIERS[i] * (MAX_H - MIN_H)
+      anim.stopAnimation()
+      Animated.timing(anim, { toValue: target, duration: 80, useNativeDriver: false, easing: Easing.out(Easing.quad) }).start()
+    })
+  }, [metering, playing])
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: MAX_H, paddingBottom: 1 }}>
@@ -62,28 +61,45 @@ function AudioVisualizer({ playing }: { playing: boolean }) {
 }
 
 function AudioPlayer({ url }: { url: string }) {
-  const player = useAudioPlayer({ uri: url })
-  const status = useAudioPlayerStatus(player)
-  const playing = status?.playing ?? false
-  const posSec = status?.currentTime ?? 0
-  const durSec = status?.duration ?? 0
+  const soundRef = useRef<Audio.Sound | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const [posSec, setPosSec] = useState(0)
+  const [durSec, setDurSec] = useState(0)
+  const [metering, setMetering] = useState(-160)
 
   useEffect(() => {
-    if (status?.didJustFinish) {
-      player.seekTo(0)
-      player.pause()
-    }
-  }, [status?.didJustFinish, player])
-
-  function toggle() {
-    try {
-      if (playing) {
-        player.pause()
-      } else {
-        player.play()
+    let mounted = true
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false })
+    Audio.Sound.createAsync(
+      { uri: url },
+      { shouldPlay: false, isMeteringEnabled: true },
+      (status: AVPlaybackStatus) => {
+        if (!mounted || !status.isLoaded) return
+        setPlaying(status.isPlaying)
+        setPosSec(status.positionMillis / 1000)
+        setDurSec((status.durationMillis ?? 0) / 1000)
+        setMetering(status.currentMeteringValue ?? -160)
+        if (status.didJustFinish) soundRef.current?.setPositionAsync(0)
       }
+    ).then(({ sound }) => {
+      if (mounted) soundRef.current = sound
+      else sound.unloadAsync()
+    }).catch(() => {})
+    return () => {
+      mounted = false
+      soundRef.current?.unloadAsync()
+      soundRef.current = null
+    }
+  }, [url])
+
+  async function toggle() {
+    const sound = soundRef.current
+    if (!sound) return
+    try {
+      if (playing) await sound.pauseAsync()
+      else await sound.playAsync()
     } catch {
-      Alert.alert('Cannot play audio', 'This audio format is not supported on this device. Try opening it on a desktop browser.')
+      Alert.alert('Cannot play audio', 'This audio format is not supported on this device.')
     }
   }
 
@@ -103,7 +119,7 @@ function AudioPlayer({ url }: { url: string }) {
       >
         <Text style={{ fontSize: 14, color: '#fff' }}>{playing ? '⏸' : '▶'}</Text>
       </TouchableOpacity>
-      <AudioVisualizer playing={playing} />
+      <AudioVisualizer playing={playing} metering={metering} />
       <View style={{ flex: 1 }}>
         <View style={{ height: 4, backgroundColor: '#e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
           <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: '#2d1b69', borderRadius: 2 }} />
