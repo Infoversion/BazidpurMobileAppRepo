@@ -148,6 +148,18 @@ const withJSC = (config) => {
       filepath = File.join(shim_dir, filename)
       File.write(filepath, content) unless File.exist?(filepath)
     end
+
+    # expo-av@16.0.8: Promise.resolver changed to JavaScriptValue-based in SDK 56.
+    # setFullscreen() expects EXPromiseResolveBlock, so use promise.legacyResolver.
+    video_view_module = File.join(
+      File.dirname(__dir__),
+      'node_modules/expo-av/ios/EXAV/Video/VideoViewModule.swift'
+    )
+    if File.exist?(video_view_module)
+      content = File.read(video_view_module)
+      patched = content.gsub('resolver: promise.resolver', 'resolver: promise.legacyResolver')
+      File.write(video_view_module, patched) if patched != content
+    end
 `
         contents = contents.replace(
           /(react_native_post_install\([\s\S]*?\)\s*\n)/,
