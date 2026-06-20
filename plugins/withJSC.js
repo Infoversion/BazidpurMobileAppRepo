@@ -158,6 +158,12 @@ const withJSC = (config) => {
         #define EXLogInfo(...)  NSLog(__VA_ARGS__)
         #define EXLogWarn(...)  NSLog(__VA_ARGS__)
         #define EXLogError(...) NSLog(__VA_ARGS__)
+        #ifndef UMPromiseResolveBlock
+        typedef void (^UMPromiseResolveBlock)(id _Nullable value);
+        #endif
+        #ifndef UMPromiseRejectBlock
+        typedef void (^UMPromiseRejectBlock)(NSString * _Nonnull code, NSString * _Nonnull message, NSError * _Nullable error);
+        #endif
       OBJC
     }.each do |filename, content|
       filepath = File.join(shim_dir, filename)
