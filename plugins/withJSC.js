@@ -135,7 +135,7 @@ const withJSC = (config) => {
         - (void)sendEventWithName:(NSString *)eventName body:(id)body;
         @end
       OBJC
-      'EXLegacyExpoViewProtocol.h' => <<~OBJC
+      'EXLegacyExpoViewProtocol.h' => <<~OBJC,
         #pragma once
         #import <Foundation/Foundation.h>
         @class EXModuleRegistry;
@@ -144,9 +144,30 @@ const withJSC = (config) => {
         - (void)setModuleRegistry:(EXModuleRegistry *)moduleRegistry;
         @end
       OBJC
+      'EXLegacyFunctions.h' => <<~OBJC
+        // Shim: EXFatal and EXErrorWithMessage removed from expo-modules-core SDK 56.
+        #pragma once
+        #import <Foundation/Foundation.h>
+        static inline NSError *EXErrorWithMessage(NSString *message) {
+          return [NSError errorWithDomain:@"EXAVError" code:0
+            userInfo:@{ NSLocalizedDescriptionKey: message }];
+        }
+        static inline void EXFatal(NSError *error) {
+          NSLog(@"[EXAV] Fatal: %@", error.localizedDescription);
+        }
+      OBJC
     }.each do |filename, content|
       filepath = File.join(shim_dir, filename)
       File.write(filepath, content) unless File.exist?(filepath)
+    end
+
+    # Inject EXLegacyFunctions.h into EXAV's prefix header so every ObjC
+    # compilation unit in the pod can see EXFatal / EXErrorWithMessage.
+    exav_pch = File.join(__dir__, 'Pods/Target Support Files/EXAV/EXAV-prefix.pch')
+    if File.exist?(exav_pch)
+      pch = File.read(exav_pch)
+      injection = "\n#ifdef __OBJC__\n#import <ExpoModulesCore/EXLegacyFunctions.h>\n#endif\n"
+      File.write(exav_pch, pch + injection) unless pch.include?('EXLegacyFunctions')
     end
 
     # expo-av@16.0.8 Swift patches for SDK 56 API changes:
