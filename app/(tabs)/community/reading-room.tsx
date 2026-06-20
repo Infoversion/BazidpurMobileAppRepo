@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, useWindowDimensions, RefreshControl,
@@ -42,16 +42,19 @@ function gradPair(id: string) {
 
 function BookCover({ book, size }: { book: Book; size: number }) {
   const uri = coverUri(book.cover_url)
-  if (uri) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const [bg, accent] = gradPair(book.id)
+
+  if (uri && !imgFailed) {
     return (
       <Image
         source={{ uri }}
         style={{ width: size, height: size * 1.35, borderRadius: 10 }}
         contentFit="cover"
+        onError={() => setImgFailed(true)}
       />
     )
   }
-  const [bg, accent] = gradPair(book.id)
   return (
     <View style={{
       width: size, height: size * 1.35, borderRadius: 10,
@@ -72,6 +75,7 @@ function BookModal({ book, onClose }: { book: Book; onClose: () => void }) {
   const uri = coverUri(book.cover_url)
   const [bg, accent] = gradPair(book.id)
   const [showPdf, setShowPdf] = useState(false)
+  const [modalImgFailed, setModalImgFailed] = useState(false)
 
   const pdfUrl = book.pdf_url
     ? (book.pdf_url.startsWith('http') ? book.pdf_url : `${R2}/${book.pdf_url}`)
@@ -132,11 +136,12 @@ function BookModal({ book, onClose }: { book: Book; onClose: () => void }) {
         <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 40 }}>
           {/* Cover */}
           <View style={{ alignItems: 'center', marginBottom: 24 }}>
-            {uri ? (
+            {uri && !modalImgFailed ? (
               <Image
                 source={{ uri }}
                 style={{ width: 140, height: 196, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16 }}
                 contentFit="cover"
+                onError={() => setModalImgFailed(true)}
               />
             ) : (
               <View style={{
