@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import type { Photo, Video } from '@/lib/types'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
-import { LikesComments } from '@/components/LikesComments'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { CuratedNotice } from '@/components/CuratedNotice'
 
@@ -265,7 +264,6 @@ function VideoCard({ item, cardWidth, thumbHeight }: { item: Video; cardWidth: n
             {item.description}
           </Text>
         ) : null}
-        <LikesComments entityType="video" entityId={item.id} />
       </View>
     </View>
   )

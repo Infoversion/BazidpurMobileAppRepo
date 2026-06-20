@@ -8,6 +8,7 @@ import { WebView } from 'react-native-webview'
 import { supabase } from '@/lib/supabase'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import { LikesComments } from '@/components/LikesComments'
+import { ReportButton } from '@/components/ReportButton'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { CuratedNotice } from '@/components/CuratedNotice'
 import type { Photo } from '@/lib/types'
@@ -158,14 +159,13 @@ function VideoCard({ item, cardWidth, thumbHeight }: { item: TMVideo; cardWidth:
       {playing ? (
         <View style={{ width: cardWidth, height: thumbHeight, backgroundColor: '#000' }}>
           <WebView
-            source={{ uri: `https://www.youtube.com/embed/${item.youtube_id}?autoplay=1&playsinline=1&modestbranding=1&rel=0&origin=https://bazidpur.com` }}
+            source={{ uri: `https://www.bazidpur.com/api/yt-embed/${item.youtube_id}` }}
             style={{ height: thumbHeight, width: cardWidth, backgroundColor: '#000' }}
             allowsFullscreenVideo
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
             javaScriptEnabled
             domStorageEnabled
-            userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
           />
         </View>
       ) : (
@@ -179,8 +179,15 @@ function VideoCard({ item, cardWidth, thumbHeight }: { item: TMVideo; cardWidth:
         </TouchableOpacity>
       )}
       <View style={{ padding: 14 }}>
-        <Text style={{ fontSize: 15, fontWeight: '700', color: '#1c1c1e', marginBottom: 4, lineHeight: 20 }} numberOfLines={2}>{item.title}</Text>
-        {item.description ? <Text style={{ fontSize: 13, color: '#8e8e93', lineHeight: 18 }} numberOfLines={2}>{item.description}</Text> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#1c1c1e', marginBottom: 4, lineHeight: 20 }} numberOfLines={2}>{item.title}</Text>
+            {item.description ? <Text style={{ fontSize: 13, color: '#8e8e93', lineHeight: 18 }} numberOfLines={2}>{item.description}</Text> : null}
+          </View>
+          <View style={{ paddingTop: 2 }}>
+            <ReportButton contentType="timeless_moment_video" contentId={item.id} size="sm" />
+          </View>
+        </View>
         <LikesComments entityType="timeless_moment_video" entityId={item.id} />
       </View>
     </View>
