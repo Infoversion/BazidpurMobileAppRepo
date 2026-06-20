@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Modal, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Modal, ActivityIndicator, Alert, Animated, Easing } from 'react-native'
 import { Image } from 'expo-image'
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { WebView } from 'react-native-webview'
@@ -23,6 +23,42 @@ function extractYouTubeId(url: string): string | null {
 function fmtSec(s: number) {
   const sec = Math.floor(s)
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+}
+
+const VIZ_COLORS = ['#f97316', '#ec4899', '#8b5cf6', '#06b6d4', '#22c55e']
+const VIZ_DURATIONS = [260, 190, 340, 210, 290]
+
+function AudioVisualizer({ playing }: { playing: boolean }) {
+  const MAX_H = 22
+  const MIN_H = 3
+  const anims = useRef(VIZ_DURATIONS.map(() => new Animated.Value(MIN_H))).current
+
+  useEffect(() => {
+    if (playing) {
+      const loops = anims.map((anim, i) =>
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(anim, { toValue: MAX_H, duration: VIZ_DURATIONS[i], useNativeDriver: false, easing: Easing.inOut(Easing.sin) }),
+            Animated.timing(anim, { toValue: MIN_H, duration: VIZ_DURATIONS[i], useNativeDriver: false, easing: Easing.inOut(Easing.sin) }),
+          ])
+        )
+      )
+      loops.forEach(l => l.start())
+      return () => loops.forEach(l => l.stop())
+    } else {
+      anims.forEach(anim =>
+        Animated.timing(anim, { toValue: MIN_H, duration: 200, useNativeDriver: false }).start()
+      )
+    }
+  }, [playing])
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: MAX_H, paddingBottom: 1 }}>
+      {anims.map((anim, i) => (
+        <Animated.View key={i} style={{ width: 4, height: anim, backgroundColor: VIZ_COLORS[i], borderRadius: 2 }} />
+      ))}
+    </View>
+  )
 }
 
 function AudioPlayer({ url }: { url: string }) {
@@ -67,6 +103,7 @@ function AudioPlayer({ url }: { url: string }) {
       >
         <Text style={{ fontSize: 14, color: '#fff' }}>{playing ? '⏸' : '▶'}</Text>
       </TouchableOpacity>
+      <AudioVisualizer playing={playing} />
       <View style={{ flex: 1 }}>
         <View style={{ height: 4, backgroundColor: '#e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
           <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: '#2d1b69', borderRadius: 2 }} />
