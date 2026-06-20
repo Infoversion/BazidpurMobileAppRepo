@@ -145,7 +145,7 @@ const withJSC = (config) => {
         @end
       OBJC
       'EXLegacyFunctions.h' => <<~OBJC
-        // Shim: EXFatal and EXErrorWithMessage removed from expo-modules-core SDK 56.
+        // Shim: EXFatal, EXErrorWithMessage, EXLog* removed from expo-modules-core SDK 56.
         #pragma once
         #import <Foundation/Foundation.h>
         static inline NSError *EXErrorWithMessage(NSString *message) {
@@ -155,6 +155,9 @@ const withJSC = (config) => {
         static inline void EXFatal(NSError *error) {
           NSLog(@"[EXAV] Fatal: %@", error.localizedDescription);
         }
+        #define EXLogInfo(...)  NSLog(__VA_ARGS__)
+        #define EXLogWarn(...)  NSLog(__VA_ARGS__)
+        #define EXLogError(...) NSLog(__VA_ARGS__)
       OBJC
     }.each do |filename, content|
       filepath = File.join(shim_dir, filename)
