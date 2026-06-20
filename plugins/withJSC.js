@@ -114,8 +114,8 @@ const withJSC = (config) => {
       end
     end
 
-    # expo-av@16.0.8 compatibility shim: EXEventEmitter and EXEventEmitterService protocols
-    # were removed from expo-modules-core SDK 56 but expo-av still imports them.
+    # expo-av@16.0.8 compatibility shims: protocols removed from expo-modules-core SDK 56
+    # but still imported by expo-av headers.
     shim_dir = File.join(__dir__, 'Pods/Headers/Public/ExpoModulesCore/ExpoModulesCore')
     FileUtils.mkdir_p(shim_dir)
     {
@@ -128,11 +128,20 @@ const withJSC = (config) => {
         - (void)stopObserving;
         @end
       OBJC
-      'EXEventEmitterService.h' => <<~OBJC
+      'EXEventEmitterService.h' => <<~OBJC,
         #pragma once
         #import <Foundation/Foundation.h>
         @protocol EXEventEmitterService <NSObject>
         - (void)sendEventWithName:(NSString *)eventName body:(id)body;
+        @end
+      OBJC
+      'EXLegacyExpoViewProtocol.h' => <<~OBJC
+        #pragma once
+        #import <Foundation/Foundation.h>
+        @class EXModuleRegistry;
+        @protocol EXLegacyExpoViewProtocol <NSObject>
+        @optional
+        - (void)setModuleRegistry:(EXModuleRegistry *)moduleRegistry;
         @end
       OBJC
     }.each do |filename, content|
