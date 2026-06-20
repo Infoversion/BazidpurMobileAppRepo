@@ -22,14 +22,17 @@ interface Props {
     | 'video_album_item'
     | 'comment'
   contentId: string
+  /** If provided, hides the flag button when the current user owns this content. */
+  ownerId?: string
   /** Optional size tweak — useful for compact spots like grid overlays. */
   size?: 'sm' | 'md'
 }
 
-export function ReportButton({ contentType, contentId, size = 'md' }: Props) {
+export function ReportButton({ contentType, contentId, ownerId, size = 'md' }: Props) {
   const { session } = useAuth()
 
   if (!session) return null
+  if (ownerId && session.user.id === ownerId) return null
 
   function onPress() {
     Alert.alert(

@@ -26,6 +26,8 @@ interface Props {
   /** Optional: if provided, show like/comment/flag toolbar tied to the active
    *  photo. The entityType is the same for every photo in this lightbox. */
   entityType?: 'album_photo' | 'timeless_moment'
+  /** If provided, hides the flag button when the current user owns this content. */
+  ownerId?: string
 }
 
 const SPRING = { useNativeDriver: true, damping: 20, stiffness: 200, mass: 1 } as const
@@ -275,7 +277,7 @@ function LightboxImage({
   )
 }
 
-export default function PhotoLightbox({ photos, startIndex, onClose, entityType }: Props) {
+export default function PhotoLightbox({ photos, startIndex, onClose, entityType, ownerId }: Props) {
   const { width, height } = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const listRef = useRef<FlatList>(null)
@@ -410,6 +412,7 @@ export default function PhotoLightbox({ photos, startIndex, onClose, entityType 
               <LightboxToolbar
                 entityType={entityType}
                 entityId={photos[currentIndex].id}
+                ownerId={ownerId}
               />
             ) : null}
           </View>
@@ -437,12 +440,15 @@ const REPORT_REASONS_PHOTO = [
 function LightboxToolbar({
   entityType,
   entityId,
+  ownerId,
 }: {
   entityType: 'album_photo' | 'timeless_moment'
   entityId: string
+  ownerId?: string
 }) {
   const { session } = useAuth()
   const userId = session?.user.id
+  const isOwner = !!(ownerId && userId && ownerId === userId)
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState(0)
   const [commentCount, setCommentCount] = useState(0)
@@ -566,7 +572,7 @@ function LightboxToolbar({
           <Text style={{ fontSize: 14, color: '#fff', fontWeight: '600' }}>{commentCount}</Text>
         </TouchableOpacity>
 
-        {userId ? (
+        {userId && !isOwner ? (
           <TouchableOpacity
             onPress={handleFlagPhoto}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}

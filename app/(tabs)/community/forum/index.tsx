@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
-import { ReportButton } from '@/components/ReportButton'
 import { useBlockedUsers, confirmBlockUser } from '@/components/BlockUserButton'
 import { AttachmentPicker, type Attachment } from '@/components/forum/AttachmentPicker'
 import { AttachmentDisplay } from '@/components/forum/AttachmentDisplay'
@@ -305,7 +304,6 @@ export default function ForumScreen() {
                     {item.media?.[0]?.media_type === 'audio'    && <Text style={{ fontSize: 11 }}>🎵</Text>}
                     {item.media?.[0]?.media_type === 'youtube'  && <Text style={{ fontSize: 11 }}>▶️</Text>}
                     {item.media?.[0]?.media_type === 'document' && <Text style={{ fontSize: 11 }}>📄</Text>}
-                    <ReportButton contentType="thread" contentId={item.id} />
                   </View>
                 </View>
                 <Text style={{ fontSize: 18, color: '#c7c7cc', alignSelf: 'center' }}>›</Text>

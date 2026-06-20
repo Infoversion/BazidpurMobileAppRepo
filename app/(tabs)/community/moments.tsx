@@ -158,7 +158,7 @@ function VideoCard({ item, cardWidth, thumbHeight }: { item: TMVideo; cardWidth:
       {playing ? (
         <View style={{ width: cardWidth, height: thumbHeight, backgroundColor: '#000' }}>
           <WebView
-            source={{ uri: `https://www.youtube.com/embed/${item.youtube_id}?autoplay=1&playsinline=1&modestbranding=1&rel=0&origin=https://bazidpur.com` }}
+            source={{ uri: `https://www.youtube.com/embed/${item.youtube_id}?playsinline=1&rel=0&autoplay=1` }}
             style={{ height: thumbHeight, width: cardWidth, backgroundColor: '#000' }}
             allowsFullscreenVideo allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false}
             javaScriptEnabled domStorageEnabled

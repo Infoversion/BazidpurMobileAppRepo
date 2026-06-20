@@ -850,11 +850,21 @@ export default function MediaAdminScreen() {
         ], 'plain-text', album.title)
       } else if (i === 2) {
         const next = !album.is_hidden
-        supabase.from('media_albums').update({ is_hidden: next }).eq('id', album.id).then(({ error }) => {
-          if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
+        ;(async () => {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (!session) return
+          const res = await fetch(
+            `https://www.bazidpur.com/api/media-albums?_t=${encodeURIComponent(session.access_token)}`,
+            {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+              body: JSON.stringify({ id: album.id, is_hidden: next }),
+            }
+          )
+          if (!res.ok) { Alert.alert('Error', 'Could not update album visibility.', [{ text: 'OK' }]); return }
           const updated = albums.map(a => a.id === album.id ? { ...a, is_hidden: next } : a)
           setAlbums(updated); setPhotoAlbums(updated.filter(a => a.album_type === 'photos')); setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
-        })
+        })()
       } else if (i === 3) {
         Alert.alert('Delete album?', `"${album.title}" will be deleted. Photos/videos inside will become unassigned.`, [
           { text: 'Cancel', style: 'cancel' },

@@ -167,9 +167,7 @@ function TreeRow({ node, depth, childCount, isExpanded, isMatch, isTraced, onTog
   onSelect: () => void
 }) {
   const hasKids = childCount > 0
-  const nameClr = node.is_alive
-    ? (node.sex === 'female' ? '#be185d' : '#1e40af')
-    : '#64748b'
+  const nameClr = node.is_alive ? '#1e40af' : '#64748b'
 
   const yearPart = node.dob ? node.dob.slice(0, 4) : ''
   const dodPart  = !node.is_alive && node.dod ? `†${node.dod.slice(0, 4)}` : ''
@@ -323,7 +321,7 @@ export default function FamilyTreeScreen() {
     scrollTarget.current = null
     const idx = flatItems.findIndex(item => item.node.id === target)
     if (idx >= 0) {
-      listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.3 })
+      listRef.current?.scrollToOffset({ offset: idx * ROW_H, animated: true })
     }
   }, [flatItems])
 

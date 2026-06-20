@@ -217,7 +217,9 @@ export default function MembersScreen() {
       `first_name.ilike.%${s}%,last_name.ilike.%${s}%,email.ilike.%${s}%,place_of_residence.ilike.%${s}%`
     )
     const { data } = await q.range(offset, offset + PAGE_SIZE - 1)
-    return (data ?? []) as User[]
+    const rows = (data ?? []) as User[]
+    const seen = new Set<string>()
+    return rows.filter(u => { if (seen.has(u.id)) return false; seen.add(u.id); return true })
   }
 
   async function fetchRoleCounts() {

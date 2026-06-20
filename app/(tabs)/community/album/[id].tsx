@@ -220,7 +220,14 @@ export default function AlbumScreen() {
   async function toggleHidePhoto(photo: AlbumPhoto) {
     const newHidden = !(photo.is_hidden ?? false)
     setSaving(photo.id)
-    await supabase.from('album_photos').update({ is_hidden: newHidden }).eq('id', photo.id)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      await fetch(`https://www.bazidpur.com/api/albums/${id}/photos?_t=${encodeURIComponent(session.access_token)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ photoId: photo.id, is_hidden: newHidden }),
+      })
+    }
     setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, is_hidden: newHidden } : p))
     setSaving(null)
   }
@@ -339,7 +346,14 @@ export default function AlbumScreen() {
         {
           text: album?.is_hidden ? 'Show' : 'Hide', onPress: async () => {
             const newHidden = !album?.is_hidden
-            await supabase.from('photo_albums').update({ is_hidden: newHidden }).eq('id', id)
+            const { data: { session } } = await supabase.auth.getSession()
+            if (session) {
+              await fetch(`https://www.bazidpur.com/api/albums?_t=${encodeURIComponent(session.access_token)}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                body: JSON.stringify({ id, is_hidden: newHidden }),
+              })
+            }
             setAlbum(prev => prev ? { ...prev, is_hidden: newHidden } : prev)
           },
         },
@@ -607,6 +621,7 @@ export default function AlbumScreen() {
           startIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           entityType="album_photo"
+          ownerId={album?.user_id}
         />
       )}
 
