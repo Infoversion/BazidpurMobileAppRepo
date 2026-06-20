@@ -9,6 +9,7 @@ import { router, useFocusEffect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { webAPI } from '@/lib/webApi'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { useBlockedUsers, confirmBlockUser } from '@/components/BlockUserButton'
 import type { Album } from '@/lib/types'
@@ -420,23 +421,17 @@ export default function GalleryScreen() {
   }
 
   async function loadVideoAlbums() {
-    // Resolve user id from current session — useAuth context may not be hydrated yet on first focus.
     const { data: { session } } = await supabase.auth.getSession()
     const myId = session?.user?.id ?? user?.id
 
-    const { data: albumData, error } = await supabase
-      .from('video_albums')
-      .select('id, title, description, is_hidden, display_order, created_at, user_id, user:user_id(first_name, last_name)')
-      .or(myId ? `is_hidden.eq.false,user_id.eq.${myId}` : 'is_hidden.eq.false')
-      .order('display_order')
-
-    if (error) {
-      console.error('[gallery] video_albums query error', error.message)
+    const res = await webAPI('/api/video-albums', 'GET')
+    if (!res.ok) {
+      console.error('[gallery] video_albums API error', res.status)
       setVideoAlbums([])
       return
     }
-
-    const raw = (albumData ?? []) as unknown as VideoAlbum[]
+    const json = await res.json()
+    const raw = (json.albums ?? []) as VideoAlbum[]
 
     if (raw.length === 0) { setVideoAlbums([]); return }
 

@@ -10,6 +10,7 @@ import Svg, { Line } from 'react-native-svg'
 import * as ImagePicker from 'expo-image-picker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { webAPI } from '@/lib/webApi'
 import * as FileSystem from 'expo-file-system/legacy'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -711,8 +712,11 @@ export default function MediaAdminScreen() {
   }
 
   async function fetchAlbums() {
-    const { data } = await supabase.from('media_albums').select('id, title, album_type, is_hidden').order('display_order')
-    return (data ?? []) as MediaAlbum[]
+    const res = await webAPI('/api/media-albums', 'GET')
+    if (!res.ok) return []
+    const json = await res.json()
+    return ((json.albums ?? []) as { id: string; title: string; album_type: string; is_hidden: boolean }[])
+      .map(a => ({ id: a.id, title: a.title, album_type: a.album_type as 'photos' | 'videos', is_hidden: a.is_hidden ?? false })) as MediaAlbum[]
   }
 
   async function fetchAlbumCoverData(allAlbums: MediaAlbum[]) {

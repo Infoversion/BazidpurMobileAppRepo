@@ -271,7 +271,10 @@ export default function MembersScreen() {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
     const rows = await fetchPage(filter, debouncedSearch, users.length)
-    setUsers(prev => [...prev, ...rows])
+    setUsers(prev => {
+      const seen = new Set(prev.map(u => u.id))
+      return [...prev, ...rows.filter(u => !seen.has(u.id))]
+    })
     setHasMore(rows.length === PAGE_SIZE)
     setLoadingMore(false)
   }

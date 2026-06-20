@@ -6,7 +6,7 @@ import {
 } from 'react-native'
 import * as DocumentPicker from 'expo-document-picker'
 import { supabase } from '@/lib/supabase'
-import { webUpload } from '@/lib/webApi'
+import { webAPI } from '@/lib/webApi'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -158,18 +158,12 @@ function MessageDetail({ item, onClose, onMarkRead, onDelete }: {
 
     setSending(true)
     try {
-      const fd = new FormData()
-      fd.append('id', item.id)
-      fd.append('message', replyText.trim())
-      attachments.forEach(a => {
-        fd.append('attachments', {
-          uri: a.uri,
-          name: a.name,
-          type: a.mimeType ?? 'application/octet-stream',
-        } as unknown as Blob)
+      const res = await webAPI('/api/admin/contacts', 'PUT', {
+        id: item.id,
+        reply_content: replyText.trim(),
+        send_email: true,
+        is_read: true,
       })
-
-      const res = await webUpload('/api/admin/contacts/reply', fd)
 
       if (res.ok) {
         setSent(true)

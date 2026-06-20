@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { webAPI } from '@/lib/webApi'
 import { ReportButton } from '@/components/ReportButton'
 
 interface VideoAlbum {
@@ -166,14 +167,16 @@ function VideoCard({
       {playing && item.youtube_id ? (
         <View style={{ width: cardWidth, height: thumbHeight, backgroundColor: '#000' }}>
           <WebView
-            source={{ uri: `https://www.youtube.com/embed/${item.youtube_id}?autoplay=1&playsinline=1&modestbranding=1&rel=0&origin=https://bazidpur.com` }}
+            source={{
+              html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0}body{background:#000;width:100vw;height:100vh}iframe{width:100%;height:100%;border:0}</style></head><body><iframe src="https://www.youtube.com/embed/${item.youtube_id}?autoplay=1&playsinline=1&modestbranding=1&rel=0&enablejsapi=1" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></body></html>`,
+              baseUrl: 'https://www.youtube.com',
+            }}
             style={{ height: thumbHeight, width: cardWidth, backgroundColor: '#000' }}
             allowsFullscreenVideo
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
             javaScriptEnabled
             domStorageEnabled
-            userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
           />
         </View>
       ) : (
@@ -417,8 +420,8 @@ export default function VideoAlbumScreen() {
   async function handleToggleHideAlbum() {
     if (!album) return
     const next = !album.is_hidden
-    const { error } = await supabase.from('video_albums').update({ is_hidden: next }).eq('id', album.id)
-    if (error) { Alert.alert('Error', error.message); return }
+    const res = await webAPI('/api/video-albums', 'PATCH', { id: album.id, is_hidden: next })
+    if (!res.ok) { Alert.alert('Error', `Could not update album (${res.status})`); return }
     setAlbum({ ...album, is_hidden: next })
   }
 

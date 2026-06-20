@@ -1,17 +1,12 @@
 import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  ScrollView, Alert, Linking, KeyboardAvoidingView, Platform,
+  ScrollView, Alert, KeyboardAvoidingView, Platform,
   ActivityIndicator,
 } from 'react-native'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
-
-const APP_URL = 'https://bazidpur.com/join'
-
-const DEFAULT_MESSAGE = `You're invited to join the Bazidpur Family app — a private space for our community to connect, share memories, explore our family tree, and preserve our heritage.
-
-Tap the link below to request access:`
+import { webAPI } from '@/lib/webApi'
 
 export default function InviteScreen() {
   const { user } = useAuth()
@@ -27,7 +22,7 @@ export default function InviteScreen() {
 
     setSending(true)
 
-    // Store in invitations table (best-effort — table may not exist)
+    // Store in invitations table (best-effort)
     await supabase.from('invitations').insert({
       invited_name: name.trim(),
       invited_email: email.trim(),
@@ -35,32 +30,25 @@ export default function InviteScreen() {
       invited_by: user?.id,
     }).then(() => {}).catch(() => {})
 
-    // Open the mail app with a pre-filled invitation
-    const senderName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'A family member'
-    const greeting = `Hi ${name.trim()},\n\n`
-    const body = `${greeting}${DEFAULT_MESSAGE}\n\n${APP_URL}\n\n${personalNote.trim() ? `Personal note from ${senderName}:\n"${personalNote.trim()}"\n\n` : ''}Warm regards,\n${senderName}`
+    try {
+      const res = await webAPI('/api/admin/invitations', 'POST', {
+        emails: [email.trim()],
+      })
 
-    const mailUrl = `mailto:${encodeURIComponent(email.trim())}?subject=${encodeURIComponent('You\'re invited to the Bazidpur Family App')}&body=${encodeURIComponent(body)}`
-
-    setSending(false)
-
-    const canOpen = await Linking.canOpenURL(mailUrl)
-    if (canOpen) {
-      await Linking.openURL(mailUrl)
-      setSent(true)
-      setName('')
-      setEmail('')
-      setPersonalNote('')
-    } else {
-      Alert.alert('No mail app found', 'Please send the invite manually via email or WhatsApp.', [
-        { text: 'Copy invite text', onPress: copyInvite },
-        { text: 'OK', style: 'cancel' },
-      ])
+      if (res.ok) {
+        setSent(true)
+        setName('')
+        setEmail('')
+        setPersonalNote('')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        Alert.alert('Failed to send', err.error ?? `Error ${res.status}`)
+      }
+    } catch (e: unknown) {
+      Alert.alert('Network error', e instanceof Error ? e.message : 'Could not reach bazidpur.com')
+    } finally {
+      setSending(false)
     }
-  }
-
-  function copyInvite() {
-    Alert.alert('Invite link', `Share this link with ${name || 'them'}:\n\n${APP_URL}`)
   }
 
   return (
@@ -77,7 +65,7 @@ export default function InviteScreen() {
           }}>
             <Text style={{ fontSize: 20 }}>✅</Text>
             <Text style={{ flex: 1, fontSize: 14, color: '#065f46', fontWeight: '500' }}>
-              Mail app opened with your invitation. Send it from there!
+              Invitation sent from support@bazidpur.com!
             </Text>
           </View>
         )}
@@ -124,7 +112,7 @@ export default function InviteScreen() {
         {/* Personal note */}
         <View style={{ backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12 }}>
           <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)', marginBottom: 6 }}>
-            Personal Note <Text style={{ fontWeight: '400' }}>(optional)</Text>
+            Personal Note <Text style={{ fontWeight: '400' }}>(optional — shown in the email)</Text>
           </Text>
           <TextInput
             style={{ fontSize: 15, color: '#000', minHeight: 90, textAlignVertical: 'top' }}
@@ -135,16 +123,6 @@ export default function InviteScreen() {
             multiline
             autoCorrect
           />
-        </View>
-
-        {/* What gets sent preview */}
-        <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 16 }}>
-          <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.5)', marginBottom: 8, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 }}>
-            Invitation Preview
-          </Text>
-          <Text style={{ fontSize: 13, color: 'rgba(60,60,67,0.7)', lineHeight: 20 }}>
-            {`Hi ${name || '[name]'},\n\n${DEFAULT_MESSAGE}\n\n${APP_URL}`}
-          </Text>
         </View>
 
         {/* Send button */}
@@ -159,24 +137,12 @@ export default function InviteScreen() {
         >
           {sending
             ? <ActivityIndicator color="#fff" />
-            : <Text style={{ fontSize: 16, fontWeight: '600', color: '#fff' }}>Send Invitation via Email</Text>
+            : <Text style={{ fontSize: 16, fontWeight: '600', color: '#fff' }}>Send Invitation</Text>
           }
         </TouchableOpacity>
 
-        {/* Copy link fallback */}
-        <TouchableOpacity
-          onPress={copyInvite}
-          style={{
-            backgroundColor: '#fff', borderRadius: 14,
-            paddingVertical: 14, alignItems: 'center',
-            borderWidth: 1, borderColor: 'rgba(60,60,67,0.15)',
-          }}
-        >
-          <Text style={{ fontSize: 15, fontWeight: '500', color: '#2d1b69' }}>Copy Invite Link</Text>
-        </TouchableOpacity>
-
         <Text style={{ textAlign: 'center', fontSize: 12, color: 'rgba(60,60,67,0.4)', lineHeight: 18 }}>
-          The invitation opens your mail app with a pre-filled message. The recipient must request access and will be reviewed by an admin.
+          The invitation email is sent from support@bazidpur.com with full formatting. The recipient must request access and will be reviewed by an admin.
         </Text>
 
       </ScrollView>
