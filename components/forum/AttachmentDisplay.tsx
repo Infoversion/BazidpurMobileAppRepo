@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Modal, ActivityIndicator, Alert, Animated, Easing } from 'react-native'
 import { Image } from 'expo-image'
-import { Audio } from 'expo-av'
-import type { AVPlaybackStatus } from 'expo-av'
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio'
 import { WebView } from 'react-native-webview'
 import YoutubePlayer from 'react-native-youtube-iframe'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -61,48 +60,50 @@ function AudioVisualizer({ playing, metering }: { playing: boolean; metering: nu
 }
 
 function AudioPlayer({ url }: { url: string }) {
-  const soundRef = useRef<Audio.Sound | null>(null)
-  const [playing, setPlaying] = useState(false)
-  const [posSec, setPosSec] = useState(0)
-  const [durSec, setDurSec] = useState(0)
+  const player = useAudioPlayer({ uri: url })
+  const status = useAudioPlayerStatus(player)
+  // Decorative metering: oscillate while playing (expo-audio status has no per-frame dB)
   const [metering, setMetering] = useState(-160)
+  const meteringTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    let mounted = true
-    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false })
-    Audio.Sound.createAsync(
-      { uri: url },
-      { shouldPlay: false, isMeteringEnabled: true },
-      (status: AVPlaybackStatus) => {
-        if (!mounted || !status.isLoaded) return
-        setPlaying(status.isPlaying)
-        setPosSec(status.positionMillis / 1000)
-        setDurSec((status.durationMillis ?? 0) / 1000)
-        setMetering(status.currentMeteringValue ?? -160)
-        if (status.didJustFinish) soundRef.current?.setPositionAsync(0)
-      }
-    ).then(({ sound }) => {
-      if (mounted) soundRef.current = sound
-      else sound.unloadAsync()
-    }).catch(() => {})
-    return () => {
-      mounted = false
-      soundRef.current?.unloadAsync()
-      soundRef.current = null
-    }
-  }, [url])
+    setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false }).catch(() => {})
+  }, [])
 
-  async function toggle() {
-    const sound = soundRef.current
-    if (!sound) return
+  useEffect(() => {
+    if (status.playing) {
+      meteringTimer.current = setInterval(() => {
+        setMetering(-60 + Math.random() * 60)
+      }, 80)
+    } else {
+      if (meteringTimer.current) clearInterval(meteringTimer.current)
+      setMetering(-160)
+    }
+    return () => { if (meteringTimer.current) clearInterval(meteringTimer.current) }
+  }, [status.playing])
+
+  // Reset to start when finished
+  useEffect(() => {
+    if (status.playbackState === 'ended' || (!status.playing && status.currentTime > 0 && status.currentTime >= status.duration && status.duration > 0)) {
+      player.seekTo(0).catch(() => {})
+    }
+  }, [status.playbackState, status.playing])
+
+  useEffect(() => {
+    return () => { player.remove() }
+  }, [])
+
+  function toggle() {
     try {
-      if (playing) await sound.pauseAsync()
-      else await sound.playAsync()
+      if (status.playing) player.pause()
+      else player.play()
     } catch {
       Alert.alert('Cannot play audio', 'This audio format is not supported on this device.')
     }
   }
 
+  const posSec = status.currentTime
+  const durSec = status.duration
   const progress = durSec > 0 ? posSec / durSec : 0
 
   return (
@@ -117,9 +118,9 @@ function AudioPlayer({ url }: { url: string }) {
           backgroundColor: '#2d1b69', alignItems: 'center', justifyContent: 'center',
         }}
       >
-        <Text style={{ fontSize: 14, color: '#fff' }}>{playing ? '⏸' : '▶'}</Text>
+        <Text style={{ fontSize: 14, color: '#fff' }}>{status.playing ? '⏸' : '▶'}</Text>
       </TouchableOpacity>
-      <AudioVisualizer playing={playing} metering={metering} />
+      <AudioVisualizer playing={status.playing} metering={metering} />
       <View style={{ flex: 1 }}>
         <View style={{ height: 4, backgroundColor: '#e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
           <View style={{ height: 4, width: `${progress * 100}%`, backgroundColor: '#2d1b69', borderRadius: 2 }} />
