@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import type { LandingPhoto } from '@/lib/types'
+import Constants from 'expo-constants'
+import * as Updates from 'expo-updates'
 
 const CIRCLE_SIZE = 68
 const OVERLAP = 22
@@ -165,6 +167,14 @@ export default function HomeScreen() {
         >
           <Text style={{ fontSize: 13, color: '#9ca3af' }}>Privacy Policy</Text>
         </TouchableOpacity>
+
+        {/* Build indicator */}
+        <View style={{ marginTop: 16, alignItems: 'center', gap: 3 }}>
+          <Text style={{ fontSize: 10, color: '#d1d5db', letterSpacing: 0.3 }}>
+            v{Constants.expoConfig?.version ?? '—'}
+            {__DEV__ ? '  ·  DEV' : Updates.updateId ? `  ·  ${Updates.updateId.slice(0, 8)}` : '  ·  embedded'}
+          </Text>
+        </View>
       </ScrollView>
     </View>
   )
