@@ -159,7 +159,7 @@ function VideoCard({ item, cardWidth, thumbHeight }: { item: TMVideo; cardWidth:
         <View style={{ width: cardWidth, height: thumbHeight, backgroundColor: '#000' }}>
           <WebView
             source={{
-              html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0}body{background:#000;width:100vw;height:100vh}iframe{width:100%;height:100%;border:0}</style></head><body><iframe src="https://www.youtube.com/embed/${item.youtube_id}?playsinline=1&rel=0&autoplay=1&enablejsapi=1" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></body></html>`,
+              html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>*{margin:0;padding:0}body{background:#000;width:100vw;height:100vh}iframe{width:100%;height:100%;border:0}</style></head><body><iframe src="https://www.youtube.com/embed/${item.youtube_id}?playsinline=1&rel=0&autoplay=1" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></body></html>`,
               baseUrl: 'https://www.youtube.com',
             }}
             style={{ height: thumbHeight, width: cardWidth, backgroundColor: '#000' }}
