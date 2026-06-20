@@ -149,16 +149,32 @@ const withJSC = (config) => {
       File.write(filepath, content) unless File.exist?(filepath)
     end
 
-    # expo-av@16.0.8: Promise.resolver changed to JavaScriptValue-based in SDK 56.
-    # setFullscreen() expects EXPromiseResolveBlock, so use promise.legacyResolver.
-    video_view_module = File.join(
-      File.dirname(__dir__),
-      'node_modules/expo-av/ios/EXAV/Video/VideoViewModule.swift'
-    )
-    if File.exist?(video_view_module)
-      content = File.read(video_view_module)
-      patched = content.gsub('resolver: promise.resolver', 'resolver: promise.legacyResolver')
-      File.write(video_view_module, patched) if patched != content
+    # expo-av@16.0.8 Swift patches for SDK 56 API changes:
+    #
+    # 1. Promise.resolver changed to JavaScriptValue-based; setFullscreen() needs legacyResolver.
+    # 2. AppContext.legacyModuleRegistry is @objc but absent from the Swift module interface
+    #    (mixed-module ObjC type constraint). Access via KVC (value(forKey:)) instead.
+    [
+      [
+        File.join(File.dirname(__dir__), 'node_modules/expo-av/ios/EXAV/Video/VideoViewModule.swift'),
+        [['resolver: promise.resolver', 'resolver: promise.legacyResolver']]
+      ],
+      [
+        File.join(File.dirname(__dir__), 'node_modules/expo-av/ios/EXAV/ExpoVideoView.swift'),
+        [
+          [
+            'guard let legacyModuleRegistry = appContext?.legacyModuleRegistry else {'\
+              "\n      fatalError(\"Unable to get the legacyModuleRegistry from appContext.\")\n    }",
+            'let legacyModuleRegistry = appContext?.value(forKey: "legacyModuleRegistry") as? EXModuleRegistry'
+          ]
+        ]
+      ]
+    ].each do |filepath, substitutions|
+      next unless File.exist?(filepath)
+      content = File.read(filepath)
+      patched = content
+      substitutions.each { |from, to| patched = patched.gsub(from, to) }
+      File.write(filepath, patched) if patched != content
     end
 `
         contents = contents.replace(
