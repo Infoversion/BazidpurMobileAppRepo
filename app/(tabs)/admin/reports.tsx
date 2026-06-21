@@ -113,6 +113,7 @@ const OFFENDER_LOOKUP: Record<string, { table: string; column: string } | null> 
   album_photo:      { table: 'album_photos',       column: 'uploaded_by' },
   video_album:      { table: 'video_albums',       column: 'user_id' },
   video_album_item: { table: 'video_album_items',  column: 'uploaded_by' },
+  comment:          { table: 'comments',           column: 'user_id' },
 }
 
 export default function ReportsScreen() {
@@ -268,6 +269,26 @@ export default function ReportsScreen() {
       const albumId = await lookupParent('video_album_items', 'album_id')
       if (!albumId) { show('info', 'Not found', 'This video may have been deleted.'); return }
       router.push({ pathname: '/(tabs)/community/video-album/[id]' as any, params: { id: albumId } })
+      return
+    }
+    if (t === 'comment') {
+      const { data, error } = await supabase.from('comments').select('entity_type, entity_id').eq('id', id).single()
+      if (error || !data) { show('info', 'Not found', 'This comment may have been deleted.'); return }
+      const et = (data as { entity_type: string; entity_id: string }).entity_type
+      const eid = (data as { entity_type: string; entity_id: string }).entity_id
+      if (et === 'photo_album') {
+        router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: eid } })
+      } else if (et === 'album_photo') {
+        const albumId = await lookupParent('album_photos', 'album_id')
+        if (!albumId) { show('info', 'Not found', 'This photo may have been deleted.'); return }
+        router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: albumId } })
+      } else if (et === 'video_album') {
+        router.push({ pathname: '/(tabs)/community/video-album/[id]' as any, params: { id: eid } })
+      } else if (et === 'experience') {
+        router.push({ pathname: '/(tabs)/community/memoir/[id]' as any, params: { id: eid } })
+      } else {
+        show('info', 'Unsupported', `No viewer for comment on: ${et}`)
+      }
       return
     }
     show('info', 'Unsupported', `No viewer is wired up for content type: ${t}`)

@@ -3,12 +3,12 @@ import * as SplashScreen from 'expo-splash-screen'
 import * as ScreenOrientation from 'expo-screen-orientation'
 import { useEffect } from 'react'
 import { Alert, Platform, LogBox } from 'react-native'
-
-LogBox.ignoreLogs(['Sending `onAnimatedValueUpdate` with no listeners registered'])
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { usePreventScreenCapture, addScreenshotListener } from 'expo-screen-capture'
 import { AuthProvider } from '@/lib/auth-context'
 import '../global.css'
+
+LogBox.ignoreLogs(['Sending `onAnimatedValueUpdate` with no listeners registered'])
 
 SplashScreen.preventAutoHideAsync()
 
