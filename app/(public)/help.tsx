@@ -157,7 +157,7 @@ const ALL_SECTIONS: HelpSection[] = [
       },
       {
         heading: 'How to Navigate',
-        body: 'Simply tap any tile to enter that section:\n\n• ✨ Timeless Moments — curated video moments from the community\n• 🖼️ The Gallery — community photos and personal albums\n• ✍️ Rhymes & Roots — Urdu and Persian poetry and ghazals\n• 📖 Memoirs — personal stories from community members\n• 📚 Reading Room — books, journals, and curated articles\n• 💬 The Forum — community discussion threads\n• 🌳 Family Tree — full interactive family tree\n• 📜 Lineage — the direct ancestral line across ten generations\n• ⚙️ Admin — admin tools (only visible to admin and superadmin)',
+        body: 'Simply tap any tile to enter that section:\n\n• ✨ Timeless Moments — curated video moments from the community\n• 🖼️ The Gallery — community photos and personal albums\n• ✍️ Rhymes & Roots — Urdu and Persian poetry and ghazals\n• 📖 Memoirs — personal stories from community members\n• 📚 Reading Room — books, journals, and curated articles\n• 💬 The Forum — community discussion threads\n• 🌍 Scattered Roots — interactive map showing where members live\n• 👨‍👩‍👧‍👦 Family Tree — full interactive family tree\n• 📜 Lineage — the direct ancestral line across ten generations\n• ⚙️ Admin — admin tools (only visible to admin and superadmin)',
       },
       {
         heading: 'Welcome Message',
@@ -187,7 +187,19 @@ const ALL_SECTIONS: HelpSection[] = [
       },
       {
         heading: 'Member Albums',
-        body: 'Below the main photo grid, personal albums uploaded by community members are listed. Each album card shows the album title, the member\'s name, and a cover photo.\n\nTap an album to open it and browse its photos. Album photos also support the full-screen lightbox — tap any photo and swipe through the album.',
+        body: 'Below the main photo grid, personal photo albums uploaded by community members are listed. Each album card shows the album title, the member\'s name, and a cover photo.\n\nTap an album to open it and browse its photos. Album photos also support the full-screen lightbox — tap any photo and swipe through the album.',
+      },
+      {
+        heading: 'Creating a Photo Album',
+        body: 'To create your own album:\n\n1. Open The Gallery and scroll down to the Members Albums section\n2. Tap the + New Album button\n3. Enter a title and optional description\n4. Tap Create\n5. Your new empty album opens — tap the + button inside it to add photos\n\nYou can add multiple photos at once. Each photo is resized and converted automatically before upload.',
+      },
+      {
+        heading: 'Video Albums',
+        body: 'Below photo albums, there is a separate Video Albums section. These are collections of YouTube videos organised by theme or event. Tap any video album to open it, then tap a video to play it full-screen.\n\nMembers can create video albums in the same way as photo albums — scroll to the Video Albums section and tap + New Video Album.',
+      },
+      {
+        heading: 'Comments on Albums and Photos',
+        body: 'At the bottom of any photo album or individual album photo, a comments section allows members to leave a message. Tap in the comment box, type your message, and tap Send.\n\nYour comment appears immediately. Other members who view the same album will see it. The album owner receives a notification when someone comments.',
       },
       {
         heading: 'Uploading a Photo',
@@ -254,6 +266,10 @@ const ALL_SECTIONS: HelpSection[] = [
         body: 'The detail view opens the full poem. It shows:\n\n• The title (in all available languages)\n• The full original text in Urdu or Persian, displayed verse by verse\n• An English translation where available\n• The author\'s name and the type (poetry or ghazal)\n\nScroll down to read through longer works.',
       },
       {
+        heading: 'Likes and Comments',
+        body: 'At the bottom of each poem or ghazal, a likes and comments bar lets you engage with the content:\n\n• Tap the heart (♥) to like — tap again to unlike\n• Tap the comment bubble to open the comments panel, read what others have written, and add your own thoughts\n\nYour likes and comments are visible to all members.',
+      },
+      {
         heading: 'Poetry vs Ghazals',
         body: 'The collection contains two forms:\n\n• Poetry — general verse composition in Urdu or Persian\n• Ghazal — a structured lyric form with rhyming couplets and a repeated refrain. Ghazals often explore themes of love, longing, divine connection, and spirituality. They are among the most celebrated forms in Urdu and Persian literature.',
       },
@@ -281,7 +297,11 @@ const ALL_SECTIONS: HelpSection[] = [
       },
       {
         heading: 'Reading a Memoir',
-        body: 'Tap a memoir card to open it. Memoirs may be structured in chapters, each covering a different period or theme. Scroll through to read the full story. Some memoirs include photos embedded within the text.',
+        body: 'Tap a memoir card to open it. Memoirs may be structured in chapters, each covering a different period or theme. Use the chapter navigation arrows at the top of the screen to jump between chapters, or scroll through to read the full story. Some memoirs include photos embedded within the text.',
+      },
+      {
+        heading: 'Likes and Comments',
+        body: 'At the bottom of each memoir, a likes and comments bar lets you engage with the story:\n\n• Tap the heart (♥) to like — tap again to unlike\n• Tap the comment bubble to read comments from other members and add your own\n\nThe memoir author receives a notification when someone comments.',
       },
       {
         heading: 'How to Access',
@@ -348,8 +368,24 @@ const ALL_SECTIONS: HelpSection[] = [
         body: 'Tap the Reply button on any existing reply to quote it. A small preview strip appears above the compose field showing who you are replying to and the start of their message. Your reply will be linked to theirs — readers can tap the quote strip inside your reply to jump back to the original message.\n\nTo cancel the quote and reply to the thread in general, tap × on the preview strip.',
       },
       {
+        heading: 'Attaching Media to a Reply',
+        body: 'When composing a reply, tap the paperclip / attachment icon in the compose bar to attach media:\n\n• 📷 Photo — choose a photo from your library. It is resized and uploaded automatically\n• 🎵 Record Audio — tap to start recording, tap again to stop. The recording is attached and plays inline for other members\n• 🎵 Upload Audio — pick an audio file from your device\n• 📄 PDF — attach a document from your device\n• ▶️ YouTube — paste a YouTube link and the video embeds directly in the reply\n\nOnly one attachment per reply is supported. Attachments appear inline beneath the reply text for all members to see.',
+      },
+      {
+        heading: 'Emoji Reactions',
+        body: 'Every thread and every reply has an emoji reaction bar. To react:\n\n• Tap any emoji pill that already has reactions to add your own\n• Tap the + button at the end of the bar to open the full emoji picker and choose any emoji\n• Tap an emoji you have already reacted with to remove your reaction\n\nThe count next to each emoji shows how many members have reacted. Long-press any emoji pill to see a list of the members who reacted with that emoji.',
+      },
+      {
+        heading: 'Blocking a Member',
+        body: 'If you do not want to see content from a specific member, you can block them:\n\n• In the Forum, long-press on any post or reply from that member to see the option to block\n• Blocking hides their posts, photos, videos, poems, and memoirs from your view\n• The blocked member is not notified\n• To unblock, go to your Profile → Blocked Members and tap Unblock',
+      },
+      {
+        heading: 'Reporting a Post',
+        body: 'To flag a post or reply that violates community guidelines:\n\n• Tap the flag icon (⚑) on the thread or reply\n• Select a reason from the list\n• Tap Submit\n\nReports are reviewed by the admin team. You will receive a notification when the report is resolved. Your identity as the reporter is kept confidential.',
+      },
+      {
         heading: 'Community Standards',
-        body: 'The Forum is a family community space. Please:\n\n• Be respectful and considerate to all members\n• Keep discussions relevant to Bazidpur and the community\n• Do not share personal contact details publicly\n• Report any inappropriate posts to the admin team via the Contact form\n\nThe admin team may remove threads or replies that violate community standards, and may revoke membership for serious or repeated violations.',
+        body: 'The Forum is a family community space. Please:\n\n• Be respectful and considerate to all members\n• Keep discussions relevant to Bazidpur and the community\n• Do not share personal contact details publicly\n• Use the report flag (⚑) for any content that violates these standards\n\nThe admin team may remove threads or replies that violate community standards, and may revoke membership for serious or repeated violations.',
       },
       {
         heading: 'How to Access',
@@ -418,6 +454,58 @@ const ALL_SECTIONS: HelpSection[] = [
     ],
   },
 
+  // ── Scattered Roots (members) ────────────────────────────────
+  {
+    id: 'scattered-roots',
+    icon: '🌍',
+    title: 'Scattered Roots',
+    onlyFor: ['member', 'admin', 'superadmin'],
+    items: [
+      {
+        heading: 'Overview',
+        body: 'Scattered Roots is an interactive world map showing where Bazidpur family members are living today. It is a visual reminder of how far the community has spread — from Bihar to the UK, the Gulf, North America, and beyond.',
+      },
+      {
+        heading: 'Reading the Map',
+        body: 'Each pin on the map represents one or more members who have set their location in their profile. Tap any pin to see the city and country for that location. Zoom in and out using the standard pinch gesture to explore different regions.',
+      },
+      {
+        heading: 'Country List',
+        body: 'Below the map, an alphabetical list shows every country where at least one member lives. This gives a quick text summary of the community\'s global spread.',
+      },
+      {
+        heading: 'Your Pin',
+        body: 'Your location appears on the map if you have entered a country, state, and city in your Profile. If you do not appear, go to Profile → edit your location fields and save. The map updates the next time it loads.',
+      },
+      {
+        heading: 'How to Access',
+        body: 'From the Community hub, tap the 🌍 Scattered Roots tile. Tap ‹ to return.',
+      },
+    ],
+  },
+
+  // ── Notifications (members) ───────────────────────────────────
+  {
+    id: 'notifications',
+    icon: '🔔',
+    title: 'Notifications',
+    onlyFor: ['member', 'admin', 'superadmin'],
+    items: [
+      {
+        heading: 'Overview',
+        body: 'The Notifications screen collects all activity alerts in one place. You receive a notification when:\n\n• 💬 Someone replies to a forum thread you posted or participated in\n• 🖼️ Someone comments on your photo album or a photo you uploaded\n• ✅ Your membership application is approved\n• ⚑ A report you submitted has been reviewed and resolved\n• 🚫 A moderation action has been taken on your account\n• 📣 The admin team sends a community-wide announcement',
+      },
+      {
+        heading: 'Reading Notifications',
+        body: 'Unread notifications appear with a coloured left border. Tap any notification to mark it as read. The notification card shows a title, a short preview of the message, and how long ago it arrived.\n\nTap Mark all as read at the top of the screen to clear all unread indicators at once.',
+      },
+      {
+        heading: 'How to Access',
+        body: 'Tap your avatar in the top-right corner to open your Profile, then tap the Notifications button. Alternatively, notifications may be accessible from the Profile screen directly.',
+      },
+    ],
+  },
+
   // ── Profile (members) ─────────────────────────────────────────
   {
     id: 'profile',
@@ -452,6 +540,10 @@ const ALL_SECTIONS: HelpSection[] = [
       {
         heading: 'Privacy Policy',
         body: 'Tap the Privacy Policy button (purple text, between the Details card and the Sign Out button) to read the full privacy policy.',
+      },
+      {
+        heading: 'Blocked Members',
+        body: 'If you have blocked any members, a Blocked Members button appears on your profile screen. Tap it to see the full list of people you have blocked. To unblock someone, tap their name and confirm — their content will become visible to you again immediately.',
       },
       {
         heading: 'Signing Out',
@@ -540,6 +632,10 @@ const ALL_SECTIONS: HelpSection[] = [
       {
         heading: 'Timeless Moments',
         body: 'To add a video to the Timeless Moments section:\n\n1. Open Admin → Moments\n2. Tap Add Moment\n3. Enter the title, a description, and the YouTube video URL\n4. Set a display order\n5. Tap Save\n\nThe moment will appear in the Timeless Moments screen for all members. To remove or edit a moment, tap it in the admin list and update or delete it.',
+      },
+      {
+        heading: 'Flagged Content',
+        body: 'The Flagged Content screen collects all reports submitted by members. Reports are grouped into two tabs:\n\n• Pending — reports waiting for admin review\n• Resolved — reports you have already acted on (saved as an audit trail)\n\nFor each report you can see: the content type (thread, reply, comment, photo, etc.), the reason the member gave, who reported it, and when.\n\nTap View Content to jump directly to the flagged item. Then choose one of three actions:\n\n• ✅ No action needed — the content is fine; the reporter is emailed\n• ⚠️ Warning sent — the content breached guidelines but does not warrant suspension\n• 🚫 Suspend the member — the member is suspended immediately and signed out\n\nOptionally add private notes, then tap Save Action. The report moves to the Resolved tab.',
       },
       {
         heading: 'Contact Submissions',
