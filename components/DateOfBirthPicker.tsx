@@ -20,14 +20,19 @@ export function DateOfBirthPicker({ value, onChange, label = 'Date of Birth', de
     : 'Select date'
   const fallback = defaultDate ?? new Date(2000, 0, 1)
 
-  function handleChange(_: any, date?: Date) {
-    if (Platform.OS === 'android') setShow(false)
+  function applyDate(date: Date | undefined) {
     if (date) {
       const y = date.getFullYear()
       const m = String(date.getMonth() + 1).padStart(2, '0')
       const d = String(date.getDate()).padStart(2, '0')
       onChange(`${y}-${m}-${d}`)
     }
+  }
+
+  // Legacy Android path still uses onChange
+  function handleChange(_: any, date?: Date) {
+    setShow(false)
+    applyDate(date)
   }
 
   return (
@@ -59,7 +64,8 @@ export function DateOfBirthPicker({ value, onChange, label = 'Date of Birth', de
               mode="date"
               display="spinner"
               maximumDate={new Date()}
-              onChange={handleChange}
+              onValueChange={(_, date) => applyDate(date)}
+              onDismiss={() => setShow(false)}
             />
           </View>
         </Modal>
