@@ -12,6 +12,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { webAPI } from '@/lib/webApi'
 import { ReportButton } from '@/components/ReportButton'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 interface VideoAlbum {
   id: string
@@ -58,16 +60,17 @@ function VideoFormModal({
   const [url, setUrl] = useState(initial?.youtubeUrl ?? '')
   const [saving, setSaving] = useState(false)
   const isEdit = initial !== null && (initial.title || initial.youtubeUrl)
+  const { dialog: fDialog, show: fShow, hide: fHide } = useDialog()
 
   async function submit() {
-    if (!title.trim()) return Alert.alert('Title required')
-    if (!url.trim()) return Alert.alert('YouTube URL required')
-    if (!extractYouTubeId(url)) return Alert.alert('Invalid YouTube URL')
+    if (!title.trim()) { fShow('error', 'Title required'); return }
+    if (!url.trim()) { fShow('error', 'YouTube URL required'); return }
+    if (!extractYouTubeId(url)) { fShow('error', 'Invalid YouTube URL'); return }
     setSaving(true)
     try {
       await onSave({ title: title.trim(), description: desc.trim(), youtubeUrl: url.trim() })
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Could not save.')
+      fShow('error', 'Error', e.message ?? 'Could not save.')
     } finally {
       setSaving(false)
     }
@@ -130,6 +133,7 @@ function VideoFormModal({
             />
           </View>
         </View>
+        <AppDialog {...fDialog} onClose={fHide} />
       </View>
     </Modal>
   )
@@ -278,6 +282,7 @@ export default function VideoAlbumScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [role, setRole] = useState<string>('member')
+  const { dialog, show, hide } = useDialog()
 
   // Modals
   const [addOpen, setAddOpen] = useState(false)
@@ -324,7 +329,7 @@ export default function VideoAlbumScreen() {
   // ── Actions ──
   async function handleAdd({ title, description, youtubeUrl }: { title: string; description: string; youtubeUrl: string }) {
     const youtube_id = extractYouTubeId(youtubeUrl)
-    if (!youtube_id) { Alert.alert('Invalid YouTube URL'); return }
+    if (!youtube_id) { show('error', 'Invalid YouTube URL'); return }
 
     // Enforce per-album limit (from media_albums_config.maxVideosPerVideoAlbum)
     let maxPerAlbum = 10
@@ -357,7 +362,7 @@ export default function VideoAlbumScreen() {
   async function handleEdit({ title, description, youtubeUrl }: { title: string; description: string; youtubeUrl: string }) {
     if (!editTarget) return
     const youtube_id = extractYouTubeId(youtubeUrl)
-    if (!youtube_id) { Alert.alert('Invalid YouTube URL'); return }
+    if (!youtube_id) { show('error', 'Invalid YouTube URL'); return }
     const { error } = await supabase
       .from('video_album_items')
       .update({ title: title || null, description: description || null, youtube_url: youtubeUrl, youtube_id })
@@ -373,7 +378,7 @@ export default function VideoAlbumScreen() {
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
           const { error } = await supabase.from('video_album_items').delete().eq('id', videoId)
-          if (error) { Alert.alert('Error', error.message); return }
+          if (error) { show('error', 'Error', error.message); return }
           setVideos(prev => prev.filter(v => v.id !== videoId))
         },
       },
@@ -382,7 +387,7 @@ export default function VideoAlbumScreen() {
 
   async function handleToggleHide(videoId: string, hide: boolean) {
     const { error } = await supabase.from('video_album_items').update({ is_hidden: hide }).eq('id', videoId)
-    if (error) { Alert.alert('Error', error.message); return }
+    if (error) { show('error', 'Error', error.message); return }
     setVideos(prev => prev.map(v => v.id === videoId ? { ...v, is_hidden: hide } : v))
   }
 
@@ -408,7 +413,7 @@ export default function VideoAlbumScreen() {
         text: 'Delete', style: 'destructive', onPress: async () => {
           await supabase.from('video_album_items').delete().eq('album_id', album.id)
           const { error } = await supabase.from('video_albums').delete().eq('id', album.id)
-          if (error) { Alert.alert('Error', error.message); return }
+          if (error) { show('error', 'Error', error.message); return }
           router.back()
         },
       },
@@ -419,7 +424,7 @@ export default function VideoAlbumScreen() {
     if (!album) return
     const next = !album.is_hidden
     const res = await webAPI('/api/video-albums', 'PATCH', { id: album.id, is_hidden: next })
-    if (!res.ok) { Alert.alert('Error', `Could not update album (${res.status})`); return }
+    if (!res.ok) { show('error', 'Error', `Could not update album (${res.status})`); return }
     setAlbum({ ...album, is_hidden: next })
   }
 
@@ -535,6 +540,7 @@ export default function VideoAlbumScreen() {
           onSave={handleEdit}
         />
       )}
+      <AppDialog {...dialog} onClose={hide} />
     </View>
   )
 }

@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, Switch, ScrollView, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, Switch, ScrollView, ActivityIndicator } from 'react-native'
 import { Stack } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { ensurePreferencesRow } from '@/lib/notifications'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 type Prefs = {
   enabled: boolean
@@ -39,6 +41,7 @@ export default function NotificationSettingsScreen() {
   const { session } = useAuth()
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS)
   const [loading, setLoading] = useState(true)
+  const { dialog, show, hide } = useDialog()
 
   const load = useCallback(async () => {
     if (!session) return
@@ -63,7 +66,7 @@ export default function NotificationSettingsScreen() {
       .eq('user_id', session.user.id)
     if (error) {
       setPrefs(prefs) // rollback
-      Alert.alert('Could not save', error.message)
+      show('error', 'Could not save', error.message)
     }
   }
 
@@ -145,6 +148,7 @@ export default function NotificationSettingsScreen() {
         </Text>
 
       </ScrollView>
+      <AppDialog {...dialog} onClose={hide} />
     </View>
   )
 }

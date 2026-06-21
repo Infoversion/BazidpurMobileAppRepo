@@ -4,6 +4,8 @@ import { Stack } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 interface BlockedRow {
   id: string
@@ -17,6 +19,7 @@ export default function BlockedUsersScreen() {
   const [rows, setRows] = useState<BlockedRow[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const { dialog, show, hide } = useDialog()
 
   const load = useCallback(async () => {
     if (!session) return
@@ -48,7 +51,7 @@ export default function BlockedUsersScreen() {
       {
         text: 'Unblock', onPress: async () => {
           const { error } = await supabase.from('user_blocks').delete().eq('id', row.id)
-          if (error) { Alert.alert('Could not unblock', error.message); return }
+          if (error) { show('error', 'Could not unblock', error.message); return }
           setRows(prev => prev.filter(r => r.id !== row.id))
         },
       },
@@ -112,6 +115,7 @@ export default function BlockedUsersScreen() {
           }}
         />
       )}
+      <AppDialog {...dialog} onClose={hide} />
     </View>
   )
 }

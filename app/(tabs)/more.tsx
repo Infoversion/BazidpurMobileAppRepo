@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView,
-  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { DateOfBirthPicker } from '@/components/DateOfBirthPicker'
 import { CountryPicker, StatePicker } from '@/components/CountryStatePicker'
@@ -12,6 +12,8 @@ import { useAuth } from '@/lib/auth-context'
 import { RoleBadge } from '@/components/RoleBadge'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { supabase } from '@/lib/supabase'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 // Use the www. host explicitly — the apex 308-redirects to www and iOS
 // NSURLSession hangs on 308 redirects for POST-with-body.
@@ -62,6 +64,7 @@ function Field({
 
 export default function ProfileScreen() {
   const { signOut, user, refreshUser } = useAuth()
+  const { dialog, show, hide } = useDialog()
 
   const [firstName, setFirstName]     = useState(user?.first_name ?? '')
   const [lastName, setLastName]       = useState(user?.last_name ?? '')
@@ -93,7 +96,7 @@ export default function ProfileScreen() {
 
   async function pickPhoto() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to change your picture.'); return }
+    if (!perm.granted) { show('error', 'Permission needed', 'Allow photo access to change your picture.'); return }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -121,7 +124,7 @@ export default function ProfileScreen() {
       if (!res.ok) throw new Error(json.error ?? 'Upload failed')
       await refreshUser?.()
     } catch (e: any) {
-      Alert.alert('Upload failed', e.message)
+      show('error', 'Upload failed', e.message)
       setLocalPhotoUri(null)
     } finally {
       setUploadingPhoto(false)
@@ -130,23 +133,23 @@ export default function ProfileScreen() {
 
   async function saveDetails() {
     if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('Required', 'First and last name cannot be empty.')
+      show('error', 'Required', 'First and last name cannot be empty.')
       return
     }
     if (!country.trim()) {
-      Alert.alert('Required', 'Please enter your country.')
+      show('error', 'Required', 'Please enter your country.')
       return
     }
     if (!state.trim()) {
-      Alert.alert('Required', 'Please enter your state or region.')
+      show('error', 'Required', 'Please enter your state or region.')
       return
     }
     if (!city.trim()) {
-      Alert.alert('Required', 'Please enter your city or village.')
+      show('error', 'Required', 'Please enter your city or village.')
       return
     }
     if (!linkToBazidpur.trim()) {
-      Alert.alert('Required', 'Please describe your connection to Bazidpur.')
+      show('error', 'Required', 'Please describe your connection to Bazidpur.')
       return
     }
     setSaving(true)
@@ -175,9 +178,9 @@ export default function ProfileScreen() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Save failed')
       await refreshUser?.()
-      Alert.alert('Saved', 'Your profile has been updated.')
+      show('success', 'Saved', 'Your profile has been updated.')
     } catch (e: any) {
-      Alert.alert('Error', e.message)
+      show('error', 'Error', e.message)
     } finally {
       setSaving(false)
     }
@@ -407,6 +410,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
         </ScrollView>
+        <AppDialog {...dialog} onClose={hide} />
       </View>
     </KeyboardAvoidingView>
   )

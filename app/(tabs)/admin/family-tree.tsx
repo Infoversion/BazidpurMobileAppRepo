@@ -13,6 +13,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { webUpload } from '@/lib/webApi'
 import { levelColor, type FamilyNode } from '@/lib/family-tree-layout'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
 const ROW_H = 64
@@ -86,6 +88,7 @@ function NodeModal({
   const [uploading, setUploading] = useState(false)
   const [parentSearch, setParentSearch] = useState('')
   const [showParentPicker, setShowParentPicker] = useState(false)
+  const { dialog: nmDialog, show: nmShow, hide: nmHide } = useDialog()
 
   useEffect(() => { setForm({ ...EMPTY, ...initial }) }, [visible])
 
@@ -105,16 +108,16 @@ function NodeModal({
       const r = await webUpload('/api/family-tree/photo', fd)
       const data = await r.json()
       if (r.ok) set('photo_url', data.url)
-      else Alert.alert('Upload failed', data.error || 'Please try again.')
+      else nmShow('error', 'Upload failed', data.error || 'Please try again.')
     } catch {
-      Alert.alert('Upload failed', 'Please check your connection.')
+      nmShow('error', 'Upload failed', 'Please check your connection.')
     } finally {
       setUploading(false)
     }
   }
 
   async function submit() {
-    if (!form.name.trim()) { Alert.alert('Name required'); return }
+    if (!form.name.trim()) { nmShow('error', 'Name required'); return }
     setSaving(true)
     await onSave({ ...form, name: form.name.trim() })
     setSaving(false)
@@ -269,6 +272,7 @@ function NodeModal({
           />
         </View>
       </Modal>
+      <AppDialog {...nmDialog} onClose={nmHide} />
     </Modal>
   )
 }
@@ -298,6 +302,7 @@ export default function FamilyTreeAdminScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [search,   setSearch]   = useState('')
+  const { dialog, show, hide } = useDialog()
 
   const [modalVisible, setModalVisible] = useState(false)
   const [modalMode,    setModalMode]    = useState<'add' | 'edit'>('add')
@@ -417,7 +422,7 @@ export default function FamilyTreeAdminScreen() {
         })
         .select().single()
 
-      if (error) { Alert.alert('Error', error.message); return }
+      if (error) { show('error', 'Error', error.message); return }
       setNodes(prev => [...prev, created as FamilyNode])
       if (data.parent_id) setExpanded(prev => { const n = new Set(prev); n.add(data.parent_id!); return n })
     } else {
@@ -437,7 +442,7 @@ export default function FamilyTreeAdminScreen() {
         .eq('id', id)
         .select().single()
 
-      if (error) { Alert.alert('Error', error.message); return }
+      if (error) { show('error', 'Error', error.message); return }
       setNodes(prev => prev.map(n => n.id === id ? (updated as FamilyNode) : n))
     }
     setModalVisible(false)
@@ -462,7 +467,7 @@ export default function FamilyTreeAdminScreen() {
             }
             collect(node.id)
             const { error } = await supabase.from('family_tree_nodes').delete().in('id', toDelete)
-            if (error) { Alert.alert('Error', error.message); return }
+            if (error) { show('error', 'Error', error.message); return }
             setNodes(prev => prev.filter(n => !toDelete.includes(n.id)))
             setModalVisible(false)
           },
@@ -699,6 +704,7 @@ export default function FamilyTreeAdminScreen() {
         onSave={handleSave}
         onDelete={modalMode === 'edit' ? () => handleDelete(modalInitial as FamilyNode) : undefined}
       />
+      <AppDialog {...dialog} onClose={hide} />
     </View>
   )
 }

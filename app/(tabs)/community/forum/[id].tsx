@@ -13,6 +13,8 @@ import { PurpleHeader } from '@/components/PurpleHeader'
 import { ReportButton } from '@/components/ReportButton'
 import { useBlockedUsers, confirmBlockUser } from '@/components/BlockUserButton'
 import { AttachmentPicker, type Attachment } from '@/components/forum/AttachmentPicker'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 import { AttachmentDisplay } from '@/components/forum/AttachmentDisplay'
 import type { ForumThread, ForumReply } from '@/lib/types'
 
@@ -69,6 +71,7 @@ export default function ThreadScreen() {
   const { user, session } = useAuth()
   const insets = useSafeAreaInsets()
   const listRef = useRef<FlatList>(null)
+  const { dialog, show, hide } = useDialog()
 
   const [thread, setThread] = useState<ForumThread | null>(null)
   const [replies, setReplies] = useState<ReplyWithAuthor[]>([])
@@ -222,8 +225,8 @@ export default function ThreadScreen() {
             .update({ is_deleted: true })
             .eq('id', replyId)
             .select('id')
-          if (error) { Alert.alert('Error', error.message); return }
-          if (!data?.length) { Alert.alert('Error', 'Reply could not be removed. You may not have permission.'); return }
+          if (error) { show('error', 'Error', error.message); return }
+          if (!data?.length) { show('error', 'Error', 'Reply could not be removed. You may not have permission.'); return }
           setReplies(prev => prev.filter(r => r.id !== replyId))
         }
       },
@@ -481,6 +484,7 @@ export default function ThreadScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <AppDialog {...dialog} onClose={hide} />
     </View>
   )
 }

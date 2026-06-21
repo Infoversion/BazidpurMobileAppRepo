@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { webAPI } from '@/lib/webApi'
 import * as FileSystem from 'expo-file-system/legacy'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -336,19 +338,20 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
 }) {
   const [form, setForm] = useState<FormState>(initial)
   const isNew = !initial.title && !initial.youtubeUrl
+  const { dialog: fmDialog, show: fmShow, hide: fmHide } = useDialog()
 
   useEffect(() => { if (visible) setForm(initial) }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function pickImages() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) { Alert.alert('Permission needed', 'Please allow photo library access in Settings.'); return }
+    if (!perm.granted) { fmShow('error', 'Permission needed', 'Please allow photo library access in Settings.'); return }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'], quality: 0.7, allowsMultipleSelection: true, allowsEditing: false, exif: false,
     })
     if (result.canceled) return
     const oversized = result.assets.filter(a => a.fileSize != null && a.fileSize > MAX_FILE_BYTES)
     const valid = result.assets.filter(a => a.fileSize == null || a.fileSize <= MAX_FILE_BYTES)
-    if (oversized.length > 0) Alert.alert(`${oversized.length} photo${oversized.length > 1 ? 's' : ''} skipped`, `Over the ${formatBytes(MAX_FILE_BYTES)} limit.`)
+    if (oversized.length > 0) fmShow('info', `${oversized.length} photo${oversized.length > 1 ? 's' : ''} skipped`, `Over the ${formatBytes(MAX_FILE_BYTES)} limit.`)
     if (valid.length > 0) setForm(f => ({ ...f, images: [...f.images, ...valid.map(a => ({ uri: a.uri, fileSize: a.fileSize ?? undefined }))] }))
   }
 
@@ -444,6 +447,7 @@ function FormModal({ visible, title: modalTitle, mediaType, initial, saving, upl
             ))}
           </View>
         </ScrollView>
+        <AppDialog {...fmDialog} onClose={fmHide} />
       </KeyboardAvoidingView>
     </Modal>
   )
@@ -548,6 +552,7 @@ export default function MomentsAdminScreen() {
   const [movePicker, setMovePicker] = useState<{ item: MomentPhoto | MomentVideo } | null>(null)
   const [albumCoverData, setAlbumCoverData] = useState<Record<string, { covers: string[]; count: number }>>({})
   const [rootCoverData, setRootCoverData] = useState<{ photos: string[]; videos: string[]; photoCount: number; videoCount: number }>({ photos: [], videos: [], photoCount: 0, videoCount: 0 })
+  const { dialog, show, hide } = useDialog()
 
   // Select mode
   const [selectMode, setSelectMode] = useState(false)
@@ -834,7 +839,7 @@ export default function MomentsAdminScreen() {
             text: 'Rename', onPress: async (newTitle?: string) => {
               if (!newTitle?.trim()) return
               const { error } = await supabase.from('tm_albums').update({ title: newTitle.trim() }).eq('id', album.id)
-              if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
+              if (error) { show('error', 'Error', friendlyError(error.message)); return }
               const updated = albums.map(a => a.id === album.id ? { ...a, title: newTitle.trim() } : a)
               setAlbums(updated); setPhotoAlbums(updated.filter(a => a.album_type === 'photos')); setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
             },
@@ -843,7 +848,7 @@ export default function MomentsAdminScreen() {
       } else if (i === 2) {
         const next = !album.is_hidden
         supabase.from('tm_albums').update({ is_hidden: next }).eq('id', album.id).then(({ error }) => {
-          if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
+          if (error) { show('error', 'Error', friendlyError(error.message)); return }
           const updated = albums.map(a => a.id === album.id ? { ...a, is_hidden: next } : a)
           setAlbums(updated); setPhotoAlbums(updated.filter(a => a.album_type === 'photos')); setVideoAlbums(updated.filter(a => a.album_type === 'videos'))
         })
@@ -882,7 +887,7 @@ export default function MomentsAdminScreen() {
     setMovePicker(null)
     const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
     const { error } = await supabase.from(table).update({ album_id: albumId }).eq('id', item.id)
-    if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
+    if (error) { show('error', 'Error', friendlyError(error.message)); return }
     if (mediaTab === 'photos') setPhotos(prev => prev.filter(x => x.id !== item.id))
     else setVideos(prev => prev.filter(x => x.id !== item.id))
     fetchAlbumCoverData(albums)
@@ -917,7 +922,7 @@ export default function MomentsAdminScreen() {
     const ids = Array.from(selectedIds)
     const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
     const { error } = await supabase.from(table).update({ album_id: albumId }).in('id', ids)
-    if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
+    if (error) { show('error', 'Error', friendlyError(error.message)); return }
     if (mediaTab === 'photos') setPhotos(prev => prev.filter(x => !selectedIds.has(x.id)))
     else setVideos(prev => prev.filter(x => !selectedIds.has(x.id)))
     cancelSelectMode()
@@ -935,7 +940,7 @@ export default function MomentsAdminScreen() {
     const res = await webAPI(path, 'PATCH', { ids, is_active: newActive })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      Alert.alert('Error', friendlyError((body as { error?: string }).error ?? `Server error ${res.status}`), [{ text: 'OK' }]); return
+      show('error', 'Error', friendlyError((body as { error?: string }).error ?? `Server error ${res.status}`)); return
     }
     if (mediaTab === 'photos') setPhotos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
     else setVideos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
@@ -950,7 +955,7 @@ export default function MomentsAdminScreen() {
         text: 'Delete', style: 'destructive', onPress: async () => {
           const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
           const { error } = await supabase.from(table).delete().in('id', ids)
-          if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
+          if (error) { show('error', 'Error', friendlyError(error.message)); return }
           if (mediaTab === 'photos') { setPhotos(prev => prev.filter(x => !selectedIds.has(x.id))); setCounts(c => ({ ...c, photos: Math.max(0, c.photos - ids.length) })) }
           else { setVideos(prev => prev.filter(x => !selectedIds.has(x.id))); setCounts(c => ({ ...c, videos: Math.max(0, c.videos - ids.length) })) }
           cancelSelectMode()
@@ -1014,7 +1019,7 @@ export default function MomentsAdminScreen() {
       }
       setModalVisible(false)
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Something went wrong. Please try again.', [{ text: 'OK' }])
+      show('error', 'Error', e instanceof Error ? e.message : 'Something went wrong. Please try again.')
     } finally {
       setSaving(false); setUploadState(null)
     }
@@ -1027,7 +1032,7 @@ export default function MomentsAdminScreen() {
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
           const { error } = await supabase.from(table).delete().eq('id', id)
-          if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
+          if (error) { show('error', 'Error', friendlyError(error.message)); return }
           if (mediaTab === 'photos') { setPhotos(prev => prev.filter(x => x.id !== id)); setCounts(c => ({ ...c, photos: c.photos - 1 })) }
           else { setVideos(prev => prev.filter(x => x.id !== id)); setCounts(c => ({ ...c, videos: c.videos - 1 })) }
         },
@@ -1041,7 +1046,7 @@ export default function MomentsAdminScreen() {
     const res = await webAPI(path, 'PATCH', { id, is_active: newActive })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      Alert.alert('Cannot Update', friendlyError((body as { error?: string }).error ?? `Server error ${res.status}`), [{ text: 'OK' }]); return
+      show('error', 'Cannot Update', friendlyError((body as { error?: string }).error ?? `Server error ${res.status}`)); return
     }
     if (mediaTab === 'photos') setPhotos(prev => prev.map(x => x.id === id ? { ...x, is_active: newActive } : x))
     else setVideos(prev => prev.map(x => x.id === id ? { ...x, is_active: newActive } : x))
@@ -1117,7 +1122,7 @@ export default function MomentsAdminScreen() {
       else setVideos(updated as MomentVideo[])
       setPhotoReorderMode(false)
     } catch {
-      Alert.alert('Error', 'Could not save order. Please try again.', [{ text: 'OK' }])
+      show('error', 'Error', 'Could not save order. Please try again.')
     } finally {
       setPhotoReorderSaving(false)
     }
@@ -1144,7 +1149,7 @@ export default function MomentsAdminScreen() {
       else setVideoAlbums(newOrder)
       setAlbumReorderMode(false)
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not save album order.', [{ text: 'OK' }])
+      show('error', 'Error', e instanceof Error ? e.message : 'Could not save album order.')
     } finally {
       setAlbumReorderSaving(false)
     }
@@ -1411,7 +1416,7 @@ export default function MomentsAdminScreen() {
           </View>
         </View>
       )}
-
+      <AppDialog {...dialog} onClose={hide} />
     </View>
   )
 }

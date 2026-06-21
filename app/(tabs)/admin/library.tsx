@@ -6,6 +6,8 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 import * as ImagePicker from 'expo-image-picker'
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
@@ -62,6 +64,7 @@ function BookModal({
 }) {
   const insets = useSafeAreaInsets()
   const isEdit = !!book
+  const { dialog, show, hide } = useDialog()
 
   const [title,       setTitle]       = useState(book?.title ?? '')
   const [author,      setAuthor]      = useState(book?.author ?? '')
@@ -116,7 +119,7 @@ function BookModal({
 
   async function pickCover() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') { Alert.alert('Permission needed'); return }
+    if (status !== 'granted') { show('error', 'Permission needed', 'Please allow access to your photo library.'); return }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -136,7 +139,7 @@ function BookModal({
       setCoverPreview(asset.uri)
       setUploadLabel('')
     } catch (e: any) {
-      Alert.alert('Upload error', e.message)
+      show('error', 'Upload error', e.message)
       setUploadLabel('')
     }
   }
@@ -158,13 +161,13 @@ function BookModal({
       setPdfName(asset.name || 'document.pdf')
       setUploadLabel('')
     } catch (e: any) {
-      Alert.alert('Upload error', e.message)
+      show('error', 'Upload error', e.message)
       setUploadLabel('')
     }
   }
 
   async function save() {
-    if (!title.trim()) { Alert.alert('Title is required'); return }
+    if (!title.trim()) { show('error', 'Title is required'); return }
     setSaving(true)
 
     const body = {
@@ -186,7 +189,7 @@ function BookModal({
     const json = await res.json()
     setSaving(false)
 
-    if (!res.ok) { Alert.alert('Error', json.error ?? 'Save failed'); return }
+    if (!res.ok) { show('error', 'Error', json.error ?? 'Save failed'); return }
     onSaved(json.book as Book)
   }
 
@@ -338,6 +341,7 @@ function BookModal({
             />
           </View>
         </ScrollView>
+        <AppDialog {...dialog} onClose={hide} />
       </View>
     </Modal>
   )

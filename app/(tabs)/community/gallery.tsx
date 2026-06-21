@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, useWindowDimensions, RefreshControl,
-  Modal, TextInput, Alert,
+  Modal, TextInput,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { router, useFocusEffect } from 'expo-router'
@@ -13,6 +13,8 @@ import { webAPI } from '@/lib/webApi'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { useBlockedUsers, confirmBlockUser } from '@/components/BlockUserButton'
 import type { Album } from '@/lib/types'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 interface VideoAlbum {
   id: string
@@ -97,13 +99,14 @@ function CreateAlbumModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
   const [saving, setSaving] = useState(false)
+  const { dialog, show, hide } = useDialog()
 
   async function save() {
     if (!title.trim()) return
     setSaving(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { Alert.alert('Error', 'Not signed in.'); return }
+      if (!session) { show('error', 'Error', 'Not signed in.'); return }
 
       // Check admin status — admins bypass the per-member limit
       const { data: profile } = await supabase
@@ -124,7 +127,7 @@ function CreateAlbumModal({ onClose, onCreated }: { onClose: () => void; onCreat
         .eq('user_id', session.user.id)
 
       if (!isAdmin && (existingCount ?? 0) >= maxPhotoAlbums) {
-        Alert.alert('Limit reached', `You can create up to ${maxPhotoAlbums} photo album${maxPhotoAlbums === 1 ? '' : 's'}.`)
+        show('info', 'Limit reached', `You can create up to ${maxPhotoAlbums} photo album${maxPhotoAlbums === 1 ? '' : 's'}.`)
         return
       }
 
@@ -139,10 +142,10 @@ function CreateAlbumModal({ onClose, onCreated }: { onClose: () => void; onCreat
         .select()
         .single()
 
-      if (error) { Alert.alert('Error', error.message); return }
+      if (error) { show('error', 'Error', error.message); return }
       onCreated(data as Album)
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Could not create album. Please try again.')
+      show('error', 'Error', e.message ?? 'Could not create album. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -192,6 +195,7 @@ function CreateAlbumModal({ onClose, onCreated }: { onClose: () => void; onCreat
             />
           </View>
         </View>
+        <AppDialog {...dialog} onClose={hide} />
       </View>
     </Modal>
   )
@@ -270,13 +274,14 @@ function CreateVideoAlbumModal({ onClose, onCreated }: { onClose: () => void; on
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
   const [saving, setSaving] = useState(false)
+  const { dialog, show, hide } = useDialog()
 
   async function save() {
     if (!title.trim()) return
     setSaving(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { Alert.alert('Error', 'Not signed in.'); return }
+      if (!session) { show('error', 'Error', 'Not signed in.'); return }
 
       const { data: profile } = await supabase
         .from('users').select('role').eq('id', session.user.id).single()
@@ -295,7 +300,7 @@ function CreateVideoAlbumModal({ onClose, onCreated }: { onClose: () => void; on
         .eq('user_id', session.user.id)
 
       if (!isAdmin && (existingCount ?? 0) >= maxVideoAlbums) {
-        Alert.alert('Limit reached', `You can create up to ${maxVideoAlbums} video album${maxVideoAlbums === 1 ? '' : 's'}.`)
+        show('info', 'Limit reached', `You can create up to ${maxVideoAlbums} video album${maxVideoAlbums === 1 ? '' : 's'}.`)
         return
       }
 
@@ -310,10 +315,10 @@ function CreateVideoAlbumModal({ onClose, onCreated }: { onClose: () => void; on
         .select()
         .single()
 
-      if (error) { Alert.alert('Error', error.message); return }
+      if (error) { show('error', 'Error', error.message); return }
       onCreated(data as VideoAlbum)
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Could not create album. Please try again.')
+      show('error', 'Error', e.message ?? 'Could not create album. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -363,6 +368,7 @@ function CreateVideoAlbumModal({ onClose, onCreated }: { onClose: () => void; on
             />
           </View>
         </View>
+        <AppDialog {...dialog} onClose={hide} />
       </View>
     </Modal>
   )

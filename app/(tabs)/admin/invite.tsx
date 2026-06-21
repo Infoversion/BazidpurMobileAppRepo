@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  ScrollView, Alert, KeyboardAvoidingView, Platform,
+  ScrollView, KeyboardAvoidingView, Platform,
   ActivityIndicator,
 } from 'react-native'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { webAPI } from '@/lib/webApi'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 export default function InviteScreen() {
   const { user } = useAuth()
@@ -15,10 +17,11 @@ export default function InviteScreen() {
   const [personalNote, setPersonalNote] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const { dialog, show, hide } = useDialog()
 
   async function sendInvite() {
-    if (!name.trim()) { Alert.alert('Missing name', 'Please enter the recipient\'s name.'); return }
-    if (!email.trim() || !email.includes('@')) { Alert.alert('Invalid email', 'Please enter a valid email address.'); return }
+    if (!name.trim()) { show('error', 'Missing name', 'Please enter the recipient\'s name.'); return }
+    if (!email.trim() || !email.includes('@')) { show('error', 'Invalid email', 'Please enter a valid email address.'); return }
 
     setSending(true)
 
@@ -42,10 +45,10 @@ export default function InviteScreen() {
         setPersonalNote('')
       } else {
         const err = await res.json().catch(() => ({}))
-        Alert.alert('Failed to send', err.error ?? `Error ${res.status}`)
+        show('error', 'Failed to send', err.error ?? `Error ${res.status}`)
       }
     } catch (e: unknown) {
-      Alert.alert('Network error', e instanceof Error ? e.message : 'Could not reach bazidpur.com')
+      show('error', 'Network error', e instanceof Error ? e.message : 'Could not reach bazidpur.com')
     } finally {
       setSending(false)
     }
@@ -146,6 +149,7 @@ export default function InviteScreen() {
         </Text>
 
       </ScrollView>
+      <AppDialog {...dialog} onClose={hide} />
     </KeyboardAvoidingView>
   )
 }

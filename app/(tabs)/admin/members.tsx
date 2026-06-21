@@ -9,6 +9,8 @@ import { useLocalSearchParams } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import type { User, UserRole } from '@/lib/types'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -184,6 +186,7 @@ export default function MembersScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
+  const { dialog, show, hide } = useDialog()
   const validTabs: FilterTab[] = ['all', 'pending', 'member', 'admin']
   const initialTab: FilterTab = validTabs.includes(tab as FilterTab) ? (tab as FilterTab) : 'all'
   const [filter, setFilter] = useState<FilterTab>(initialTab)
@@ -294,7 +297,7 @@ export default function MembersScreen() {
       updateData.is_active = true
     }
     const { error } = await supabase.from('users').update(updateData).eq('id', userId)
-    if (error) { Alert.alert('Error', error.message); return }
+    if (error) { show('error', 'Error', error.message); return }
 
     setUsers(prev => {
       const updated = prev.map(x => x.id === userId ? { ...x, role: newRole } : x)
@@ -343,7 +346,7 @@ export default function MembersScreen() {
   async function updateActive(userId: string, is_active: boolean) {
     const { error } = await supabase.from('users').update({ is_active }).eq('id', userId)
     if (error) {
-      Alert.alert('Error', error.message)
+      show('error', 'Error', error.message)
     } else {
       setUsers(u => u.map(x => x.id === userId ? { ...x, is_active } : x))
     }
@@ -388,7 +391,7 @@ export default function MembersScreen() {
     }
 
     if (options.length === 0) {
-      Alert.alert(`${user.first_name} ${user.last_name}`, 'No actions available for this account.')
+      show('info', `${user.first_name} ${user.last_name}`, 'No actions available for this account.')
       return
     }
 
@@ -686,7 +689,7 @@ export default function MembersScreen() {
           </View>
         )}
       </Modal>
-
+      <AppDialog {...dialog} onClose={hide} />
     </View>
   )
 }

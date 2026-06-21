@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
-  ActivityIndicator, RefreshControl, Alert,
+  ActivityIndicator, RefreshControl,
   Modal, TextInput, ScrollView,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -9,6 +9,8 @@ import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 type ReportStatus = 'pending' | 'reviewed_ok' | 'warning_sent' | 'suspended'
 
@@ -121,6 +123,7 @@ export default function ReportsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<'pending' | 'resolved'>('pending')
   const [actionTarget, setActionTarget] = useState<Report | null>(null)
+  const { dialog, show, hide } = useDialog()
 
   async function load() {
     const { data } = await supabase
@@ -152,18 +155,18 @@ export default function ReportsScreen() {
     if (status === 'suspended') {
       const lookup = OFFENDER_LOOKUP[report.content_type]
       if (!lookup) {
-        Alert.alert('Cannot suspend', `The "${report.content_type}" type is admin-curated and has no offender to suspend.`)
+        show('error', 'Cannot suspend', `The "${report.content_type}" type is admin-curated and has no offender to suspend.`)
         return
       }
       const { data: contentRow, error: lookupError } = await supabase
         .from(lookup.table).select(lookup.column).eq('id', report.content_id).single()
       if (lookupError || !contentRow) {
-        Alert.alert('Cannot suspend', 'The reported content may have been deleted, so the offender could not be identified.')
+        show('error', 'Cannot suspend', 'The reported content may have been deleted, so the offender could not be identified.')
         return
       }
       const offenderId = (contentRow as Record<string, string | null>)[lookup.column]
       if (!offenderId) {
-        Alert.alert('Cannot suspend', 'No author is associated with the reported content.')
+        show('error', 'Cannot suspend', 'No author is associated with the reported content.')
         return
       }
       const { error: suspendError } = await supabase
@@ -175,7 +178,7 @@ export default function ReportsScreen() {
         })
         .eq('id', offenderId)
       if (suspendError) {
-        Alert.alert('Could not suspend user', suspendError.message)
+        show('error', 'Could not suspend user', suspendError.message)
         return
       }
     }
@@ -191,7 +194,7 @@ export default function ReportsScreen() {
       .eq('id', report.id)
 
     if (error) {
-      Alert.alert('Could not save action', error.message)
+      show('error', 'Could not save action', error.message)
       return
     }
 
@@ -235,7 +238,7 @@ export default function ReportsScreen() {
     }
     if (t === 'reply') {
       const threadId = await lookupParent('thread_replies', 'thread_id')
-      if (!threadId) { Alert.alert('Not found', 'This reply may have been deleted.'); return }
+      if (!threadId) { show('info', 'Not found', 'This reply may have been deleted.'); return }
       router.push({ pathname: '/(tabs)/community/forum/[id]' as any, params: { id: threadId } })
       return
     }
@@ -253,7 +256,7 @@ export default function ReportsScreen() {
     }
     if (t === 'album_photo') {
       const albumId = await lookupParent('album_photos', 'album_id')
-      if (!albumId) { Alert.alert('Not found', 'This photo may have been deleted.'); return }
+      if (!albumId) { show('info', 'Not found', 'This photo may have been deleted.'); return }
       router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: albumId } })
       return
     }
@@ -263,11 +266,11 @@ export default function ReportsScreen() {
     }
     if (t === 'video_album_item') {
       const albumId = await lookupParent('video_album_items', 'album_id')
-      if (!albumId) { Alert.alert('Not found', 'This video may have been deleted.'); return }
+      if (!albumId) { show('info', 'Not found', 'This video may have been deleted.'); return }
       router.push({ pathname: '/(tabs)/community/video-album/[id]' as any, params: { id: albumId } })
       return
     }
-    Alert.alert('Unsupported', `No viewer is wired up for content type: ${t}`)
+    show('info', 'Unsupported', `No viewer is wired up for content type: ${t}`)
   }
 
   if (loading) {
@@ -436,6 +439,7 @@ export default function ReportsScreen() {
           onApply={applyAction}
         />
       )}
+      <AppDialog {...dialog} onClose={hide} />
     </View>
   )
 }
@@ -454,6 +458,7 @@ function ActionModal({
   )
   const [notes, setNotes] = useState(report.action_notes ?? '')
   const [saving, setSaving] = useState(false)
+  const { dialog: aDialog, show: aShow, hide: aHide } = useDialog()
 
   const options: Array<{ key: ReportStatus; title: string; desc: string; tint: string }> = [
     {
@@ -477,7 +482,7 @@ function ActionModal({
   ]
 
   async function submit() {
-    if (!choice) { Alert.alert('Choose an action', 'Pick one of the three options to record what you did.'); return }
+    if (!choice) { aShow('info', 'Choose an action', 'Pick one of the three options to record what you did.'); return }
     setSaving(true)
     try { await onApply(report, choice, notes) }
     finally { setSaving(false) }
@@ -548,6 +553,7 @@ function ActionModal({
             </Text>
           </View>
         </ScrollView>
+        <AppDialog {...aDialog} onClose={aHide} />
       </View>
     </Modal>
   )

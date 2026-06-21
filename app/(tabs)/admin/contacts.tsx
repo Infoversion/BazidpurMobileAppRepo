@@ -7,6 +7,8 @@ import {
 import * as DocumentPicker from 'expo-document-picker'
 import { supabase } from '@/lib/supabase'
 import { webAPI } from '@/lib/webApi'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,6 +125,7 @@ function MessageDetail({ item, onClose, onMarkRead, onDelete }: {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
+  const { dialog, show, hide } = useDialog()
 
   const date = new Date(item.created_at).toLocaleString('en-GB', {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -142,7 +145,7 @@ function MessageDetail({ item, onClose, onMarkRead, onDelete }: {
         })
       }
     } catch {
-      Alert.alert('Error', 'Could not open the file picker.')
+      show('error', 'Error', 'Could not open the file picker.')
     }
   }
 
@@ -152,7 +155,7 @@ function MessageDetail({ item, onClose, onMarkRead, onDelete }: {
 
   async function sendReply() {
     if (!replyText.trim()) {
-      Alert.alert('Empty reply', 'Please type a reply before sending.')
+      show('info', 'Empty reply', 'Please type a reply before sending.')
       return
     }
 
@@ -172,10 +175,10 @@ function MessageDetail({ item, onClose, onMarkRead, onDelete }: {
         onMarkRead()
       } else {
         const err = await res.json().catch(() => ({}))
-        Alert.alert('Failed to send', err.message ?? `Server returned ${res.status}. Check the endpoint.`)
+        show('error', 'Failed to send', err.message ?? `Server returned ${res.status}. Check the endpoint.`)
       }
     } catch (e: unknown) {
-      Alert.alert('Network error', e instanceof Error ? e.message : 'Could not reach bazidpur.com')
+      show('error', 'Network error', e instanceof Error ? e.message : 'Could not reach bazidpur.com')
     } finally {
       setSending(false)
     }
@@ -339,6 +342,7 @@ function MessageDetail({ item, onClose, onMarkRead, onDelete }: {
 
         </View>
       </ScrollView>
+      <AppDialog {...dialog} onClose={hide} />
     </KeyboardAvoidingView>
   )
 }

@@ -15,6 +15,8 @@ import { webAPI } from '@/lib/webApi'
 import { useAuth } from '@/lib/auth-context'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import type { AlbumPhoto, Album, Photo } from '@/lib/types'
+import { AppDialog } from '@/components/AppDialog'
+import { useDialog } from '@/lib/useDialog'
 
 const R2    = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
 const WEB   = 'https://bazidpur.com'
@@ -175,6 +177,7 @@ export default function AlbumScreen() {
   // Upload
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; pct: number } | null>(null)
   const uploadCancelRef = useRef<(() => void) | null>(null)
+  const { dialog, show, hide } = useDialog()
 
   async function load() {
     const [{ data: a }, { data: p }] = await Promise.all([
@@ -247,7 +250,7 @@ export default function AlbumScreen() {
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
       setPhotos(photos)
-      Alert.alert('Could not reorder', (body as { error?: string }).error ?? `Server error ${res.status}`)
+      show('error', 'Could not reorder', (body as { error?: string }).error ?? `Server error ${res.status}`)
     }
   }
 
@@ -256,7 +259,7 @@ export default function AlbumScreen() {
   async function addPhotos() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow access to your photo library.')
+      show('error', 'Permission needed', 'Please allow access to your photo library.')
       return
     }
 
@@ -269,7 +272,7 @@ export default function AlbumScreen() {
     if (result.canceled || !result.assets.length) return
 
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { Alert.alert('Error', 'Not signed in.'); return }
+    if (!session) { show('error', 'Error', 'Not signed in.'); return }
 
     const assets = result.assets
     setUploadProgress({ current: 0, total: assets.length, pct: 0 })
@@ -323,13 +326,13 @@ export default function AlbumScreen() {
         if (!res || res.status < 200 || res.status >= 300) {
           let msg = `Upload failed (${res?.status ?? 'no response'})`
           try { const j = JSON.parse(res?.body ?? '{}'); msg = j.error ?? msg } catch {}
-          Alert.alert('Upload error', `Photo ${i + 1}: ${msg}`)
+          show('error', 'Upload error', `Photo ${i + 1}: ${msg}`)
           break
         }
         const parsed = JSON.parse(res.body)
         if (parsed.photo) uploaded.push(parsed.photo as AlbumPhoto)
       } catch (e) {
-        Alert.alert('Upload error', `Photo ${i + 1} failed.`)
+        show('error', 'Upload error', `Photo ${i + 1} failed.`)
         break
       }
     }
@@ -677,6 +680,7 @@ export default function AlbumScreen() {
           </TouchableOpacity>
         </View>
       )}
+      <AppDialog {...dialog} onClose={hide} />
     </View>
   )
 }
