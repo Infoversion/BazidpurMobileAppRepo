@@ -37,7 +37,7 @@ export function ReportButton({ contentType, contentId, ownerId, size = 'md' }: P
   function onPress() {
     Alert.alert(
       'Report Content',
-      'Why are you reporting this? Our team reviews reports within 24 hours.',
+      'Why are you reporting this? Our team reviews reports within 48 hours.',
       [
         ...REASONS.map(reason => ({
           text: reason,
@@ -48,7 +48,7 @@ export function ReportButton({ contentType, contentId, ownerId, size = 'md' }: P
               content_id: contentId,
               reason,
             })
-            Alert.alert('Report submitted', 'Thank you. Our team will review this content within 24 hours.')
+            Alert.alert('Report submitted', 'Thank you. Our team will review this content within 48 hours.')
           },
         })),
         { text: 'Cancel', style: 'cancel' },

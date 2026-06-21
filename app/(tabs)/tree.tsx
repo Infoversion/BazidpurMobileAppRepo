@@ -30,8 +30,9 @@ const AVATAR = 36
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 function Avatar({ node }: { node: FamilyNode }) {
   const [failed, setFailed] = useState(false)
-  const color   = levelColor(node.tree_level)
-  const initial = node.name.trim().charAt(0).toUpperCase()
+  const color    = levelColor(node.tree_level)
+  const initial  = node.name.trim().charAt(0).toUpperCase()
+  const sexColor = node.sex === 'male' ? '#3b82f6' : '#ec4899'
 
   const uri = node.photo_url
     ? (node.photo_url.startsWith('http') ? node.photo_url : `${R2}/${node.photo_url}`)
@@ -41,14 +42,14 @@ function Avatar({ node }: { node: FamilyNode }) {
     return (
       <Image
         source={{ uri }}
-        style={s.avatar}
+        style={[s.avatar, { borderWidth: 2.5, borderColor: sexColor }]}
         onError={() => setFailed(true)}
       />
     )
   }
 
   return (
-    <View style={[s.avatar, s.avatarFallback, { backgroundColor: color }]}>
+    <View style={[s.avatar, s.avatarFallback, { backgroundColor: color, borderWidth: 2.5, borderColor: sexColor }]}>
       <Text style={s.avatarInitial}>{initial}</Text>
     </View>
   )
@@ -172,7 +173,6 @@ function TreeRow({ node, depth, childCount, isExpanded, isMatch, isTraced, onTog
   const yearPart = node.dob ? node.dob.slice(0, 4) : ''
   const dodPart  = !node.is_alive && node.dod ? `†${node.dod.slice(0, 4)}` : ''
   const datePart = [yearPart, dodPart].filter(Boolean).join('  ')
-  const sexColor = node.sex === 'male' ? '#3b82f6' : '#ec4899'
 
   return (
     <TouchableOpacity
@@ -207,12 +207,9 @@ function TreeRow({ node, depth, childCount, isExpanded, isMatch, isTraced, onTog
         <Text style={[s.rowName, { color: nameClr }]} numberOfLines={1}>
           {node.name}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: sexColor }}>
-            {node.sex === 'male' ? '♂' : '♀'}
-          </Text>
-          {datePart ? <Text style={s.rowSub}>{datePart}</Text> : null}
-        </View>
+        {datePart ? (
+          <Text style={[s.rowSub, { marginTop: 2 }]}>{datePart}</Text>
+        ) : null}
       </View>
 
       {/* Deceased indicator */}

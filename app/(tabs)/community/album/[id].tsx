@@ -240,9 +240,14 @@ export default function AlbumScreen() {
     ;[arr[idx], arr[swapIdx]] = [arr[swapIdx], arr[idx]]
     const updated = arr.map((p, i) => ({ ...p, display_order: i }))
     setPhotos(updated)
-    await Promise.all(
+    const results = await Promise.all(
       updated.map(p => supabase.from('album_photos').update({ display_order: p.display_order }).eq('id', p.id))
     )
+    const failed = results.find(r => r.error)
+    if (failed?.error) {
+      setPhotos(photos)
+      Alert.alert('Could not reorder', failed.error.message)
+    }
   }
 
   // ── Add photos ──────────────────────────────────────────────────────────────

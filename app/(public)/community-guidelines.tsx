@@ -74,7 +74,7 @@ export default function CommunityGuidelinesScreen() {
         </Section>
 
         <Section number="6" title="Reporting and moderation">
-          <Para>If you see content that breaks these guidelines, tap the small flag icon (⚑) on it. Reports are reviewed by our admin team within 24 hours.</Para>
+          <Para>If you see content that breaks these guidelines, tap the small flag icon (⚑) on it. Reports are reviewed by our admin team within 48 hours.</Para>
           <Para>You can also block another member to stop seeing their content. From a member's name or post, choose "Block this user." You can unblock anyone later from your profile.</Para>
           <Para>Admin actions on a report can include: hiding the content from other members, deleting it, contacting the poster, or — for repeated or severe breaches — removing the member's account.</Para>
         </Section>

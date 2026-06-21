@@ -953,18 +953,9 @@ export default function MediaAdminScreen() {
       return item ? (item as MediaVideo).is_active !== false : false
     })
     const newActive = !allActive
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { Alert.alert('Error', 'Not signed in.', [{ text: 'OK' }]); return }
     const table = mediaTab === 'photos' ? 'photos' : 'videos'
-    const res = await fetch(
-      `https://www.bazidpur.com/api/${table}?_t=${encodeURIComponent(session.access_token)}`,
-      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, is_active: newActive }) }
-    )
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
-      Alert.alert('Error', j.error || 'Failed to update.', [{ text: 'OK' }])
-      return
-    }
+    const { error } = await supabase.from(table).update({ is_active: newActive }).in('id', ids)
+    if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
     if (mediaTab === 'photos') setPhotos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
     else setVideos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
     cancelSelectMode()
@@ -1065,18 +1056,9 @@ export default function MediaAdminScreen() {
 
   async function toggleActive(id: string, current: boolean) {
     const newActive = !current
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { Alert.alert('Error', 'Not signed in.', [{ text: 'OK' }]); return }
     const table = mediaTab === 'photos' ? 'photos' : 'videos'
-    const res = await fetch(
-      `https://www.bazidpur.com/api/${table}?_t=${encodeURIComponent(session.access_token)}`,
-      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, is_active: newActive }) }
-    )
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
-      Alert.alert('Cannot Update', j.error || 'Failed to update. Please try again.', [{ text: 'OK' }])
-      return
-    }
+    const { error } = await supabase.from(table).update({ is_active: newActive }).eq('id', id)
+    if (error) { Alert.alert('Cannot Update', friendlyError(error.message), [{ text: 'OK' }]); return }
     if (mediaTab === 'photos') setPhotos(prev => prev.map(x => x.id === id ? { ...x, is_active: newActive } : x))
     else setVideos(prev => prev.map(x => x.id === id ? { ...x, is_active: newActive } : x))
   }
@@ -1186,10 +1168,11 @@ export default function MediaAdminScreen() {
 
   // ── Pill helpers ──────────────────────────────────────────────────────────
 
-  function Pill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  function Pill({ label, active, onPress, dotColor }: { label: string; active: boolean; onPress: () => void; dotColor?: string }) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.75}
-        style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: active ? '#2d1b69' : 'rgba(118,118,128,0.10)' }}>
+        style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: active ? '#2d1b69' : 'rgba(118,118,128,0.10)', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {dotColor ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: active ? '#fff' : dotColor }} /> : null}
         <Text style={{ fontSize: 12, fontWeight: active ? '700' : '500', color: active ? '#fff' : 'rgba(60,60,67,0.65)' }}>{label}</Text>
       </TouchableOpacity>
     )
@@ -1202,12 +1185,12 @@ export default function MediaAdminScreen() {
 
       {/* Combined toolbar */}
       <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 8, gap: 5, borderBottomWidth: 0.5, borderBottomColor: '#e5e5ea' }}>
-        <Pill label={`📷 ${counts.photos}`} active={mediaTab === 'photos'} onPress={() => { setMediaTab('photos'); setStatusFilter('all'); cancelSelectMode() }} />
-        <Pill label={`🎬 ${counts.videos}`} active={mediaTab === 'videos'} onPress={() => { setMediaTab('videos'); setStatusFilter('all'); cancelSelectMode() }} />
+        <Pill label={`Photos ${counts.photos}`} active={mediaTab === 'photos'} onPress={() => { setMediaTab('photos'); setStatusFilter('all'); cancelSelectMode() }} />
+        <Pill label={`Videos ${counts.videos}`} active={mediaTab === 'videos'} onPress={() => { setMediaTab('videos'); setStatusFilter('all'); cancelSelectMode() }} />
         <View style={{ width: 1, height: 18, backgroundColor: '#d1d1d6', marginHorizontal: 2 }} />
         <Pill label="All" active={statusFilter === 'all'} onPress={() => setStatusFilter('all')} />
-        <Pill label="● Active" active={statusFilter === 'active'} onPress={() => setStatusFilter('active')} />
-        <Pill label="○ Hidden" active={statusFilter === 'hidden'} onPress={() => setStatusFilter('hidden')} />
+        <Pill label="Active" active={statusFilter === 'active'} dotColor="#22c55e" onPress={() => setStatusFilter('active')} />
+        <Pill label="Hidden" active={statusFilter === 'hidden'} dotColor="#ef4444" onPress={() => setStatusFilter('hidden')} />
       </View>
 
       {/* Search row or select mode header */}

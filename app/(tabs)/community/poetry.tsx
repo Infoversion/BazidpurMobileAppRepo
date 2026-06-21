@@ -8,7 +8,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { CuratedNotice } from '@/components/CuratedNotice'
-import { ReportButton } from '@/components/ReportButton'
 import { LikesComments } from '@/components/LikesComments'
 import type { Poetry, PoetryVerse } from '@/lib/types'
 
@@ -74,7 +73,6 @@ function PoemSheet({ poem, onClose }: { poem: Poetry; onClose: () => void }) {
             ) : null}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 16 }}>
-            <ReportButton contentType="poem" contentId={poem.id} />
             <TouchableOpacity
               onPress={onClose}
               style={{

@@ -19,7 +19,7 @@ const TILES: Tile[] = [
   { emoji: '📚', label: 'Reading Room',    sub: 'Books & journals',  route: '/(tabs)/community/reading-room' },
   { emoji: '💬', label: 'The Forum',       sub: 'Community threads', route: '/(tabs)/community/forum' },
   { emoji: '🌍', label: 'Scattered Roots', sub: 'Where we are',      route: '/(tabs)/community/scattered-roots' },
-  { emoji: '🌳', label: 'Family Tree',     sub: 'Trace lineage',     route: '/(tabs)/tree' },
+  { emoji: '👨‍👩‍👧‍👦', label: 'Family Tree',     sub: 'Trace lineage',     route: '/(tabs)/tree' },
   { emoji: '📜', label: 'Lineage',         sub: 'Ten generations',   route: '/(tabs)/lineage' },
   { emoji: '⚙️', label: 'Admin',          sub: 'Manage content',    route: '/(tabs)/admin', adminOnly: true },
 ]

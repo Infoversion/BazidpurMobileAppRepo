@@ -521,7 +521,7 @@ function LightboxToolbar({
     if (!userId) return
     Alert.alert(
       'Report photo',
-      'Why are you reporting this photo? Our team reviews reports within 24 hours.',
+      'Why are you reporting this photo? Our team reviews reports within 48 hours.',
       [
         ...REPORT_REASONS_PHOTO.map(reason => ({
           text: reason,
@@ -532,7 +532,7 @@ function LightboxToolbar({
               content_id: entityId,
               reason,
             })
-            Alert.alert('Report submitted', 'Thank you. Our team will review this photo within 24 hours.')
+            Alert.alert('Report submitted', 'Thank you. Our team will review this photo within 48 hours.')
           },
         })),
         { text: 'Cancel', style: 'cancel' },
@@ -572,7 +572,7 @@ function LightboxToolbar({
           <Text style={{ fontSize: 14, color: '#fff', fontWeight: '600' }}>{commentCount}</Text>
         </TouchableOpacity>
 
-        {userId && !isOwner ? (
+        {userId && !isOwner && entityType !== 'timeless_moment' ? (
           <TouchableOpacity
             onPress={handleFlagPhoto}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}

@@ -8,7 +8,6 @@ import { WebView } from 'react-native-webview'
 import { supabase } from '@/lib/supabase'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import { LikesComments } from '@/components/LikesComments'
-import { ReportButton } from '@/components/ReportButton'
 import { PurpleHeader } from '@/components/PurpleHeader'
 import { CuratedNotice } from '@/components/CuratedNotice'
 import type { Photo } from '@/lib/types'
@@ -184,9 +183,6 @@ function VideoCard({ item, cardWidth, thumbHeight }: { item: TMVideo; cardWidth:
             <Text style={{ fontSize: 15, fontWeight: '700', color: '#1c1c1e', marginBottom: 4, lineHeight: 20 }} numberOfLines={2}>{item.title}</Text>
             {item.description ? <Text style={{ fontSize: 13, color: '#8e8e93', lineHeight: 18 }} numberOfLines={2}>{item.description}</Text> : null}
           </View>
-          <View style={{ paddingTop: 2 }}>
-            <ReportButton contentType="timeless_moment_video" contentId={item.id} size="sm" />
-          </View>
         </View>
         <LikesComments entityType="timeless_moment_video" entityId={item.id} />
       </View>
@@ -215,7 +211,7 @@ export default function TimelessMomentsScreen() {
   async function fetchData() {
     const [{ data: albs }, { data: p }, { data: v }] = await Promise.all([
       supabase.from('tm_albums').select('id, title, description, cover_photo_url, album_type').eq('is_hidden', false).order('display_order'),
-      supabase.from('timeless_moments').select('id, title, description, r2_url, thumbnail_url, album_id').order('display_order'),
+      supabase.from('timeless_moments').select('id, title, description, r2_url, thumbnail_url, album_id').or('is_active.is.null,is_active.eq.true').order('display_order'),
       supabase.from('timeless_moment_videos').select('id, title, description, youtube_id, youtube_url, album_id').eq('is_active', true).order('display_order'),
     ])
 

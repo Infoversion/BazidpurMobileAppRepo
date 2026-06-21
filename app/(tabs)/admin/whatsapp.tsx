@@ -24,93 +24,47 @@ interface ChatRecord {
 
 const PAGE_SIZE = 25
 
-// ─── Archive import modal ─────────────────────────────────────────────────────
+// ─── Upload function ──────────────────────────────────────────────────────────
 
-function ArchiveImportBar({ onImported }: { onImported: (record: ChatRecord) => void }) {
-  const [uploading, setUploading] = useState(false)
-  const [title, setTitle] = useState('')
+async function pickAndUpload(title: string, onSuccess: (record: ChatRecord) => void) {
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['text/plain', 'application/zip', '*/*'],
+      copyToCacheDirectory: true,
+    })
+    if (result.canceled) return
 
-  async function pickAndUpload() {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/plain', 'application/zip', '*/*'],
-        copyToCacheDirectory: true,
-      })
-      if (result.canceled) return
+    const file = result.assets[0]
 
-      const file = result.assets[0]
-      if (!title.trim()) {
-        Alert.alert('Name required', 'Please enter a name for this chat archive before uploading.')
-        return
-      }
+    const fd = new FormData()
+    fd.append('file', { uri: file.uri, name: file.name, type: file.mimeType ?? 'text/plain' } as unknown as Blob)
+    fd.append('title', title.trim())
 
-      setUploading(true)
+    const res = await webUpload('/api/admin/whatsapp/archive', fd)
 
-      const fd = new FormData()
-      fd.append('file', { uri: file.uri, name: file.name, type: file.mimeType ?? 'text/plain' } as unknown as Blob)
-      fd.append('title', title.trim())
-
-      const res = await webUpload('/api/admin/whatsapp/archive', fd)
-
-      if (res.ok) {
-        const record = await res.json()
-        onImported(record as ChatRecord)
-        setTitle('')
-        Alert.alert('Archived', `"${title.trim()}" has been imported successfully.`)
-      } else {
-        const err = await res.json().catch(() => ({}))
-        Alert.alert('Import failed', err.message ?? `Server returned ${res.status}`)
-      }
-    } catch (e: unknown) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Upload failed')
-    } finally {
-      setUploading(false)
+    if (res.ok) {
+      const record = await res.json()
+      onSuccess(record as ChatRecord)
+      Alert.alert('Archived', `"${title}" has been imported successfully.`)
+    } else {
+      const err = await res.json().catch(() => ({}))
+      Alert.alert('Import failed', err.message ?? `Server returned ${res.status}`)
     }
+  } catch (e: unknown) {
+    Alert.alert('Error', e instanceof Error ? e.message : 'Upload failed')
   }
-
-  return (
-    <View style={{ backgroundColor: '#fff', margin: 16, borderRadius: 14, padding: 16, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }}>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: 'rgba(60,60,67,0.5)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
-        Archive a WhatsApp Chat
-      </Text>
-
-      <View style={{ backgroundColor: 'rgba(118,118,128,0.08)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4 }}>
-        <TextInput
-          style={{ fontSize: 15, color: '#000', paddingVertical: 9 }}
-          placeholder="Chat name / label…"
-          placeholderTextColor="rgba(60,60,67,0.4)"
-          value={title}
-          onChangeText={setTitle}
-          autoCapitalize="sentences"
-          autoCorrect={false}
-        />
-      </View>
-
-      <Text style={{ fontSize: 12, color: 'rgba(60,60,67,0.45)', lineHeight: 17 }}>
-        Export the chat from WhatsApp (without media), then tap below to select the .txt or .zip file.
-      </Text>
-
-      <TouchableOpacity
-        onPress={pickAndUpload}
-        disabled={uploading}
-        style={{
-          backgroundColor: '#2d1b69', borderRadius: 10,
-          paddingVertical: 13, alignItems: 'center',
-          opacity: uploading ? 0.7 : 1,
-        }}
-      >
-        {uploading
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>Select File & Archive</Text>
-        }
-      </TouchableOpacity>
-    </View>
-  )
 }
 
 // ─── Chat row ─────────────────────────────────────────────────────────────────
 
-function ChatRow({ item, onPress }: { item: ChatRecord; onPress: () => void }) {
+function ChatRow({
+  item, uploading, onPress, onUpload,
+}: {
+  item: ChatRecord
+  uploading: boolean
+  onPress: () => void
+  onUpload: () => void
+}) {
   const label = item.title || item.name || item.filename || 'Chat'
   const date = new Date(item.created_at).toLocaleDateString('en-GB', {
     day: 'numeric', month: 'short', year: 'numeric',
@@ -132,6 +86,20 @@ function ChatRow({ item, onPress }: { item: ChatRecord; onPress: () => void }) {
           {date}{item.message_count != null ? ` · ${item.message_count} messages` : ''}
         </Text>
       </View>
+      <TouchableOpacity
+        onPress={onUpload}
+        disabled={uploading}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={{
+          backgroundColor: uploading ? '#e5e7eb' : '#ede9fe',
+          borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
+        }}
+      >
+        {uploading
+          ? <ActivityIndicator size="small" color="#2d1b69" />
+          : <Text style={{ fontSize: 12, fontWeight: '600', color: '#2d1b69' }}>Upload</Text>
+        }
+      </TouchableOpacity>
       <Text style={{ fontSize: 20, color: '#c7c7cc' }}>›</Text>
     </TouchableOpacity>
   )
@@ -212,7 +180,8 @@ export default function WhatsAppAdminScreen() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selected, setSelected] = useState<ChatRecord | null>(null)
   const [totalCount, setTotalCount] = useState(0)
-  const [showImport, setShowImport] = useState(false)
+  const [uploadingId, setUploadingId] = useState<string | null>(null)
+  const [addingNew, setAddingNew] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 400)
@@ -278,6 +247,37 @@ export default function WhatsAppAdminScreen() {
     ])
   }
 
+  function handleUploadForChat(item: ChatRecord) {
+    const title = item.title || item.name || item.filename || 'Chat'
+    setUploadingId(item.id)
+    pickAndUpload(title, record => {
+      setChats(prev => [record, ...prev])
+      setTotalCount(c => c + 1)
+    }).finally(() => setUploadingId(null))
+  }
+
+  function handleAddNew() {
+    Alert.prompt(
+      'New Chat Group',
+      'Enter a name for this chat group:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: (name?: string) => {
+            if (!name?.trim()) return
+            setAddingNew(true)
+            pickAndUpload(name.trim(), record => {
+              setChats(prev => [record, ...prev])
+              setTotalCount(c => c + 1)
+            }).finally(() => setAddingNew(false))
+          },
+        },
+      ],
+      'plain-text'
+    )
+  }
+
   if (selected) {
     return <ChatDetail item={selected} onClose={() => setSelected(null)} onDelete={() => deleteChat(selected.id)} />
   }
@@ -289,9 +289,9 @@ export default function WhatsAppAdminScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
 
-      {/* Search + archive toggle */}
-      <View style={{ backgroundColor: '#f2f2f7', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, gap: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(118,118,128,0.12)', borderRadius: 10, paddingHorizontal: 10, gap: 6 }}>
+      {/* Search bar + new group button */}
+      <View style={{ backgroundColor: '#f2f2f7', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(118,118,128,0.12)', borderRadius: 10, paddingHorizontal: 10, gap: 6 }}>
           <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)' }}>🔍</Text>
           <TextInput
             style={{ flex: 1, fontSize: 15, color: '#000', paddingVertical: 9 }}
@@ -299,19 +299,19 @@ export default function WhatsAppAdminScreen() {
             value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing"
           />
         </View>
-
         <TouchableOpacity
-          onPress={() => setShowImport(v => !v)}
+          onPress={handleAddNew}
+          disabled={addingNew}
           style={{
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-            backgroundColor: showImport ? '#2d1b69' : '#fff',
-            borderRadius: 10, paddingVertical: 10,
-            borderWidth: 1, borderColor: '#2d1b69',
+            backgroundColor: '#2d1b69', borderRadius: 10,
+            paddingHorizontal: 14, paddingVertical: 9,
+            opacity: addingNew ? 0.7 : 1,
           }}
         >
-          <Text style={{ fontSize: 14, fontWeight: '600', color: showImport ? '#fff' : '#2d1b69' }}>
-            {showImport ? '✕  Close' : '+ Archive a Chat'}
-          </Text>
+          {addingNew
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>+ New</Text>
+          }
         </TouchableOpacity>
       </View>
 
@@ -323,13 +323,15 @@ export default function WhatsAppAdminScreen() {
         onEndReached={onLoadMore}
         onEndReachedThreshold={0.3}
         ItemSeparatorComponent={() => <View style={{ height: 0.5, backgroundColor: 'rgba(60,60,67,0.18)', marginLeft: 72 }} />}
-        ListHeaderComponent={
-          <>
-            {showImport && <ArchiveImportBar onImported={record => { setChats(prev => [record, ...prev]); setTotalCount(c => c + 1); setShowImport(false) }} />}
-            <View style={{ height: 8 }} />
-          </>
-        }
-        renderItem={({ item }) => <ChatRow item={item} onPress={() => setSelected(item)} />}
+        ListHeaderComponent={<View style={{ height: 8 }} />}
+        renderItem={({ item }) => (
+          <ChatRow
+            item={item}
+            uploading={uploadingId === item.id}
+            onPress={() => setSelected(item)}
+            onUpload={() => handleUploadForChat(item)}
+          />
+        )}
         ListFooterComponent={
           loadingMore
             ? <ActivityIndicator color="#2d1b69" style={{ paddingVertical: 20 }} />
@@ -340,15 +342,13 @@ export default function WhatsAppAdminScreen() {
               : null
         }
         ListEmptyComponent={
-          !showImport ? (
-            <View style={{ alignItems: 'center', paddingTop: 80, paddingHorizontal: 32 }}>
-              <Text style={{ fontSize: 40, marginBottom: 14 }}>💬</Text>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: '#000', marginBottom: 6 }}>No chat archives</Text>
-              <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)', textAlign: 'center' }}>
-                Tap "+ Archive a Chat" to import a WhatsApp export.
-              </Text>
-            </View>
-          ) : null
+          <View style={{ alignItems: 'center', paddingTop: 80, paddingHorizontal: 32 }}>
+            <Text style={{ fontSize: 40, marginBottom: 14 }}>💬</Text>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#000', marginBottom: 6 }}>No chat archives</Text>
+            <Text style={{ fontSize: 14, color: 'rgba(60,60,67,0.6)', textAlign: 'center' }}>
+              Tap "+ New" to archive a WhatsApp chat export.
+            </Text>
+          </View>
         }
       />
     </View>

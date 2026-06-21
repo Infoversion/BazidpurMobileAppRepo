@@ -7,6 +7,7 @@ import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { ErrorDialog } from '@/components/ErrorDialog'
 
 export type LikeCommentEntityType =
   | 'album_photo'
@@ -129,6 +130,7 @@ export function LikesComments({
 
   const [composerOpen, setComposerOpen] = useState(false)
   const [likersOpen, setLikersOpen] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<{ title: string; detail?: string } | null>(null)
 
   const PAGE_SIZE = 10
 
@@ -237,7 +239,7 @@ export function LikesComments({
       .select('id, content, created_at, user_id, user:users!comments_user_id_fkey(first_name, last_name, photo_url)')
       .single()
     if (error || !data) {
-      Alert.alert('Could not post comment', error?.message ?? 'Please try again.')
+      setErrorMsg({ title: 'Could not post comment', detail: error?.message })
       return false
     }
     // Prepend to the list (newest-first ordering matches the paginated fetch)
@@ -264,7 +266,7 @@ export function LikesComments({
             .eq('id', commentId)
             .eq('user_id', userId!)
           if (error) {
-            Alert.alert('Could not delete', error.message)
+            setErrorMsg({ title: 'Could not delete comment', detail: error.message })
             return
           }
           setComments(prev => prev.filter(c => c.id !== commentId))
@@ -278,7 +280,7 @@ export function LikesComments({
     if (!userId) return
     Alert.alert(
       'Report comment',
-      'Why are you reporting this comment? Our team reviews reports within 24 hours.',
+      'Why are you reporting this comment? Our team reviews reports within 48 hours.',
       [
         ...REPORT_REASONS.map(reason => ({
           text: reason,
@@ -289,7 +291,7 @@ export function LikesComments({
               content_id: commentId,
               reason,
             })
-            Alert.alert('Report submitted', 'Thank you. Our team will review this comment within 24 hours.')
+            Alert.alert('Report submitted', 'Thank you. Our team will review this comment within 48 hours.')
           },
         })),
         { text: 'Cancel', style: 'cancel' },
@@ -455,6 +457,13 @@ export function LikesComments({
           onClose={() => setLikersOpen(false)}
         />
       ) : null}
+
+      <ErrorDialog
+        visible={!!errorMsg}
+        title={errorMsg?.title ?? ''}
+        detail={errorMsg?.detail}
+        onClose={() => setErrorMsg(null)}
+      />
     </View>
   )
 }
