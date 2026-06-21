@@ -89,10 +89,6 @@ function AudioPlayer({ url }: { url: string }) {
     }
   }, [status.playbackState, status.playing])
 
-  useEffect(() => {
-    return () => { player.remove() }
-  }, [])
-
   function toggle() {
     try {
       if (status.playing) player.pause()
