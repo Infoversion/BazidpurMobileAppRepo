@@ -75,7 +75,8 @@ export function DateOfBirthPicker({ value, onChange, label = 'Date of Birth', de
           mode="date"
           display="default"
           maximumDate={new Date()}
-          onChange={handleChange}
+          onValueChange={(_, date) => { setShow(false); applyDate(date) }}
+          onDismiss={() => setShow(false)}
         />
       ) : null}
     </View>
