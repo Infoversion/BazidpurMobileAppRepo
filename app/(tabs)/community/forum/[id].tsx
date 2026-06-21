@@ -19,6 +19,8 @@ import { AttachmentDisplay } from '@/components/forum/AttachmentDisplay'
 import type { ForumThread, ForumReply } from '@/lib/types'
 
 const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+const EMOJIS = ['❤️', '😄', '🤲', '👍', '😂', '😮', '😢', '🔥', '👏', '🌟']
+type ReactionMap = Record<string, number>
 
 function mobileTypeToMediaType(type: string): 'image' | 'audio' | 'document' | 'youtube' {
   if (type === 'photo') return 'image'
@@ -51,6 +53,78 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
+function ReactionBar({ reactions, userReactions, onToggle }: {
+  reactions: ReactionMap
+  userReactions: string[]
+  onToggle: (emoji: string) => void
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const activeEmojis = EMOJIS.filter(e => (reactions[e] ?? 0) > 0 || userReactions.includes(e))
+
+  return (
+    <View style={{ marginTop: 8 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+        {activeEmojis.map(emoji => {
+          const active = userReactions.includes(emoji)
+          return (
+            <Pressable
+              key={emoji}
+              onPress={() => onToggle(emoji)}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 3,
+                paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12,
+                backgroundColor: active ? '#f5f3fb' : '#f3f4f6',
+                borderWidth: 1, borderColor: active ? '#2d1b69' : '#e5e7eb',
+              }}
+            >
+              <Text style={{ fontSize: 14 }}>{emoji}</Text>
+              {(reactions[emoji] ?? 0) > 0 && (
+                <Text style={{ fontSize: 11, fontWeight: '600', color: active ? '#2d1b69' : '#6b7280' }}>
+                  {reactions[emoji]}
+                </Text>
+              )}
+            </Pressable>
+          )
+        })}
+        <Pressable
+          onPress={() => setPickerOpen(v => !v)}
+          style={{
+            width: 26, height: 26, borderRadius: 13,
+            backgroundColor: '#f3f4f6', borderWidth: 1, borderColor: '#e5e7eb',
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Text style={{ fontSize: 13, color: '#9ca3af' }}>+</Text>
+        </Pressable>
+      </View>
+      {pickerOpen && (
+        <View style={{
+          flexDirection: 'row', flexWrap: 'wrap', gap: 4,
+          marginTop: 6, padding: 8,
+          backgroundColor: '#fff', borderRadius: 14,
+          borderWidth: 1, borderColor: '#e5e7eb',
+          shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
+        }}>
+          {EMOJIS.map(emoji => (
+            <Pressable
+              key={emoji}
+              onPress={() => { onToggle(emoji); setPickerOpen(false) }}
+              style={{
+                width: 38, height: 38, alignItems: 'center', justifyContent: 'center',
+                borderRadius: 10,
+                backgroundColor: userReactions.includes(emoji) ? '#f5f3fb' : 'transparent',
+              }}
+            >
+              <Text style={{ fontSize: 22 }}>{emoji}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  )
+}
+
 function Avatar({ author }: { author?: { first_name: string; last_name: string; photo_url?: string } }) {
   const uri = avatarUri(author?.photo_url)
   const initials = author ? `${author.first_name[0]}${author.last_name[0]}` : '?'
@@ -75,6 +149,8 @@ export default function ThreadScreen() {
 
   const [thread, setThread] = useState<ForumThread | null>(null)
   const [replies, setReplies] = useState<ReplyWithAuthor[]>([])
+  const [reactions, setReactions] = useState<Record<string, ReactionMap>>({})
+  const [userReactions, setUserReactions] = useState<Record<string, string[]>>({})
   const { isBlocked, refresh: refreshBlocks } = useBlockedUsers()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -126,11 +202,13 @@ export default function ThreadScreen() {
     ])
 
     const replyIds = (r ?? []).map((x: any) => x.id)
-    const [{ data: threadMedia }, { data: replyMedia }] = await Promise.all([
+    const allEntityIds = [id as string, ...replyIds]
+    const [{ data: threadMedia }, { data: replyMedia }, { data: reactionData }] = await Promise.all([
       supabase.from('thread_media').select('id, thread_id, reply_id, url, filename, media_type').eq('thread_id', id).is('reply_id', null),
       replyIds.length > 0
         ? supabase.from('thread_media').select('id, thread_id, reply_id, url, filename, media_type').in('reply_id', replyIds)
         : Promise.resolve({ data: [], error: null }),
+      supabase.from('forum_reactions').select('entity_type, entity_id, emoji, user_id').in('entity_id', allEntityIds),
     ])
 
     const replyMediaMap: Record<string, any[]> = {}
@@ -139,8 +217,22 @@ export default function ThreadScreen() {
       replyMediaMap[m.reply_id].push(m)
     })
 
+    const reactionsMap: Record<string, ReactionMap> = {}
+    const userReactionsMap: Record<string, string[]> = {}
+    const currentUserId = session?.user?.id
+    ;(reactionData ?? []).forEach((rx: any) => {
+      if (!reactionsMap[rx.entity_id]) reactionsMap[rx.entity_id] = {}
+      reactionsMap[rx.entity_id][rx.emoji] = (reactionsMap[rx.entity_id][rx.emoji] || 0) + 1
+      if (currentUserId && rx.user_id === currentUserId) {
+        if (!userReactionsMap[rx.entity_id]) userReactionsMap[rx.entity_id] = []
+        userReactionsMap[rx.entity_id].push(rx.emoji)
+      }
+    })
+
     setThread({ ...(t as any), media: threadMedia ?? [] })
     setReplies((r ?? []).map((reply: any) => ({ ...reply, media: replyMediaMap[reply.id] ?? [] })) as unknown as ReplyWithAuthor[])
+    setReactions(reactionsMap)
+    setUserReactions(userReactionsMap)
   }
 
   useEffect(() => { load().finally(() => setLoading(false)) }, [id])
@@ -156,6 +248,49 @@ export default function ThreadScreen() {
     await load()
     setRefreshing(false)
   }, [id])
+
+  async function toggleReaction(entityType: 'thread' | 'reply', entityId: string, emoji: string) {
+    if (!session?.user?.id) return
+    const currentUserReactions = userReactions[entityId] ?? []
+    const isReacted = currentUserReactions.includes(emoji)
+
+    setReactions(prev => {
+      const entityReactions = { ...(prev[entityId] ?? {}) }
+      if (isReacted) {
+        entityReactions[emoji] = Math.max(0, (entityReactions[emoji] || 0) - 1)
+        if (!entityReactions[emoji]) delete entityReactions[emoji]
+      } else {
+        entityReactions[emoji] = (entityReactions[emoji] || 0) + 1
+      }
+      return { ...prev, [entityId]: entityReactions }
+    })
+    setUserReactions(prev => {
+      const userR = [...(prev[entityId] ?? [])]
+      if (isReacted) {
+        const idx = userR.indexOf(emoji)
+        if (idx >= 0) userR.splice(idx, 1)
+      } else {
+        userR.push(emoji)
+      }
+      return { ...prev, [entityId]: userR }
+    })
+
+    if (isReacted) {
+      await supabase.from('forum_reactions')
+        .delete()
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+        .eq('user_id', session.user.id)
+        .eq('emoji', emoji)
+    } else {
+      await supabase.from('forum_reactions').insert({
+        entity_type: entityType,
+        entity_id: entityId,
+        user_id: session.user.id,
+        emoji,
+      })
+    }
+  }
 
   async function submitReply() {
     if (!replyText.trim() && !replyAttachment) return
@@ -275,6 +410,11 @@ export default function ThreadScreen() {
       {thread.media?.[0] ? (
         <AttachmentDisplay type={mediaTypeToDisplayType(thread.media[0].media_type)} url={thread.media[0].url} />
       ) : null}
+      <ReactionBar
+        reactions={reactions[thread.id] ?? {}}
+        userReactions={userReactions[thread.id] ?? []}
+        onToggle={emoji => toggleReaction('thread', thread.id, emoji)}
+      />
     </View>
   ) : null
 
@@ -393,6 +533,11 @@ export default function ThreadScreen() {
                   {item.media?.[0] ? (
                     <AttachmentDisplay type={mediaTypeToDisplayType(item.media[0].media_type)} url={item.media[0].url} />
                   ) : null}
+                  <ReactionBar
+                    reactions={reactions[item.id] ?? {}}
+                    userReactions={userReactions[item.id] ?? []}
+                    onToggle={emoji => toggleReaction('reply', item.id, emoji)}
+                  />
                 </View>
               </View>
             )
