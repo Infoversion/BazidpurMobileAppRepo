@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
 import {
   View, Text, TouchableOpacity, Modal, FlatList,
-  TextInput, SafeAreaView,
+  TextInput,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 // Direct subpath imports to avoid pulling in the 7.7MB city.json that the
 // barrel re-exports — parsing it blows JSC's stack on iOS.
 import Country from 'country-state-city/lib/country'
