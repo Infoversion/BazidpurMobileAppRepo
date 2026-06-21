@@ -87,8 +87,7 @@ const withJSC = (config) => {
         fs.writeFileSync(factoryDelegatePath, src)
       }
 
-      // expo-av@16.0.8 SDK 56 Swift patches — done here in JS to avoid double-quote
-      // escaping issues when embedding the match strings inside a Ruby Podfile template literal.
+      // expo-av@16.0.8 SDK 56 Swift patches
       const videoViewModulePath = path.join(
         cfg.modRequest.projectRoot,
         'node_modules/expo-av/ios/EXAV/Video/VideoViewModule.swift'
@@ -115,8 +114,11 @@ const withJSC = (config) => {
       const podfilePath = path.join(cfg.modRequest.platformProjectRoot, 'Podfile')
       let contents = fs.readFileSync(podfilePath, 'utf8')
 
+      // Set USE_THIRD_PARTY_JSC=1 so use_react_native! includes React-jsc instead of hermes.
+      // Do NOT set USE_HERMES=0 — RN 0.85.3 calls exit() if USE_HERMES=0 without USE_THIRD_PARTY_JSC=1,
+      // and if USE_THIRD_PARTY_JSC=1, react_native_post_install automatically sets USE_HERMES=false.
       if (!contents.includes("ENV['USE_THIRD_PARTY_JSC']")) {
-        contents = `ENV['USE_THIRD_PARTY_JSC'] = '1'\nENV['USE_HERMES'] = '0'\n${contents}`
+        contents = `ENV['USE_THIRD_PARTY_JSC'] = '1'\n${contents}`
       }
 
       if (!contents.includes("require 'fileutils'")) {
@@ -136,6 +138,13 @@ const withJSC = (config) => {
         defs << 'USE_HERMES=0' unless defs.include?('USE_HERMES=0')
         defs << 'USE_THIRD_PARTY_JSC=1' unless defs.include?('USE_THIRD_PARTY_JSC=1')
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+
+        # Force dSYM generation for all pod frameworks in Release so that any
+        # framework that enters the archive (including hermesvm) has a matching
+        # dSYM — preventing Apple's symbol upload validator from rejecting the build.
+        if config.name == 'Release'
+          config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
+        end
       end
     end
 
