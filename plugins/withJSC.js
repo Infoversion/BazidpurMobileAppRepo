@@ -87,6 +87,31 @@ const withJSC = (config) => {
         fs.writeFileSync(factoryDelegatePath, src)
       }
 
+      // expo-av@16.0.8 SDK 56 Swift patches — done here in JS to avoid double-quote
+      // escaping issues when embedding the match strings inside a Ruby Podfile template literal.
+      const videoViewModulePath = path.join(
+        cfg.modRequest.projectRoot,
+        'node_modules/expo-av/ios/EXAV/Video/VideoViewModule.swift'
+      )
+      if (fs.existsSync(videoViewModulePath)) {
+        let src = fs.readFileSync(videoViewModulePath, 'utf8')
+        const patched = src.replace('resolver: promise.resolver', 'resolver: promise.legacyResolver')
+        if (patched !== src) fs.writeFileSync(videoViewModulePath, patched)
+      }
+
+      const expoVideoViewPath = path.join(
+        cfg.modRequest.projectRoot,
+        'node_modules/expo-av/ios/EXAV/ExpoVideoView.swift'
+      )
+      if (fs.existsSync(expoVideoViewPath)) {
+        let src = fs.readFileSync(expoVideoViewPath, 'utf8')
+        const patched = src.replace(
+          'guard let legacyModuleRegistry = appContext?.legacyModuleRegistry else {\n      fatalError("Unable to get the legacyModuleRegistry from appContext.")\n    }',
+          'let legacyModuleRegistry = appContext?.value(forKey: "legacyModuleRegistry") as? EXModuleRegistry'
+        )
+        if (patched !== src) fs.writeFileSync(expoVideoViewPath, patched)
+      }
+
       const podfilePath = path.join(cfg.modRequest.platformProjectRoot, 'Podfile')
       let contents = fs.readFileSync(podfilePath, 'utf8')
 
@@ -179,33 +204,6 @@ const withJSC = (config) => {
       File.write(exav_pch, pch + injection) unless pch.include?('EXLegacyFunctions')
     end
 
-    # expo-av@16.0.8 Swift patches for SDK 56 API changes:
-    #
-    # 1. Promise.resolver changed to JavaScriptValue-based; setFullscreen() needs legacyResolver.
-    # 2. AppContext.legacyModuleRegistry is @objc but absent from the Swift module interface
-    #    (mixed-module ObjC type constraint). Access via KVC (value(forKey:)) instead.
-    [
-      [
-        File.join(File.dirname(__dir__), 'node_modules/expo-av/ios/EXAV/Video/VideoViewModule.swift'),
-        [['resolver: promise.resolver', 'resolver: promise.legacyResolver']]
-      ],
-      [
-        File.join(File.dirname(__dir__), 'node_modules/expo-av/ios/EXAV/ExpoVideoView.swift'),
-        [
-          [
-            'guard let legacyModuleRegistry = appContext?.legacyModuleRegistry else {'\
-              "\n      fatalError(\"Unable to get the legacyModuleRegistry from appContext.\")\n    }",
-            'let legacyModuleRegistry = appContext?.value(forKey: "legacyModuleRegistry") as? EXModuleRegistry'
-          ]
-        ]
-      ]
-    ].each do |filepath, substitutions|
-      next unless File.exist?(filepath)
-      content = File.read(filepath)
-      patched = content
-      substitutions.each { |from, to| patched = patched.gsub(from, to) }
-      File.write(filepath, patched) if patched != content
-    end
 `
         contents = contents.replace(
           /(react_native_post_install\([\s\S]*?\)\s*\n)/,
