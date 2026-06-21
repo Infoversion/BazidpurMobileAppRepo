@@ -53,13 +53,20 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
-function ReactionBar({ reactions, userReactions, onToggle }: {
+function ReactionBar({ reactions, userReactions, reactionUsers, onToggle }: {
   reactions: ReactionMap
   userReactions: string[]
+  reactionUsers: Record<string, string[]>
   onToggle: (emoji: string) => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const activeEmojis = EMOJIS.filter(e => (reactions[e] ?? 0) > 0 || userReactions.includes(e))
+
+  function showWhoReacted(emoji: string) {
+    const names = reactionUsers[emoji] ?? []
+    if (!names.length) return
+    Alert.alert(`${emoji} Reactions`, names.join('\n'))
+  }
 
   return (
     <View style={{ marginTop: 8 }}>
@@ -70,6 +77,7 @@ function ReactionBar({ reactions, userReactions, onToggle }: {
             <Pressable
               key={emoji}
               onPress={() => onToggle(emoji)}
+              onLongPress={() => showWhoReacted(emoji)}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 3,
                 paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12,
@@ -151,6 +159,7 @@ export default function ThreadScreen() {
   const [replies, setReplies] = useState<ReplyWithAuthor[]>([])
   const [reactions, setReactions] = useState<Record<string, ReactionMap>>({})
   const [userReactions, setUserReactions] = useState<Record<string, string[]>>({})
+  const [reactionUsers, setReactionUsers] = useState<Record<string, Record<string, string[]>>>({})
   const { isBlocked, refresh: refreshBlocks } = useBlockedUsers()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -208,7 +217,9 @@ export default function ThreadScreen() {
       replyIds.length > 0
         ? supabase.from('thread_media').select('id, thread_id, reply_id, url, filename, media_type').in('reply_id', replyIds)
         : Promise.resolve({ data: [], error: null }),
-      supabase.from('forum_reactions').select('entity_type, entity_id, emoji, user_id').in('entity_id', allEntityIds),
+      supabase.from('forum_reactions')
+        .select('entity_type, entity_id, emoji, user_id, reactor:user_id(first_name, last_name)')
+        .in('entity_id', allEntityIds),
     ])
 
     const replyMediaMap: Record<string, any[]> = {}
@@ -219,10 +230,15 @@ export default function ThreadScreen() {
 
     const reactionsMap: Record<string, ReactionMap> = {}
     const userReactionsMap: Record<string, string[]> = {}
+    const reactionUsersMap: Record<string, Record<string, string[]>> = {}
     const currentUserId = session?.user?.id
     ;(reactionData ?? []).forEach((rx: any) => {
+      const name = rx.reactor ? `${rx.reactor.first_name} ${rx.reactor.last_name}`.trim() : 'Member'
       if (!reactionsMap[rx.entity_id]) reactionsMap[rx.entity_id] = {}
       reactionsMap[rx.entity_id][rx.emoji] = (reactionsMap[rx.entity_id][rx.emoji] || 0) + 1
+      if (!reactionUsersMap[rx.entity_id]) reactionUsersMap[rx.entity_id] = {}
+      if (!reactionUsersMap[rx.entity_id][rx.emoji]) reactionUsersMap[rx.entity_id][rx.emoji] = []
+      reactionUsersMap[rx.entity_id][rx.emoji].push(name)
       if (currentUserId && rx.user_id === currentUserId) {
         if (!userReactionsMap[rx.entity_id]) userReactionsMap[rx.entity_id] = []
         userReactionsMap[rx.entity_id].push(rx.emoji)
@@ -233,6 +249,7 @@ export default function ThreadScreen() {
     setReplies((r ?? []).map((reply: any) => ({ ...reply, media: replyMediaMap[reply.id] ?? [] })) as unknown as ReplyWithAuthor[])
     setReactions(reactionsMap)
     setUserReactions(userReactionsMap)
+    setReactionUsers(reactionUsersMap)
   }
 
   useEffect(() => { load().finally(() => setLoading(false)) }, [id])
@@ -253,6 +270,7 @@ export default function ThreadScreen() {
     if (!session?.user?.id) return
     const currentUserReactions = userReactions[entityId] ?? []
     const isReacted = currentUserReactions.includes(emoji)
+    const myName = user ? `${user.first_name} ${user.last_name}`.trim() : 'You'
 
     setReactions(prev => {
       const entityReactions = { ...(prev[entityId] ?? {}) }
@@ -273,6 +291,19 @@ export default function ThreadScreen() {
         userR.push(emoji)
       }
       return { ...prev, [entityId]: userR }
+    })
+    setReactionUsers(prev => {
+      const entityUsers = { ...(prev[entityId] ?? {}) }
+      const names = [...(entityUsers[emoji] ?? [])]
+      if (isReacted) {
+        const idx = names.indexOf(myName)
+        if (idx >= 0) names.splice(idx, 1)
+      } else {
+        names.push(myName)
+      }
+      if (names.length) entityUsers[emoji] = names
+      else delete entityUsers[emoji]
+      return { ...prev, [entityId]: entityUsers }
     })
 
     if (isReacted) {
@@ -413,6 +444,7 @@ export default function ThreadScreen() {
       <ReactionBar
         reactions={reactions[thread.id] ?? {}}
         userReactions={userReactions[thread.id] ?? []}
+        reactionUsers={reactionUsers[thread.id] ?? {}}
         onToggle={emoji => toggleReaction('thread', thread.id, emoji)}
       />
     </View>
@@ -536,6 +568,7 @@ export default function ThreadScreen() {
                   <ReactionBar
                     reactions={reactions[item.id] ?? {}}
                     userReactions={userReactions[item.id] ?? []}
+                    reactionUsers={reactionUsers[item.id] ?? {}}
                     onToggle={emoji => toggleReaction('reply', item.id, emoji)}
                   />
                 </View>
