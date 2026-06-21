@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { supabase } from '@/lib/supabase'
+import { webAPI } from '@/lib/webApi'
 import { useAuth } from '@/lib/auth-context'
 import PhotoLightbox from '@/components/gallery/PhotoLightbox'
 import type { AlbumPhoto, Album, Photo } from '@/lib/types'
@@ -240,13 +241,13 @@ export default function AlbumScreen() {
     ;[arr[idx], arr[swapIdx]] = [arr[swapIdx], arr[idx]]
     const updated = arr.map((p, i) => ({ ...p, display_order: i }))
     setPhotos(updated)
-    const results = await Promise.all(
-      updated.map(p => supabase.from('album_photos').update({ display_order: p.display_order }).eq('id', p.id))
-    )
-    const failed = results.find(r => r.error)
-    if (failed?.error) {
+    const res = await webAPI(`/api/albums/${id}/photos`, 'PATCH', {
+      updates: updated.map(p => ({ id: p.id, display_order: p.display_order })),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
       setPhotos(photos)
-      Alert.alert('Could not reorder', failed.error.message)
+      Alert.alert('Could not reorder', (body as { error?: string }).error ?? `Server error ${res.status}`)
     }
   }
 

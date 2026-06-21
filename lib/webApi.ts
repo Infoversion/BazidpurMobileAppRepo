@@ -7,7 +7,7 @@ export const WEB = 'https://www.bazidpur.com'
 
 export async function webAPI(
   path: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'GET',
   body?: object,
 ): Promise<Response> {
   const { data: { session } } = await supabase.auth.getSession()

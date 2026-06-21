@@ -10,6 +10,7 @@ import Svg, { Line } from 'react-native-svg'
 import * as ImagePicker from 'expo-image-picker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
+import { webAPI } from '@/lib/webApi'
 import * as FileSystem from 'expo-file-system/legacy'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -930,9 +931,12 @@ export default function MomentsAdminScreen() {
       return item ? (item as MomentVideo).is_active !== false : false
     })
     const newActive = !allActive
-    const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
-    const { error } = await supabase.from(table).update({ is_active: newActive }).in('id', ids)
-    if (error) { Alert.alert('Error', friendlyError(error.message), [{ text: 'OK' }]); return }
+    const path = mediaTab === 'photos' ? '/api/timeless-moments' : '/api/timeless-moments/videos'
+    const res = await webAPI(path, 'PATCH', { ids, is_active: newActive })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      Alert.alert('Error', friendlyError((body as { error?: string }).error ?? `Server error ${res.status}`), [{ text: 'OK' }]); return
+    }
     if (mediaTab === 'photos') setPhotos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
     else setVideos(prev => prev.map(x => selectedIds.has(x.id) ? { ...x, is_active: newActive } : x))
     cancelSelectMode()
@@ -1033,9 +1037,12 @@ export default function MomentsAdminScreen() {
 
   async function toggleActive(id: string, current: boolean) {
     const newActive = !current
-    const table = mediaTab === 'photos' ? 'timeless_moments' : 'timeless_moment_videos'
-    const { error } = await supabase.from(table).update({ is_active: newActive }).eq('id', id)
-    if (error) { Alert.alert('Cannot Update', friendlyError(error.message), [{ text: 'OK' }]); return }
+    const path = mediaTab === 'photos' ? '/api/timeless-moments' : '/api/timeless-moments/videos'
+    const res = await webAPI(path, 'PATCH', { id, is_active: newActive })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      Alert.alert('Cannot Update', friendlyError((body as { error?: string }).error ?? `Server error ${res.status}`), [{ text: 'OK' }]); return
+    }
     if (mediaTab === 'photos') setPhotos(prev => prev.map(x => x.id === id ? { ...x, is_active: newActive } : x))
     else setVideos(prev => prev.map(x => x.id === id ? { ...x, is_active: newActive } : x))
   }

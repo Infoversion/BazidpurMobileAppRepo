@@ -5,8 +5,9 @@ import {
   Alert, ActionSheetIOS, Platform, ScrollView,
 } from 'react-native'
 import * as DocumentPicker from 'expo-document-picker'
+import * as FileSystem from 'expo-file-system/legacy'
 import { supabase } from '@/lib/supabase'
-import { webUpload } from '@/lib/webApi'
+import { webAPI, WEB } from '@/lib/webApi'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,7 +27,7 @@ const PAGE_SIZE = 25
 
 // ─── Upload function ──────────────────────────────────────────────────────────
 
-async function pickAndUpload(title: string, onSuccess: (record: ChatRecord) => void) {
+async function pickAndUpload(chatId: string, onSuccess: () => void) {
   try {
     const result = await DocumentPicker.getDocumentAsync({
       type: ['text/plain', 'application/zip', '*/*'],
@@ -35,20 +36,58 @@ async function pickAndUpload(title: string, onSuccess: (record: ChatRecord) => v
     if (result.canceled) return
 
     const file = result.assets[0]
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { Alert.alert('Error', 'Not logged in'); return }
 
-    const fd = new FormData()
-    fd.append('file', { uri: file.uri, name: file.name, type: file.mimeType ?? 'text/plain' } as unknown as Blob)
-    fd.append('title', title.trim())
+    const task = FileSystem.createUploadTask(
+      `${WEB}/api/whatsapp/upload`,
+      file.uri,
+      {
+        httpMethod: 'POST',
+        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        fieldName: 'file',
+        mimeType: file.mimeType ?? 'application/zip',
+        parameters: { chatId, replace: 'true' },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      }
+    )
 
-    const res = await webUpload('/api/admin/whatsapp/archive', fd)
+    const res = await task.uploadAsync()
+    if (!res) { Alert.alert('Upload failed', 'No response from server'); return }
 
-    if (res.ok) {
-      const record = await res.json()
-      onSuccess(record as ChatRecord)
-      Alert.alert('Archived', `"${title}" has been imported successfully.`)
+    if (res.status < 200 || res.status >= 300) {
+      const msg = (() => {
+        try { return JSON.parse(res.body ?? '{}').error ?? `Server error ${res.status}` }
+        catch { return `Server error ${res.status}` }
+      })()
+      Alert.alert('Upload failed', msg)
+      return
+    }
+
+    // Parse SSE response — find the last done/error event
+    let doneEvent: Record<string, unknown> | null = null
+    let errorEvent: Record<string, unknown> | null = null
+    for (const line of (res.body ?? '').split('\n')) {
+      if (!line.startsWith('data: ')) continue
+      try {
+        const obj = JSON.parse(line.slice(6)) as Record<string, unknown>
+        if (obj.type === 'done') doneEvent = obj
+        else if (obj.type === 'error') errorEvent = obj
+      } catch {}
+    }
+
+    if (errorEvent) {
+      Alert.alert('Import error', String(errorEvent.message ?? 'Unknown error'))
+      return
+    }
+
+    if (doneEvent) {
+      const inserted = doneEvent.inserted as number
+      const media = doneEvent.mediaUploaded as number
+      Alert.alert('Archived', `${inserted} messages imported${media > 0 ? `, ${media} media files` : ''}.`)
+      onSuccess()
     } else {
-      const err = await res.json().catch(() => ({}))
-      Alert.alert('Import failed', err.message ?? `Server returned ${res.status}`)
+      Alert.alert('Upload failed', 'Unexpected response from server')
     }
   } catch (e: unknown) {
     Alert.alert('Error', e instanceof Error ? e.message : 'Upload failed')
@@ -248,11 +287,10 @@ export default function WhatsAppAdminScreen() {
   }
 
   function handleUploadForChat(item: ChatRecord) {
-    const title = item.title || item.name || item.filename || 'Chat'
     setUploadingId(item.id)
-    pickAndUpload(title, record => {
-      setChats(prev => [record, ...prev])
-      setTotalCount(c => c + 1)
+    pickAndUpload(item.id, () => {
+      // refresh to show updated message count
+      fetchPage(debouncedSearch, 0).then(rows => { setChats(rows); setHasMore(rows.length === PAGE_SIZE) })
     }).finally(() => setUploadingId(null))
   }
 
@@ -264,13 +302,27 @@ export default function WhatsAppAdminScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Continue',
-          onPress: (name?: string) => {
+          onPress: async (name?: string) => {
             if (!name?.trim()) return
             setAddingNew(true)
-            pickAndUpload(name.trim(), record => {
-              setChats(prev => [record, ...prev])
+            try {
+              const res = await webAPI('/api/whatsapp', 'POST', { name: name.trim() })
+              if (!res.ok) {
+                const body = await res.json().catch(() => ({}))
+                Alert.alert('Error', (body as { error?: string }).error ?? `Server error ${res.status}`)
+                return
+              }
+              const { chat } = await res.json() as { chat: ChatRecord }
+              setChats(prev => [chat, ...prev])
               setTotalCount(c => c + 1)
-            }).finally(() => setAddingNew(false))
+              await pickAndUpload(chat.id, () => {
+                fetchPage(debouncedSearch, 0).then(rows => { setChats(rows); setHasMore(rows.length === PAGE_SIZE) })
+              })
+            } catch (e: unknown) {
+              Alert.alert('Error', e instanceof Error ? e.message : 'Failed')
+            } finally {
+              setAddingNew(false)
+            }
           },
         },
       ],

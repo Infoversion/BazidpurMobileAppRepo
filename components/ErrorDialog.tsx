@@ -50,7 +50,7 @@ export function ErrorDialog({ visible, title, detail, onClose, closeLabel = 'OK'
             onPress={onClose}
             style={{
               marginTop: 22,
-              backgroundColor: '#2d1b69',
+              backgroundColor: '#1d4ed8',
               borderRadius: 12,
               paddingVertical: 13,
               paddingHorizontal: 40,
