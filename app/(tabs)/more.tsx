@@ -18,12 +18,7 @@ import { useDialog } from '@/lib/useDialog'
 // Use the www. host explicitly — the apex 308-redirects to www and iOS
 // NSURLSession hangs on 308 redirects for POST-with-body.
 const API = 'https://www.bazidpur.com/api'
-const R2  = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
-
-function resolveUri(url?: string | null) {
-  if (!url) return null
-  return url.startsWith('http') ? url : `${R2}/${url}`
-}
+import { resolveUri } from '@/lib/constants'
 
 function Field({
   label, value, onChangeText, placeholder, multiline, keyboardType, editable = true,

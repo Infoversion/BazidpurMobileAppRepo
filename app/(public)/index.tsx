@@ -1,10 +1,8 @@
-import React from 'react'
 import { View, Text, TouchableOpacity } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { useAuth } from '@/lib/auth-context'
-
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { R2 } from '@/lib/constants'
 
 export default function LandingScreen() {
   const { session, user } = useAuth()

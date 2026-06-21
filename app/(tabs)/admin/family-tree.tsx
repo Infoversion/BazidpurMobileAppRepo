@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   ActivityIndicator, Modal, ScrollView, Switch, Image,
@@ -16,13 +16,11 @@ import { levelColor, type FamilyNode } from '@/lib/family-tree-layout'
 import { AppDialog } from '@/components/AppDialog'
 import { useDialog } from '@/lib/useDialog'
 
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { resolveUri } from '@/lib/constants'
+
 const ROW_H = 64
 
-function resolvePhoto(url?: string | null) {
-  if (!url) return null
-  return url.startsWith('http') ? url : `${R2}/${url}`
-}
+const resolvePhoto = (url?: string | null) => url ? resolveUri(url) : null
 function sexColor(sex: string) {
   if (sex === 'male') return '#3b82f6'
   if (sex === 'female') return '#ec4899'

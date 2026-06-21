@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, ActivityIndicator,
   TouchableOpacity, RefreshControl, FlatList,
@@ -11,29 +11,7 @@ import { LikesComments } from '@/components/LikesComments'
 import { supabase } from '@/lib/supabase'
 import type { Experience, ExperienceChapter } from '@/lib/types'
 
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
-
-function imgUri(url?: string | null) {
-  if (!url) return null
-  return url.startsWith('http') ? url : `${R2}/${url}`
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n\n')
-    .replace(/<\/h[1-6]>/gi, '\n\n')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
+import { resolveUri as imgUri, stripHtml } from '@/lib/constants'
 
 function ChapterNav({
   chapterIndex,

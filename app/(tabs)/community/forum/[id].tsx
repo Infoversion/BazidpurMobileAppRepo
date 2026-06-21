@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, TextInput, KeyboardAvoidingView,
@@ -18,7 +18,8 @@ import { useDialog } from '@/lib/useDialog'
 import { AttachmentDisplay } from '@/components/forum/AttachmentDisplay'
 import type { ForumThread, ForumReply } from '@/lib/types'
 
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { resolveUri } from '@/lib/constants'
+
 const EMOJIS = ['❤️', '😄', '🤲', '👍', '😂', '😮', '😢', '🔥', '👏', '🌟']
 type ReactionMap = Record<string, number>
 
@@ -36,10 +37,7 @@ function mediaTypeToDisplayType(mediaType: string): string {
   return mediaType
 }
 
-function avatarUri(url?: string | null) {
-  if (!url) return null
-  return url.startsWith('http') ? url : `${R2}/${url}`
-}
+const avatarUri = (url?: string | null) => url ? resolveUri(url) : null
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -348,7 +346,6 @@ export default function ThreadScreen() {
           media_type: mobileTypeToMediaType(replyAttachment.type),
           file_size: 0,
         }).select('id, thread_id, reply_id, url, filename, media_type').single()
-        console.log('[thread_media insert]', JSON.stringify({ m, mediaErr }))
         if (m) media = [m]
       }
       setReplies(prev => [...prev, { ...(data as unknown as ReplyWithAuthor), media }])

@@ -12,7 +12,7 @@ import {
   type FamilyNode,
 } from '@/lib/family-tree-layout'
 
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { R2 } from '@/lib/constants'
 
 function countDescendants(nodeId: string, allNodes: FamilyNode[]): number {
   const children = allNodes.filter(n => n.parent_id === nodeId)

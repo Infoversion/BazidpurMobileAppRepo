@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View, Text, FlatList, ActivityIndicator,
   useWindowDimensions, RefreshControl, TouchableOpacity,
@@ -18,14 +18,15 @@ import type { AlbumPhoto, Album, Photo } from '@/lib/types'
 import { AppDialog } from '@/components/AppDialog'
 import { useDialog } from '@/lib/useDialog'
 
-const R2    = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { resolveUri } from '@/lib/constants'
+
 const WEB   = 'https://bazidpur.com'
 
 function toPhoto(ap: AlbumPhoto): Photo {
   return {
     id: ap.id,
     title: ap.caption || '',
-    r2_url: ap.r2_url.startsWith('http') ? ap.r2_url : `${R2}/${ap.r2_url}`,
+    r2_url: resolveUri(ap.r2_url),
     thumbnail_url: ap.thumbnail_url || ap.r2_url,
     display_order: ap.display_order,
     is_active: !(ap.is_hidden ?? false),
@@ -34,9 +35,7 @@ function toPhoto(ap: AlbumPhoto): Photo {
   }
 }
 
-function imgUri(url: string) {
-  return url.startsWith('http') ? url : `${R2}/${url}`
-}
+const imgUri = resolveUri
 
 // ── Edit album modal ───────────────────────────────────────────────────────────
 function EditAlbumModal({

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl, Alert, Modal,
@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabase'
 // Use the www. host explicitly — the apex 308-redirects to www and iOS
 // NSURLSession hangs on 308 redirects for POST-with-body.
 const WEB = 'https://www.bazidpur.com'
-const R2  = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { resolveUri } from '@/lib/constants'
 
 interface Book {
   id: string
@@ -30,10 +30,7 @@ interface Book {
   created_at: string
 }
 
-function coverUri(url?: string | null) {
-  if (!url) return null
-  return url.startsWith('http') ? url : `${R2}/${url}`
-}
+const coverUri = (url?: string | null) => url ? resolveUri(url) : null
 
 // ── Upload progress bar ───────────────────────────────────────────────────────
 function UploadBar({ label, pct }: { label: string; pct: number }) {

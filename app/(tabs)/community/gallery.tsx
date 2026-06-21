@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, useWindowDimensions, RefreshControl,
@@ -28,12 +28,7 @@ interface VideoAlbum {
 }
 interface VideoAlbumWithThumbs extends VideoAlbum { _youtubeIds: string[] }
 
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
-
-function imgUri(url?: string | null) {
-  if (!url) return null
-  return url.startsWith('http') ? url : `${R2}/${url}`
-}
+import { resolveUri as imgUri } from '@/lib/constants'
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime()

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, Linking, useWindowDimensions, Modal, ActivityIndicator, Alert, Animated, Easing } from 'react-native'
 import { Image } from 'expo-image'
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio'
@@ -6,19 +6,7 @@ import { WebView } from 'react-native-webview'
 import YoutubePlayer from 'react-native-youtube-iframe'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-function extractYouTubeId(url: string): string | null {
-  const patterns = [
-    /[?&]v=([^&\s]+)/,
-    /youtu\.be\/([^?\s]+)/,
-    /youtube\.com\/shorts\/([^?\s]+)/,
-    /youtube\.com\/embed\/([^?\s]+)/,
-  ]
-  for (const p of patterns) {
-    const m = url.match(p)
-    if (m) return m[1]
-  }
-  return null
-}
+import { extractYouTubeId } from '@/lib/youtube'
 
 function fmtSec(s: number) {
   const sec = Math.floor(s)

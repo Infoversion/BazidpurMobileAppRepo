@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl, Modal,
@@ -16,7 +16,7 @@ import { AttachmentPicker, type Attachment } from '@/components/forum/Attachment
 import { AttachmentDisplay } from '@/components/forum/AttachmentDisplay'
 import type { ForumThread } from '@/lib/types'
 
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { resolveUri } from '@/lib/constants'
 
 function mobileTypeToMediaType(type: string): 'image' | 'audio' | 'document' | 'youtube' {
   if (type === 'photo') return 'image'
@@ -26,10 +26,7 @@ function mobileTypeToMediaType(type: string): 'image' | 'audio' | 'document' | '
   return 'image'
 }
 
-function avatarUri(url?: string | null) {
-  if (!url) return null
-  return url.startsWith('http') ? url : `${R2}/${url}`
-}
+const avatarUri = (url?: string | null) => url ? resolveUri(url) : null
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime()

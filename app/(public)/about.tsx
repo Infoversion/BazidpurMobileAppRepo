@@ -1,8 +1,7 @@
 import { View, Text, TouchableOpacity, ScrollView, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
-
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { R2 } from '@/lib/constants'
 const MOSQUE_PHOTO  = `${R2}/about/mosque-entrance2.png`
 const FIELDS_PHOTO  = `${R2}/about/village-fields.jpg`
 const AERIAL_PHOTO  = `${R2}/about/bazidpur-aerial-landmarks.png`

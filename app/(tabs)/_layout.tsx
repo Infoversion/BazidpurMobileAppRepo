@@ -11,7 +11,8 @@ import Svg, { Polyline, Path, Circle } from 'react-native-svg'
 import { usePathname } from 'expo-router'
 import type { Session } from '@supabase/supabase-js'
 
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { R2 } from '@/lib/constants'
+
 const HIDDEN = new Set(['index', 'contact', 'tree', 'lineage', 'more', 'admin', 'blocked-users', 'notifications', 'notification-settings'])
 
 function getSubScreenIcon(pathname: string): string | null {

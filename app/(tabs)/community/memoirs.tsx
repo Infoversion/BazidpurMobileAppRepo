@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl,
@@ -10,12 +10,7 @@ import { PurpleHeader } from '@/components/PurpleHeader'
 import { CuratedNotice } from '@/components/CuratedNotice'
 import type { Experience } from '@/lib/types'
 
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
-
-function imgUri(url?: string | null) {
-  if (!url) return null
-  return url.startsWith('http') ? url : `${R2}/${url}`
-}
+import { resolveUri as imgUri } from '@/lib/constants'
 
 interface ExperienceWithCount extends Experience {
   chapters?: { id: string }[]

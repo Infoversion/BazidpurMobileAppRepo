@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
 
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { resolveUri } from '@/lib/constants'
 
 interface Book {
   id: string
@@ -24,10 +24,7 @@ interface Book {
   created_at: string
 }
 
-function coverUri(url?: string | null) {
-  if (!url) return null
-  return url.startsWith('http') ? url : `${R2}/${url}`
-}
+const coverUri = (url?: string | null) => url ? resolveUri(url) : null
 
 // Deterministic gradient colour from book id
 const GRAD_PAIRS = [
@@ -78,7 +75,7 @@ function BookModal({ book, onClose }: { book: Book; onClose: () => void }) {
   const [modalImgFailed, setModalImgFailed] = useState(false)
 
   const pdfUrl = book.pdf_url
-    ? (book.pdf_url.startsWith('http') ? book.pdf_url : `${R2}/${book.pdf_url}`)
+    ? resolveUri(book.pdf_url)
     : null
 
   if (showPdf && pdfUrl) {

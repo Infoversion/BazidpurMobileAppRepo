@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import { useState, useRef } from 'react'
 import {
   View, Text, TouchableOpacity, TextInput, Modal,
   ActivityIndicator, Alert,
@@ -15,6 +15,7 @@ import {
   useAudioRecorder,
 } from 'expo-audio'
 import { supabase } from '@/lib/supabase'
+import { extractYouTubeId } from '@/lib/youtube'
 
 const API = 'https://www.bazidpur.com/api'
 
@@ -24,20 +25,6 @@ export interface Attachment {
   type: AttachmentType
   url: string
   filename?: string
-}
-
-function extractYouTubeId(url: string): string | null {
-  const patterns = [
-    /[?&]v=([^&\s]+)/,
-    /youtu\.be\/([^?\s]+)/,
-    /youtube\.com\/shorts\/([^?\s]+)/,
-    /youtube\.com\/embed\/([^?\s]+)/,
-  ]
-  for (const p of patterns) {
-    const m = url.match(p)
-    if (m) return m[1]
-  }
-  return null
 }
 
 async function presign(token: string, type: string, filename: string, contentType: string) {

@@ -3,7 +3,7 @@ import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { PurpleHeader } from '@/components/PurpleHeader'
 
-const R2 = 'https://pub-7e314f102b4e417bab40fb584bfb85bf.r2.dev'
+import { R2 } from '@/lib/constants'
 const SHRINE_NIGHT      = `${R2}/urs/urs-shrine-night2.png`
 const MOSQUE_GATHERING  = `${R2}/urs/urs-mosque-gathering2.png`
 const QAWWALI           = `${R2}/urs/urs-qawwali.jpg`
