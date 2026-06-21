@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { TouchableOpacity, Text, Alert } from 'react-native'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { AppDialog } from '@/components/AppDialog'
 
 const REASONS = [
   'Inappropriate content',
@@ -30,6 +32,7 @@ interface Props {
 
 export function ReportButton({ contentType, contentId, ownerId, size = 'md' }: Props) {
   const { session } = useAuth()
+  const [confirmed, setConfirmed] = useState(false)
 
   if (!session) return null
   if (ownerId && session.user.id === ownerId) return null
@@ -48,7 +51,7 @@ export function ReportButton({ contentType, contentId, ownerId, size = 'md' }: P
               content_id: contentId,
               reason,
             })
-            Alert.alert('Report submitted', 'Thank you. Our team will review this content within 48 hours.')
+            setConfirmed(true)
           },
         })),
         { text: 'Cancel', style: 'cancel' },
@@ -57,11 +60,18 @@ export function ReportButton({ contentType, contentId, ownerId, size = 'md' }: P
   }
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-    >
-      <Text style={{ fontSize: size === 'sm' ? 20 : 26, color: '#ef4444' }}>⚑</Text>
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity onPress={onPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Text style={{ fontSize: size === 'sm' ? 20 : 26, color: '#ef4444' }}>⚑</Text>
+      </TouchableOpacity>
+
+      <AppDialog
+        visible={confirmed}
+        type="success"
+        title="Report submitted"
+        detail="Thank you. Our team will review this content within 48 hours."
+        onClose={() => setConfirmed(false)}
+      />
+    </>
   )
 }

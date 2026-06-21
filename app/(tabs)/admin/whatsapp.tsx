@@ -8,6 +8,7 @@ import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import { supabase } from '@/lib/supabase'
 import { webAPI, WEB } from '@/lib/webApi'
+import { AppDialog } from '@/components/AppDialog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,7 +28,13 @@ const PAGE_SIZE = 25
 
 // ─── Upload function ──────────────────────────────────────────────────────────
 
-async function pickAndUpload(chatId: string, onSuccess: () => void) {
+type DialogMsg = { type: 'success' | 'error'; title: string; detail?: string }
+
+async function pickAndUpload(
+  chatId: string,
+  onSuccess: () => void,
+  onMessage: (msg: DialogMsg) => void,
+) {
   try {
     const result = await DocumentPicker.getDocumentAsync({
       type: ['text/plain', 'application/zip', '*/*'],
@@ -37,7 +44,7 @@ async function pickAndUpload(chatId: string, onSuccess: () => void) {
 
     const file = result.assets[0]
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { Alert.alert('Error', 'Not logged in'); return }
+    if (!session) { onMessage({ type: 'error', title: 'Not logged in' }); return }
 
     const task = FileSystem.createUploadTask(
       `${WEB}/api/whatsapp/upload`,
@@ -53,14 +60,14 @@ async function pickAndUpload(chatId: string, onSuccess: () => void) {
     )
 
     const res = await task.uploadAsync()
-    if (!res) { Alert.alert('Upload failed', 'No response from server'); return }
+    if (!res) { onMessage({ type: 'error', title: 'Upload failed', detail: 'No response from server' }); return }
 
     if (res.status < 200 || res.status >= 300) {
-      const msg = (() => {
+      const detail = (() => {
         try { return JSON.parse(res.body ?? '{}').error ?? `Server error ${res.status}` }
         catch { return `Server error ${res.status}` }
       })()
-      Alert.alert('Upload failed', msg)
+      onMessage({ type: 'error', title: 'Upload failed', detail })
       return
     }
 
@@ -77,20 +84,24 @@ async function pickAndUpload(chatId: string, onSuccess: () => void) {
     }
 
     if (errorEvent) {
-      Alert.alert('Import error', String(errorEvent.message ?? 'Unknown error'))
+      onMessage({ type: 'error', title: 'Import error', detail: String(errorEvent.message ?? 'Unknown error') })
       return
     }
 
     if (doneEvent) {
       const inserted = doneEvent.inserted as number
       const media = doneEvent.mediaUploaded as number
-      Alert.alert('Archived', `${inserted} messages imported${media > 0 ? `, ${media} media files` : ''}.`)
+      onMessage({
+        type: 'success',
+        title: 'Chat archived',
+        detail: `${inserted} messages imported${media > 0 ? ` · ${media} media files` : ''}.`,
+      })
       onSuccess()
     } else {
-      Alert.alert('Upload failed', 'Unexpected response from server')
+      onMessage({ type: 'error', title: 'Upload failed', detail: 'Unexpected response from server' })
     }
   } catch (e: unknown) {
-    Alert.alert('Error', e instanceof Error ? e.message : 'Upload failed')
+    onMessage({ type: 'error', title: 'Upload failed', detail: e instanceof Error ? e.message : 'Unknown error' })
   }
 }
 
@@ -221,6 +232,9 @@ export default function WhatsAppAdminScreen() {
   const [totalCount, setTotalCount] = useState(0)
   const [uploadingId, setUploadingId] = useState<string | null>(null)
   const [addingNew, setAddingNew] = useState(false)
+  const [dialog, setDialog] = useState<DialogMsg & { visible: boolean }>({ visible: false, type: 'success', title: '' })
+
+  function showDialog(msg: DialogMsg) { setDialog({ ...msg, visible: true }) }
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 400)
@@ -288,10 +302,11 @@ export default function WhatsAppAdminScreen() {
 
   function handleUploadForChat(item: ChatRecord) {
     setUploadingId(item.id)
-    pickAndUpload(item.id, () => {
-      // refresh to show updated message count
-      fetchPage(debouncedSearch, 0).then(rows => { setChats(rows); setHasMore(rows.length === PAGE_SIZE) })
-    }).finally(() => setUploadingId(null))
+    pickAndUpload(
+      item.id,
+      () => { fetchPage(debouncedSearch, 0).then(rows => { setChats(rows); setHasMore(rows.length === PAGE_SIZE) }) },
+      showDialog,
+    ).finally(() => setUploadingId(null))
   }
 
   function handleAddNew() {
@@ -309,17 +324,19 @@ export default function WhatsAppAdminScreen() {
               const res = await webAPI('/api/whatsapp', 'POST', { name: name.trim() })
               if (!res.ok) {
                 const body = await res.json().catch(() => ({}))
-                Alert.alert('Error', (body as { error?: string }).error ?? `Server error ${res.status}`)
+                showDialog({ type: 'error', title: 'Could not create chat', detail: (body as { error?: string }).error ?? `Server error ${res.status}` })
                 return
               }
               const { chat } = await res.json() as { chat: ChatRecord }
               setChats(prev => [chat, ...prev])
               setTotalCount(c => c + 1)
-              await pickAndUpload(chat.id, () => {
-                fetchPage(debouncedSearch, 0).then(rows => { setChats(rows); setHasMore(rows.length === PAGE_SIZE) })
-              })
+              await pickAndUpload(
+                chat.id,
+                () => { fetchPage(debouncedSearch, 0).then(rows => { setChats(rows); setHasMore(rows.length === PAGE_SIZE) }) },
+                showDialog,
+              )
             } catch (e: unknown) {
-              Alert.alert('Error', e instanceof Error ? e.message : 'Failed')
+              showDialog({ type: 'error', title: 'Failed', detail: e instanceof Error ? e.message : 'Unknown error' })
             } finally {
               setAddingNew(false)
             }
@@ -402,6 +419,14 @@ export default function WhatsAppAdminScreen() {
             </Text>
           </View>
         }
+      />
+
+      <AppDialog
+        visible={dialog.visible}
+        type={dialog.type}
+        title={dialog.title}
+        detail={dialog.detail}
+        onClose={() => setDialog(d => ({ ...d, visible: false }))}
       />
     </View>
   )
