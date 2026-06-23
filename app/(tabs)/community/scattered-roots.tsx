@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native'
+import { View, Text, ScrollView, ActivityIndicator, useWindowDimensions, Platform } from 'react-native'
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps'
+import { WebView } from 'react-native-webview'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { PurpleHeader } from '@/components/PurpleHeader'
@@ -12,6 +13,24 @@ interface Member {
   location_city?: string
   location_state?: string
   location_country?: string
+}
+
+function buildLeafletHtml(members: Member[]): string {
+  const markers = JSON.stringify(members.map(m => [m.location_lat, m.location_lng]))
+  return `<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>html,body,#map{margin:0;padding:0;width:100%;height:100%}
+.dot{width:12px;height:12px;background:#dc2626;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.4)}</style>
+</head><body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var map=L.map('map',{zoomControl:false,attributionControl:false}).setView([28,20],2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+var icon=L.divIcon({className:'',html:'<div class="dot"></div>',iconSize:[12,12],iconAnchor:[6,6]});
+${markers}.forEach(function(c){L.marker(c,{icon:icon}).addTo(map);});
+</script></body></html>`
 }
 
 export default function ScatteredRootsScreen() {
@@ -62,42 +81,46 @@ export default function ScatteredRootsScreen() {
 
           {/* Map */}
           <View style={{ marginTop: 12, marginHorizontal: 16, borderRadius: 16, overflow: 'hidden', borderWidth: 0.5, borderColor: '#e5e5ea' }}>
-            <MapView
-              provider={PROVIDER_DEFAULT}
-              style={{ width: '100%', height: mapHeight }}
-              initialRegion={{
-                latitude: 28,
-                longitude: 72,
-                latitudeDelta: 45,
-                longitudeDelta: 55,
-              }}
-              mapType="standard"
-              scrollEnabled
-              zoomEnabled
-              rotateEnabled={false}
-              pitchEnabled={false}
-              showsUserLocation={false}
-              showsMyLocationButton={false}
-              showsCompass={false}
-              showsScale={false}
-              toolbarEnabled={false}
-            >
-              {members.map(m => (
-                <Marker
-                  key={m.id}
-                  coordinate={{ latitude: m.location_lat, longitude: m.location_lng }}
-                  anchor={{ x: 0.5, y: 0.5 }}
-                  tracksViewChanges={false}
-                >
-                  <View style={{
-                    width: 12, height: 12, borderRadius: 6,
-                    backgroundColor: '#dc2626',
-                    borderWidth: 2, borderColor: '#fff',
-                    shadowColor: '#000', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2,
-                  }} />
-                </Marker>
-              ))}
-            </MapView>
+            {Platform.OS === 'android' ? (
+              <WebView
+                source={{ html: buildLeafletHtml(members), baseUrl: 'https://bazidpur.com' }}
+                style={{ width: '100%', height: mapHeight }}
+                scrollEnabled={false}
+                originWhitelist={['*']}
+              />
+            ) : (
+              <MapView
+                provider={PROVIDER_DEFAULT}
+                style={{ width: '100%', height: mapHeight }}
+                initialRegion={{ latitude: 28, longitude: 72, latitudeDelta: 45, longitudeDelta: 55 }}
+                mapType="standard"
+                scrollEnabled
+                zoomEnabled
+                rotateEnabled={false}
+                pitchEnabled={false}
+                showsUserLocation={false}
+                showsMyLocationButton={false}
+                showsCompass={false}
+                showsScale={false}
+                toolbarEnabled={false}
+              >
+                {members.map(m => (
+                  <Marker
+                    key={m.id}
+                    coordinate={{ latitude: m.location_lat, longitude: m.location_lng }}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                    tracksViewChanges={false}
+                  >
+                    <View style={{
+                      width: 12, height: 12, borderRadius: 6,
+                      backgroundColor: '#dc2626',
+                      borderWidth: 2, borderColor: '#fff',
+                      shadowColor: '#000', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 1 }, shadowRadius: 2,
+                    }} />
+                  </Marker>
+                ))}
+              </MapView>
+            )}
           </View>
 
           {/* Countries */}
