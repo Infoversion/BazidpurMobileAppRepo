@@ -6,5 +6,8 @@ module.exports = {
     'react-native-worklets': {
       platforms: { ios: null, android: null },
     },
+    '@react-native-community/javascriptcore': {
+      platforms: { android: null }, // iOS-only — JSC swap is not needed on Android
+    },
   },
 }

@@ -11,6 +11,7 @@ const originalGetPolyfills = config.serializer.getPolyfills
 config.serializer.getPolyfills = (ctx) => [
   path.resolve(__dirname, 'polyfills/text-encoder.js'),
   ...originalGetPolyfills(ctx),
+  path.resolve(__dirname, 'polyfills/rn-build-env.js'),
 ]
 
 module.exports = withNativeWind(config, { input: './global.css' })

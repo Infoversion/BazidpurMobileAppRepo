@@ -2,15 +2,15 @@
   "expo": {
     "name": "Bazidpur",
     "slug": "bazidpur-app",
-    "version": "1.1.2",
+    "version": "1.1.4",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "bazidpur",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.bazidpur.app",
-      "buildNumber": "9",
+      "buildNumber": "14",
       "jsEngine": "jsc",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Used to update your profile photo and attach images to forum posts.",

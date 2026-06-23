@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import {
+  GestureHandlerRootView,
   PinchGestureHandler, PanGestureHandler, TapGestureHandler, LongPressGestureHandler,
   State,
   type PinchGestureHandlerStateChangeEvent,
@@ -316,7 +317,7 @@ export default function PhotoLightbox({ photos, startIndex, onClose, entityType,
     >
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
-      <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000' }}>
 
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateY: dismissY }] }]}>
           <Animated.View style={{ flex: 1, backgroundColor: '#000', opacity: bgOpacity }}>
@@ -418,7 +419,7 @@ export default function PhotoLightbox({ photos, startIndex, onClose, entityType,
           </View>
         </Animated.View>
 
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   )
 }

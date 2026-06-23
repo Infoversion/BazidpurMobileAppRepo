@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl,
@@ -124,6 +124,7 @@ export default function ReportsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState<'pending' | 'resolved'>('pending')
   const [actionTarget, setActionTarget] = useState<Report | null>(null)
+  const [locations, setLocations] = useState<Record<string, string>>({})
   const { dialog, show, hide } = useDialog()
 
   async function load() {
@@ -131,14 +132,116 @@ export default function ReportsScreen() {
       .from('reports')
       .select('id, content_type, content_id, reason, created_at, status, action_notes, resolved_at, resolved_by, reporter:reporter_id(first_name, last_name), resolver:resolved_by(first_name, last_name)')
       .order('created_at', { ascending: false })
-    setReports((data ?? []) as unknown as Report[])
+    const reps = (data ?? []) as unknown as Report[]
+    setReports(reps)
+    return reps
   }
 
-  useEffect(() => { load().finally(() => setLoading(false)) }, [])
+  async function resolveLocation(report: Report): Promise<string> {
+    const { content_type: t, content_id: id } = report
+    try {
+      if (t === 'thread') {
+        const { data } = await supabase.from('threads').select('title').eq('id', id).single()
+        return `Community → The Forum → "${data?.title ?? 'Thread'}"`
+      }
+      if (t === 'reply') {
+        const { data } = await supabase.from('thread_replies').select('thread_id').eq('id', id).single()
+        if (data?.thread_id) {
+          const { data: th } = await supabase.from('threads').select('title').eq('id', data.thread_id).single()
+          return `Community → The Forum → "${th?.title ?? 'Thread'}" → Reply`
+        }
+        return 'Community → The Forum → Reply'
+      }
+      if (t === 'poem' || t === 'poetry') {
+        return 'Community → Rhymes & Roots → Poetry'
+      }
+      if (t === 'memoir' || t === 'experience') {
+        const { data } = await supabase.from('experiences').select('title').eq('id', id).single()
+        return `Community → Memoirs → "${data?.title ?? 'Memoir'}"`
+      }
+      if (t === 'photo_album') {
+        const { data } = await supabase.from('photo_albums').select('name').eq('id', id).single()
+        return `Community → Gallery → Photo Albums → "${data?.name ?? 'Album'}"`
+      }
+      if (t === 'album_photo') {
+        const { data } = await supabase.from('album_photos').select('album_id').eq('id', id).single()
+        if (data?.album_id) {
+          const { data: album } = await supabase.from('photo_albums').select('name').eq('id', data.album_id).single()
+          return `Community → Gallery → "${album?.name ?? 'Album'}" → Photo`
+        }
+        return 'Community → Gallery → Photo'
+      }
+      if (t === 'video_album') {
+        const { data } = await supabase.from('video_albums').select('name').eq('id', id).single()
+        return `Community → Gallery → Video Albums → "${data?.name ?? 'Album'}"`
+      }
+      if (t === 'video_album_item') {
+        const { data } = await supabase.from('video_album_items').select('album_id').eq('id', id).single()
+        if (data?.album_id) {
+          const { data: album } = await supabase.from('video_albums').select('name').eq('id', data.album_id).single()
+          return `Community → Gallery → "${album?.name ?? 'Album'}" → Video`
+        }
+        return 'Community → Gallery → Video'
+      }
+      if (t === 'timeless_moment') {
+        const { data } = await supabase.from('timeless_moments').select('title').eq('id', id).single()
+        return `Community → Timeless Moments → Photos → "${data?.title ?? 'Photo'}"`
+      }
+      if (t === 'timeless_moment_video') {
+        const { data } = await supabase.from('timeless_moment_videos').select('title').eq('id', id).single()
+        return `Community → Timeless Moments → Videos → "${data?.title ?? 'Video'}"`
+      }
+      if (t === 'comment') {
+        const { data } = await supabase.from('comments').select('entity_type, entity_id').eq('id', id).single()
+        if (!data) return 'Community → Comment (deleted)'
+        const { entity_type: et, entity_id: eid } = data as { entity_type: string; entity_id: string }
+        if (et === 'photo_album') {
+          const { data: album } = await supabase.from('photo_albums').select('name').eq('id', eid).single()
+          return `Community → Gallery → Photo Albums → "${album?.name ?? 'Album'}" → Comments`
+        }
+        if (et === 'album_photo') {
+          const { data: photo } = await supabase.from('album_photos').select('album_id').eq('id', eid).single()
+          if (photo?.album_id) {
+            const { data: album } = await supabase.from('photo_albums').select('name').eq('id', photo.album_id).single()
+            return `Community → Gallery → "${album?.name ?? 'Album'}" → Photo → Comments`
+          }
+          return 'Community → Gallery → Photo → Comments'
+        }
+        if (et === 'video_album') {
+          const { data: album } = await supabase.from('video_albums').select('name').eq('id', eid).single()
+          return `Community → Gallery → Video Albums → "${album?.name ?? 'Album'}" → Comments`
+        }
+        if (et === 'experience') {
+          const { data: exp } = await supabase.from('experiences').select('title').eq('id', eid).single()
+          return `Community → Memoirs → "${exp?.title ?? 'Memoir'}" → Comments`
+        }
+        if (et === 'timeless_moment') {
+          const { data: moment } = await supabase.from('timeless_moments').select('title').eq('id', eid).single()
+          return `Community → Timeless Moments → Photos → "${moment?.title ?? 'Photo'}" → Comments`
+        }
+        if (et === 'timeless_moment_video') {
+          const { data: vid } = await supabase.from('timeless_moment_videos').select('title').eq('id', eid).single()
+          return `Community → Timeless Moments → Videos → "${vid?.title ?? 'Video'}" → Comments`
+        }
+        return `Community → Comment (on: ${et})`
+      }
+    } catch {
+      // fall through to generic label
+    }
+    return t
+  }
+
+  async function loadWithLocations() {
+    const reps = await load()
+    const entries = await Promise.all(reps.map(async r => [r.id, await resolveLocation(r)] as const))
+    setLocations(Object.fromEntries(entries))
+  }
+
+  useEffect(() => { loadWithLocations().finally(() => setLoading(false)) }, [])
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    await load()
+    await loadWithLocations()
     setRefreshing(false)
   }, [])
 
@@ -271,6 +374,10 @@ export default function ReportsScreen() {
       router.push({ pathname: '/(tabs)/community/video-album/[id]' as any, params: { id: albumId } })
       return
     }
+    if (t === 'timeless_moment' || t === 'timeless_moment_video') {
+      router.push('/(tabs)/community/moments' as any)
+      return
+    }
     if (t === 'comment') {
       const { data, error } = await supabase.from('comments').select('entity_type, entity_id').eq('id', id).single()
       if (error || !data) { show('info', 'Not found', 'This comment may have been deleted.'); return }
@@ -279,13 +386,15 @@ export default function ReportsScreen() {
       if (et === 'photo_album') {
         router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: eid } })
       } else if (et === 'album_photo') {
-        const albumId = await lookupParent('album_photos', 'album_id')
-        if (!albumId) { show('info', 'Not found', 'This photo may have been deleted.'); return }
-        router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: albumId } })
+        const { data: photoRow } = await supabase.from('album_photos').select('album_id').eq('id', eid).single()
+        if (!photoRow?.album_id) { show('info', 'Not found', 'This photo may have been deleted.'); return }
+        router.push({ pathname: '/(tabs)/community/album/[id]' as any, params: { id: photoRow.album_id } })
       } else if (et === 'video_album') {
         router.push({ pathname: '/(tabs)/community/video-album/[id]' as any, params: { id: eid } })
       } else if (et === 'experience') {
         router.push({ pathname: '/(tabs)/community/memoir/[id]' as any, params: { id: eid } })
+      } else if (et === 'timeless_moment' || et === 'timeless_moment_video') {
+        router.push('/(tabs)/community/moments' as any)
       } else {
         show('info', 'Unsupported', `No viewer for comment on: ${et}`)
       }
@@ -392,9 +501,15 @@ export default function ReportsScreen() {
                     <Text style={{ fontSize: 13, color: '#6b7280', width: 84, flexShrink: 0 }}>Reason</Text>
                     <Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: '#ef4444' }}>{item.reason}</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: item.status === 'pending' ? 14 : 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
                     <Text style={{ fontSize: 13, color: '#6b7280', width: 84, flexShrink: 0 }}>Reported by</Text>
                     <Text style={{ flex: 1, fontSize: 13, color: '#374151' }}>{reporter}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: item.status === 'pending' ? 14 : 8 }}>
+                    <Text style={{ fontSize: 13, color: '#6b7280', width: 84, flexShrink: 0 }}>Location</Text>
+                    <Text style={{ flex: 1, fontSize: 12, color: '#374151', lineHeight: 17 }}>
+                      {locations[item.id] ?? '…'}
+                    </Text>
                   </View>
 
                   {/* Resolution details (resolved tab only) */}
