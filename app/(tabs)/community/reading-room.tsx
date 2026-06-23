@@ -5,6 +5,168 @@ import {
   Modal, ScrollView,
 } from 'react-native'
 import { WebView } from 'react-native-webview'
+
+function buildPdfHtml(pdfUrl: string): string {
+  const safeUrl = pdfUrl.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#1a1a2e;font-family:sans-serif}
+#wrap{display:flex;flex-direction:column;height:100%}
+#toolbar{display:flex;align-items:center;justify-content:center;gap:12px;padding:10px 16px;background:#2d1b69;flex-shrink:0}
+button{padding:9px 22px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;font-size:17px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:disabled{opacity:0.3}
+#pageInfo{color:#fff;font-size:14px;font-weight:600;min-width:72px;text-align:center}
+#viewer{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;justify-content:center;align-items:flex-start;padding:10px 0 20px}
+#viewer canvas{display:block;box-shadow:0 4px 20px rgba(0,0,0,0.6)}
+#overlay{position:fixed;inset:0;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:40px}
+#pctLabel{color:#9ca3af;font-size:14px;margin-bottom:4px;text-align:center}
+#barWrap{width:100%;max-width:280px;background:rgba(255,255,255,0.1);border-radius:99px;height:8px;overflow:hidden}
+#bar{height:100%;width:0%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:99px;transition:width 0.3s ease}
+#pct{color:#a78bfa;font-size:15px;font-weight:700;text-align:center}
+#errMsg{display:none;color:#f87171;text-align:center;padding:32px;font-size:15px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <div id="pctLabel">Loading PDF…</div>
+  <div id="barWrap"><div id="bar"></div></div>
+  <div id="pct">0%</div>
+</div>
+<div id="errMsg"></div>
+<div id="wrap" style="display:none">
+  <div id="toolbar">
+    <button id="prevBtn" onclick="go(-1)" disabled>&#8249;</button>
+    <span id="pageInfo">— / —</span>
+    <button id="nextBtn" onclick="go(1)" disabled>&#8250;</button>
+  </div>
+  <div id="viewer"></div>
+</div>
+<canvas id="c" style="position:fixed;top:-99999px;left:-99999px"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var PDF_URL='${safeUrl}';
+window.onerror=function(msg,src,line,col,err){
+  document.getElementById('overlay').style.display='none';
+  var e=document.getElementById('errMsg');
+  e.style.display='block';
+  e.textContent='JS Error: '+msg+' (line '+line+')';
+  return true;
+};
+var pdfDoc=null,curPage=1,busy=false;
+var canvas=document.getElementById('c');
+var ctx=canvas.getContext('2d');
+var viewer=document.getElementById('viewer');
+
+function showErr(msg){
+  viewer.innerHTML='<div style="padding:24px;text-align:center"><p style="color:#f87171;font-size:14px;line-height:1.6">'+msg+'</p></div>';
+  busy=false;
+}
+function renderPage(n){
+  if(busy)return;
+  busy=true;
+  var guard=setTimeout(function(){showErr('Render timed out on page '+n+'. Worker may not have loaded.');},12000);
+  pdfDoc.getPage(n).then(function(page){
+    var baseVp=page.getViewport({scale:1});
+    var scale=(window.innerWidth-8)/baseVp.width;
+    var vp=page.getViewport({scale:scale});
+    canvas.width=vp.width;
+    canvas.height=vp.height;
+    page.render({canvasContext:ctx,viewport:vp}).promise.then(function(){
+      clearTimeout(guard);
+      try{
+        var dataUrl=canvas.toDataURL('image/jpeg',0.92);
+        var img=new Image();
+        img.onload=function(){
+          viewer.innerHTML='';
+          viewer.appendChild(img);
+          img.style.cssText='display:block;max-width:100%;box-shadow:0 4px 20px rgba(0,0,0,0.6)';
+          document.getElementById('pageInfo').textContent=n+' / '+pdfDoc.numPages;
+          document.getElementById('prevBtn').disabled=n<=1;
+          document.getElementById('nextBtn').disabled=n>=pdfDoc.numPages;
+          viewer.scrollTop=0;
+          busy=false;
+        };
+        img.onerror=function(){showErr('Image load failed after render.');};
+        img.src=dataUrl;
+      }catch(ex){showErr('toDataURL failed: '+ex);}
+    }).catch(function(e){showErr('Render failed: '+e);clearTimeout(guard);});
+  }).catch(function(e){showErr('getPage failed: '+e);clearTimeout(guard);});
+}
+
+function go(delta){
+  var n=curPage+delta;
+  if(n<1||n>pdfDoc.numPages||busy)return;
+  curPage=n;
+  renderPage(curPage);
+}
+
+// Animated progress: asymptotes toward 90% over ~20s, snaps to 100% on load.
+// Real onProgress data is used when the CDN sends Content-Length; otherwise the
+// timer-based animation runs so the bar always moves.
+var displayedPct=0,realPct=0,timerPct=0,loadDone=false;
+var startTime=Date.now();
+var barEl=document.getElementById('bar');
+var pctEl=document.getElementById('pct');
+function setProgress(p){
+  if(p<displayedPct)return;
+  displayedPct=p;
+  barEl.style.width=p+'%';
+  pctEl.textContent=p+'%';
+}
+var ticker=setInterval(function(){
+  if(loadDone){clearInterval(ticker);return;}
+  var secs=(Date.now()-startTime)/1000;
+  timerPct=Math.round(88*(1-Math.exp(-secs/12)));
+  setProgress(Math.max(timerPct,realPct));
+},300);
+
+pdfjsLib.getDocument({
+  url:PDF_URL,
+  onProgress:function(p){
+    if(p.total>0){realPct=Math.min(88,Math.round(p.loaded/p.total*88));setProgress(realPct);}
+  }
+}).promise.then(function(doc){
+  pdfDoc=doc;
+  loadDone=true;clearInterval(ticker);
+  setProgress(100);
+  setTimeout(function(){
+    document.getElementById('overlay').style.display='none';
+    document.getElementById('wrap').style.display='flex';
+    renderPage(1);
+  },200);
+}).catch(function(){
+  loadDone=true;clearInterval(ticker);
+  document.getElementById('overlay').style.display='none';
+  var e=document.getElementById('errMsg');
+  e.style.display='block';
+  e.textContent='Could not load PDF. Please check your connection and try again.';
+});
+
+// Swipe left/right to navigate pages — single-touch only (pinch disables it)
+var sx=0,sy=0,sActive=false;
+viewer.addEventListener('touchstart',function(e){
+  if(e.touches.length>1){sActive=false;return;}
+  sx=e.touches[0].clientX;sy=e.touches[0].clientY;sActive=true;
+},{passive:true});
+viewer.addEventListener('touchend',function(e){
+  if(!sActive)return;
+  var dx=e.changedTouches[0].clientX-sx;
+  var dy=e.changedTouches[0].clientY-sy;
+  if(Math.abs(dx)>80&&Math.abs(dx)>Math.abs(dy)*1.5){go(dx<0?1:-1);}
+  sActive=false;
+},{passive:true});
+viewer.addEventListener('touchmove',function(e){
+  if(e.touches.length>1)sActive=false;
+},{passive:true});
+</script>
+</body>
+</html>`
+}
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
@@ -81,7 +243,7 @@ function BookModal({ book, onClose }: { book: Book; onClose: () => void }) {
   if (showPdf && pdfUrl) {
     return (
       <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setShowPdf(false)}>
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
           <View style={{
             flexDirection: 'row', alignItems: 'center',
             paddingTop: insets.top + 8, paddingBottom: 10, paddingHorizontal: 16,
@@ -99,15 +261,10 @@ function BookModal({ book, onClose }: { book: Book; onClose: () => void }) {
             </Text>
           </View>
           <WebView
-            source={{ uri: pdfUrl }}
-            style={{ flex: 1 }}
-            startInLoadingState
-            renderLoading={() => (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f2f2f7' }}>
-                <ActivityIndicator color="#2d1b69" size="large" />
-                <Text style={{ marginTop: 12, color: '#6b7280', fontSize: 14 }}>Loading PDF…</Text>
-              </View>
-            )}
+            source={{ html: buildPdfHtml(pdfUrl), baseUrl: 'https://bazidpur.com' }}
+            style={{ flex: 1, backgroundColor: '#1a1a2e' }}
+            originWhitelist={['*']}
+            mixedContentMode="always"
           />
         </View>
       </Modal>

@@ -9,5 +9,16 @@ module.exports = {
     '@react-native-community/javascriptcore': {
       platforms: { android: null }, // iOS-only — JSC swap is not needed on Android
     },
+    // react-native-pdf 6.x: gradle namespace is com.wonday.rnpdf but the Java
+    // class lives in org.wonday.pdf — autolinking generates the wrong import,
+    // so we override it here.
+    'react-native-pdf': {
+      platforms: {
+        android: {
+          packageImportPath: 'import org.wonday.pdf.RNPDFPackage;',
+          packageInstance: 'new RNPDFPackage()',
+        },
+      },
+    },
   },
 }
