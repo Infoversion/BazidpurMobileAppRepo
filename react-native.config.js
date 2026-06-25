@@ -14,6 +14,7 @@ module.exports = {
     // so we override it here.
     'react-native-pdf': {
       platforms: {
+        ios: null,     // replaced by PDF.js WebView — disable native pod
         android: {
           packageImportPath: 'import org.wonday.pdf.RNPDFPackage;',
           packageInstance: 'new RNPDFPackage()',

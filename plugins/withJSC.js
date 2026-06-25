@@ -220,6 +220,39 @@ const withJSC = (config) => {
       end
     end
 
+    # folly/coro/Coroutine.h shim: RCT-Folly ships without coroutine headers but
+    # folly/Expected.h and folly/Optional.h include them unconditionally on C++20.
+    # Provide minimal aliases including detect_promise_return_object_eager_conversion
+    # which Folly uses for C++23 eager promise-return-object conversion detection.
+    folly_coro_dir = File.join(__dir__, 'Pods/Headers/Public/RCT-Folly/folly/coro')
+    FileUtils.mkdir_p(folly_coro_dir)
+    folly_coro_shim = File.join(folly_coro_dir, 'Coroutine.h')
+    File.write(folly_coro_shim, <<~CPP)
+      #pragma once
+      #include <type_traits>
+      #if defined(__cpp_impl_coroutine) || defined(__cpp_coroutines)
+      #include <coroutine>
+      namespace folly { namespace coro {
+        using std::coroutine_handle;
+        using std::coroutine_traits;
+        using std::suspend_always;
+        using std::suspend_never;
+        struct detect_promise_return_object_eager_conversion : std::false_type {};
+      }}
+      #endif
+    CPP
+
+    # Yoga private headers: React-Fabric includes yoga/style/Style.h and its transitive
+    # deps (yoga/algorithm/, etc.) which Yoga only ships as private headers.
+    # Copy all private subdirectories to Public so React-Fabric can resolve them.
+    yoga_priv_base = File.join(__dir__, 'Pods/Headers/Private/Yoga/yoga')
+    yoga_pub_base  = File.join(__dir__, 'Pods/Headers/Public/Yoga/yoga')
+    %w[algorithm config debug enums event node numeric style].each do |subdir|
+      src = File.join(yoga_priv_base, subdir)
+      dst = File.join(yoga_pub_base, subdir)
+      FileUtils.cp_r(src, dst) if Dir.exist?(src) && !Dir.exist?(dst)
+    end
+
     # expo-av@16.0.8 compatibility shims: protocols removed from expo-modules-core SDK 56
     # but still imported by expo-av headers.
     shim_dir = File.join(__dir__, 'Pods/Headers/Public/ExpoModulesCore/ExpoModulesCore')
