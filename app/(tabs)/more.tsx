@@ -214,10 +214,14 @@ export default function ProfileScreen() {
     )
   }
 
+  const [deleted, setDeleted] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
   async function confirmDeleteAccount() {
     try {
+      setDeleting(true)
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) { show('error', 'Error', 'Not signed in.'); return }
+      if (!session?.access_token) { show('error', 'Error', 'Not signed in.'); setDeleting(false); return }
       const res = await fetch('https://bazidpur.com/api/auth/delete-account', {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -225,13 +229,55 @@ export default function ProfileScreen() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         show('error', 'Error', body.error ?? 'Could not delete account. Please try again.')
+        setDeleting(false)
         return
       }
       await signOut()
-      router.replace('/(public)')
+      setDeleted(true)
     } catch {
       show('error', 'Error', 'Network error. Please check your connection and try again.')
+      setDeleting(false)
     }
+  }
+
+  if (deleted) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#f9fafb', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <View style={{
+          width: 80, height: 80, borderRadius: 40,
+          backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center', marginBottom: 24,
+        }}>
+          <Text style={{ fontSize: 38 }}>🕊️</Text>
+        </View>
+        <Text style={{ fontSize: 24, fontWeight: '800', color: '#1c1c1e', textAlign: 'center', marginBottom: 12 }}>
+          Account Deleted
+        </Text>
+        <Text style={{ fontSize: 15, color: '#6b7280', textAlign: 'center', lineHeight: 23, marginBottom: 8 }}>
+          Your account and personal data have been permanently removed.
+        </Text>
+        <Text style={{ fontSize: 15, color: '#6b7280', textAlign: 'center', lineHeight: 23, marginBottom: 36 }}>
+          It was a privilege to be part of your connection to Bazidpur. We wish you well. 🌿
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.replace('/(public)')}
+          style={{
+            backgroundColor: '#2d1b69', borderRadius: 14,
+            paddingVertical: 15, paddingHorizontal: 40,
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Go to Home</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+
+  if (deleting) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#f9fafb', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <ActivityIndicator size="large" color="#2d1b69" />
+        <Text style={{ fontSize: 15, color: '#6b7280' }}>Deleting your account…</Text>
+      </View>
+    )
   }
 
   return (

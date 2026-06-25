@@ -549,6 +549,10 @@ const ALL_SECTIONS: HelpSection[] = [
         heading: 'Signing Out',
         body: 'Tap the red Sign Out button at the bottom of the profile screen to sign out. You can also sign out from any screen using the door icon in the top-right of the purple header bar. After signing out, you are returned to the Home screen as a visitor.',
       },
+      {
+        heading: 'Deleting Your Account',
+        body: 'You have the right to permanently delete your account and personal data at any time.\n\nTo delete your account:\n\n1. Open your Profile screen (tap your avatar in the top-right corner)\n2. Scroll to the very bottom, below the Sign Out button\n3. Tap "Delete Account" (small grey text)\n4. Read the confirmation message carefully — this action is permanent\n5. Tap "Yes, Delete My Account" to confirm\n6. Your account is deleted immediately\n\nWhat happens when you delete:\n\n• Your personal profile data is permanently removed from our servers\n• Your name is removed from all community content you posted\n• Your login credentials are erased — you cannot recover the account\n• Posts, photos, and contributions you made to the community may remain in anonymised form to preserve community history\n\nThis action cannot be undone. If you simply wish to take a break, consider signing out instead. If you have questions before deleting, contact us via the ✉️ envelope icon in the top bar.',
+      },
     ],
   },
 
