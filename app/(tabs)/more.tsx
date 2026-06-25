@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, ScrollView,
-  TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
+  TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native'
 import { DateOfBirthPicker } from '@/components/DateOfBirthPicker'
 import { CountryPicker, StatePicker } from '@/components/CountryStatePicker'
@@ -184,6 +184,54 @@ export default function ProfileScreen() {
   async function handleSignOut() {
     await signOut()
     router.replace('/(public)')
+  }
+
+  function handleDeleteAccount() {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all your personal data. Community content (posts, replies) will be removed. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete My Account',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you sure?',
+              'Your account will be permanently deleted. Type DELETE to confirm.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, Delete',
+                  style: 'destructive',
+                  onPress: confirmDeleteAccount,
+                },
+              ]
+            )
+          },
+        },
+      ]
+    )
+  }
+
+  async function confirmDeleteAccount() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) { show('error', 'Error', 'Not signed in.'); return }
+      const res = await fetch('https://bazidpur.com/api/auth/delete-account', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        show('error', 'Error', body.error ?? 'Could not delete account. Please try again.')
+        return
+      }
+      await signOut()
+      router.replace('/(public)')
+    } catch {
+      show('error', 'Error', 'Network error. Please check your connection and try again.')
+    }
   }
 
   return (
@@ -402,6 +450,16 @@ export default function ProfileScreen() {
             }}
           >
             <Text style={{ fontSize: 16, fontWeight: '600', color: '#ff3b30' }}>Sign Out</Text>
+          </TouchableOpacity>
+
+          {/* Delete account */}
+          <TouchableOpacity
+            onPress={handleDeleteAccount}
+            style={{ paddingVertical: 14, alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 14, color: '#9ca3af', textDecorationLine: 'underline' }}>
+              Delete Account
+            </Text>
           </TouchableOpacity>
 
         </ScrollView>
